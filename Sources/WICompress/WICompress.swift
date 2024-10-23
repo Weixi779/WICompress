@@ -47,7 +47,7 @@ struct WICompress {
     ///   - width: 图片宽度
     ///   - height: 图片高度
     /// - Returns: 压缩比例
-    private static func lubanAlgorithm(width: Int, height: Int) -> Int {
+    private static func lubanFactor(width: Int, height: Int) -> Int {
         let originalWidth = ensureEven(width)
         let originalHeight = ensureEven(height)
         
@@ -83,30 +83,18 @@ extension WICompress {
     /// 压缩图片并返回 UIImage
     /// - Parameter image: 原始图片
     /// - Returns: 压缩后的图片
-    static func compressImage(_ image: UIImage, formatData: Data? = nil) -> UIImage? {
-        guard let formatData = formatData else {
-            return compressSizeWithLuban(image)
-        }
-        
-        let format = determineImageType(formatData)
-        switch format {
-        case .jpeg, .png:
-            return compressSizeWithLuban(image)
-        case .heif:
-            return compressSizeWithLuban(image) // 可根据需要扩展
-        default:
-            return compressSizeWithLuban(image)
-        }
+    static func resizeImageInLuban(_ image: UIImage) -> UIImage? {
+        return compressSizeInLuban(image)
     }
     
     /// 使用 Luban 算法压缩图片尺寸
     /// - Parameter image: 原始图片
     /// - Returns: 压缩后的图片
-    private static func compressSizeWithLuban(_ image: UIImage) -> UIImage? {
+    private static func compressSizeInLuban(_ image: UIImage) -> UIImage? {
         let width = Int(image.size.width)
         let height = Int(image.size.height)
         
-        let compressRatio = lubanAlgorithm(width: width, height: height)
+        let compressRatio = lubanFactor(width: width, height: height)
         let targetWidth = CGFloat(max(width / compressRatio, 1))
         let targetHeight = CGFloat(max(height / compressRatio, 1))
         
