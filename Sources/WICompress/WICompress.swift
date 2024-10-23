@@ -2,42 +2,8 @@ import Foundation
 import CoreImage
 import UniformTypeIdentifiers
 
-enum WIImageFormat {
-    case jpeg
-    case png
-    case heif
-    case unknown
-}
-
 struct WICompress {
     
-    /// 确定图片的格式类型
-    /// - Parameter data: 图片数据
-    /// - Returns: 图片格式枚举
-    private static func determineImageType(_ data: Data) -> WIImageFormat {
-        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
-              let uti = CGImageSourceGetType(imageSource) else {
-            return .unknown
-        }
-        
-        // 转换 UTI 为 UTType
-        guard let type = UTType(uti as String) else { return .unknown }
-        
-        // 判断图片格式
-        if type.conforms(to: .jpeg) {
-            return .jpeg
-        } else if type.conforms(to: .png) {
-            return .png
-        } else if type.conforms(to: .heif) || type.conforms(to: .heic) {
-            return .heif
-        } else {
-            return .unknown
-        }
-    }
-    
-    /// 确保尺寸为偶数
-    /// - Parameter size: 原始尺寸
-    /// - Returns: 偶数尺寸
     private static func ensureEven(_ size: Int) -> Int {
         return size % 2 == 1 ? size + 1 : size
     }
@@ -80,10 +46,10 @@ import UIKit
 
 extension WICompress {
     
-    /// 压缩图片并返回 UIImage
-    /// - Parameter image: 原始图片
-    /// - Returns: 压缩后的图片
-    static func resizeImageInLuban(_ image: UIImage) -> UIImage? {
+    /// Resize Image By luban Algorithm
+    /// - Parameter image: The image to be compressed
+    /// - Returns: Resize uiimage, or nil if conversion fails
+    static func resizeImage(_ image: UIImage) -> UIImage? {
         let width = Int(image.size.width)
         let height = Int(image.size.height)
         
@@ -91,36 +57,20 @@ extension WICompress {
         return image.resize(by: compressRatio)
     }
     
-    /// 压缩图片并转换为数据
+    /// Compress the image to the specified format data
+    /// It is strongly recommended to provide the data when the image source is HEIC; otherwise, the compression results will be poor.
     /// - Parameters:
-    ///   - image: 原始图片
-    ///   - quality: 压缩质量
-    ///   - formatData: 原始图片数据用于确定格式
-    /// - Returns: 压缩后的图片数据
-    static func compressImageToData(_ image: UIImage, quality: CGFloat = 0.6, formatData: Data? = nil) -> Data? {
-        let format = determineImageType(formatData ?? Data())
-        return compressData(image, quality: quality, format: format)
-    }
-}
-
-extension WICompress {
-    
-    /// 将 UIImage 转换为数据
-    /// - Parameters:
-    ///   - image: 要转换的图片
-    ///   - quality: 压缩质量（仅适用于 JPEG/HEIC）
-    /// - Returns: 图片数据
-    private static func compressData(_ image: UIImage, quality: CGFloat = 1.0, format: WIImageFormat) -> Data? {
-        switch format {
-        case .jpeg:
-            return image.jpegData(compressionQuality: quality)
-        case .heif:
-            return image.heicData(compressionQuality: quality)
-        case .png:
-            return image.pngData()
-        default:
-            return image.jpegData(compressionQuality: quality)
-        }
+    ///   - image: The image to be compressed
+    ///   - quality: Compression quality (0.0 - 1.0), default is 0.6
+    ///   - formatData: Data used to determine the image format, defaults to .jpeg if nil
+    /// - Returns: Compressed image data, or nil if conversion fails
+    static func compressImage(
+        _ image: UIImage,
+        quality: CGFloat = 0.6,
+        formatData: Data? = nil
+    ) -> Data? {
+        let format = WIImageFormat.init(data: formatData ?? Data())
+        return format.compress(image: image, quality: quality)
     }
 }
 
