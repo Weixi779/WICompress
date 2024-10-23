@@ -87,6 +87,20 @@ extension WICompress {
         return compressSizeInLuban(image)
     }
     
+    /// 压缩图片并转换为数据
+    /// - Parameters:
+    ///   - image: 原始图片
+    ///   - quality: 压缩质量
+    ///   - formatData: 原始图片数据用于确定格式
+    /// - Returns: 压缩后的图片数据
+    static func compressImageToData(_ image: UIImage, quality: CGFloat = 0.6, formatData: Data? = nil) -> Data? {
+        let format = determineImageType(formatData ?? Data())
+        return compressData(image, quality: quality, format: format)
+    }
+}
+
+extension WICompress {
+    
     /// 使用 Luban 算法压缩图片尺寸
     /// - Parameter image: 原始图片
     /// - Returns: 压缩后的图片
@@ -95,10 +109,7 @@ extension WICompress {
         let height = Int(image.size.height)
         
         let compressRatio = lubanFactor(width: width, height: height)
-        let targetWidth = CGFloat(max(width / compressRatio, 1))
-        let targetHeight = CGFloat(max(height / compressRatio, 1))
-        
-        return image.resize(to: CGSize(width: targetWidth, height: targetHeight))
+        return image.resize(by: compressRatio)
     }
     
     /// 将 UIImage 转换为数据
@@ -118,20 +129,30 @@ extension WICompress {
             return image.jpegData(compressionQuality: quality)
         }
     }
+}
+
+// MARK: - UIImage Resize
+extension UIImage {
     
-    /// 压缩图片并转换为数据
-    /// - Parameters:
-    ///   - image: 原始图片
-    ///   - quality: 压缩质量
-    ///   - formatData: 原始图片数据用于确定格式
-    /// - Returns: 压缩后的图片数据
-    static func compressImageToData(_ image: UIImage, quality: CGFloat = 0.6, formatData: Data? = nil) -> Data? {
-        let format = determineImageType(formatData ?? Data())
-        return compressData(image, quality: quality, format: format)
+    func resize(to targetSize: CGSize) -> UIImage? {
+        let rendererFormat = UIGraphicsImageRendererFormat.default()
+        rendererFormat.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: rendererFormat)
+        
+        return renderer.image { _ in
+            self.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
+    
+    func resize(by ratio: Int) -> UIImage? {
+        let targetWidth = CGFloat(max(Int(self.size.width) / ratio, 1))
+        let targetHeight = CGFloat(max(Int(self.size.height) / ratio, 1))
+        
+        return self.resize(to: CGSize(width: targetWidth, height: targetHeight))
     }
 }
 
-// MARK: - UIImage Extension for HEIC Conversion
+// MARK: - UIImage to HEIC
 extension UIImage {
     
     func fixOrientation() -> UIImage {
@@ -179,16 +200,6 @@ extension UIImage {
         guard CGImageDestinationFinalize(destination) else { return nil }
         
         return mutableData as Data
-    }
-    
-    func resize(to targetSize: CGSize) -> UIImage? {
-        let rendererFormat = UIGraphicsImageRendererFormat.default()
-        rendererFormat.scale = 1.0
-        let renderer = UIGraphicsImageRenderer(size: targetSize, format: rendererFormat)
-        
-        return renderer.image { _ in
-            self.draw(in: CGRect(origin: .zero, size: targetSize))
-        }
     }
 }
 #endif
