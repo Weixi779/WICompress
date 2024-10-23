@@ -84,7 +84,11 @@ extension WICompress {
     /// - Parameter image: 原始图片
     /// - Returns: 压缩后的图片
     static func resizeImageInLuban(_ image: UIImage) -> UIImage? {
-        return compressSizeInLuban(image)
+        let width = Int(image.size.width)
+        let height = Int(image.size.height)
+        
+        let compressRatio = lubanFactor(width: width, height: height)
+        return image.resize(by: compressRatio)
     }
     
     /// 压缩图片并转换为数据
@@ -100,17 +104,6 @@ extension WICompress {
 }
 
 extension WICompress {
-    
-    /// 使用 Luban 算法压缩图片尺寸
-    /// - Parameter image: 原始图片
-    /// - Returns: 压缩后的图片
-    private static func compressSizeInLuban(_ image: UIImage) -> UIImage? {
-        let width = Int(image.size.width)
-        let height = Int(image.size.height)
-        
-        let compressRatio = lubanFactor(width: width, height: height)
-        return image.resize(by: compressRatio)
-    }
     
     /// 将 UIImage 转换为数据
     /// - Parameters:
