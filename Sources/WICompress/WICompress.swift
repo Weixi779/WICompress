@@ -119,12 +119,12 @@ extension WICompress {
     ///   - image: 要转换的图片
     ///   - quality: 压缩质量（仅适用于 JPEG/HEIC）
     /// - Returns: 图片数据
-    private static func toData(_ image: UIImage, quality: CGFloat = 1.0, format: WIImageFormat) -> Data? {
+    private static func compressData(_ image: UIImage, quality: CGFloat = 1.0, format: WIImageFormat) -> Data? {
         switch format {
         case .jpeg:
             return image.jpegData(compressionQuality: quality)
         case .heif:
-            return compressToHEIC(image: image, quality: quality)
+            return image.heicData(compressionQuality: quality)
         case .png:
             return image.pngData()
         default:
@@ -140,16 +140,24 @@ extension WICompress {
     /// - Returns: 压缩后的图片数据
     static func compressImageToData(_ image: UIImage, quality: CGFloat = 0.6, formatData: Data? = nil) -> Data? {
         let format = determineImageType(formatData ?? Data())
-        return toData(image, quality: quality, format: format)
+        return compressData(image, quality: quality, format: format)
+    }
+}
+
+// MARK: - UIImage Extension for HEIC Conversion
+extension UIImage {
+    
+    func fixOrientation() -> UIImage {
+        guard self.imageOrientation != .up else { return self }
+        
+        let renderer = UIGraphicsImageRenderer(size: self.size)
+        return renderer.image { _ in
+            self.draw(in: CGRect(origin: .zero, size: self.size))
+        }
     }
     
-    /// 压缩图片为 HEIC 格式数据
-    /// - Parameters:
-    ///   - image: 要压缩的图片
-    ///   - quality: 压缩质量
-    /// - Returns: HEIC 格式的数据
-    private static func compressToHEIC(image: UIImage, quality: CGFloat) -> Data? {
-        let normalized = normalizedImage(image)
+    func heicData(compressionQuality: CGFloat) -> Data? {
+        let normalized = self.fixOrientation()
         
         guard let ciImage = CIImage(image: normalized) else { return nil }
         
@@ -165,29 +173,10 @@ extension WICompress {
         
         let resizedImage = UIImage(cgImage: scaledCGImage, scale: 1.0, orientation: .up)
         
-        return resizedImage.heicData(compressionQuality: quality)
+        return resizedImage.compressHeicData(compressionQuality: compressionQuality)
     }
     
-    /// 归一化图片方向
-    /// - Parameter image: 原始图片
-    /// - Returns: 归一化后的图片
-    private static func normalizedImage(_ image: UIImage) -> UIImage {
-        guard image.imageOrientation != .up else { return image }
-        
-        UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
-        defer { UIGraphicsEndImageContext() }
-        image.draw(in: CGRect(origin: .zero, size: image.size))
-        return UIGraphicsGetImageFromCurrentImageContext() ?? image
-    }
-}
-
-// MARK: - UIImage Extension for HEIC Conversion
-extension UIImage {
-    
-    /// 将 UIImage 转换为 HEIC 数据
-    /// - Parameter compressionQuality: 压缩质量
-    /// - Returns: HEIC 格式的数据
-    func heicData(compressionQuality: CGFloat) -> Data? {
+    private func compressHeicData(compressionQuality: CGFloat) -> Data? {
         guard let cgImage = self.cgImage else { return nil }
         
         let mutableData = NSMutableData()
