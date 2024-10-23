@@ -98,20 +98,7 @@ extension WICompress {
         let targetWidth = CGFloat(max(width / compressRatio, 1))
         let targetHeight = CGFloat(max(height / compressRatio, 1))
         
-        return resize(image, to: CGSize(width: targetWidth, height: targetHeight))
-    }
-    
-    /// 调整图片大小
-    /// - Parameter targetSize: 目标尺寸
-    /// - Returns: 调整后的图片
-    private static func resize(_ image: UIImage, to targetSize: CGSize) -> UIImage? {
-        let rendererFormat = UIGraphicsImageRendererFormat.default()
-        rendererFormat.scale = 1.0
-        let renderer = UIGraphicsImageRenderer(size: targetSize, format: rendererFormat)
-        
-        return renderer.image { _ in
-            image.draw(in: CGRect(origin: .zero, size: targetSize))
-        }
+        return image.resize(to: CGSize(width: targetWidth, height: targetHeight))
     }
     
     /// 将 UIImage 转换为数据
@@ -192,6 +179,16 @@ extension UIImage {
         guard CGImageDestinationFinalize(destination) else { return nil }
         
         return mutableData as Data
+    }
+    
+    func resize(to targetSize: CGSize) -> UIImage? {
+        let rendererFormat = UIGraphicsImageRendererFormat.default()
+        rendererFormat.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: rendererFormat)
+        
+        return renderer.image { _ in
+            self.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
     }
 }
 #endif
