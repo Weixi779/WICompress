@@ -1,25 +1,32 @@
-//
-//  WIImageWrapper.swift
-//  WICompress
-//
-//  Created by 孙世伟 on 2025/2/27.
-//
-
 #if os(iOS)
 
 import UIKit
 import UniformTypeIdentifiers
 
 protocol WIImageResizing {
+    
+    /// Resize the image to a specific target size.
+    /// - Parameter targetSize: The target size (`CGSize`) including width and height.
+    /// - Returns: A new resized `UIImage?`, or `nil` if resizing fails.
     func resize(to targetSize: CGSize) -> UIImage?
-    func resize(by ratio: Int) -> UIImage?    
+    
+    /// Resize the image by a given scale ratio.
+    /// - Parameter ratio: The scale ratio (`Int`) by which to resize the image.
+    /// - Returns: A new resized `UIImage?`, or `nil` if resizing fails.
+    func resize(by ratio: Int) -> UIImage?
 }
 
 protocol WIImageHEICConversion {
+    
+    /// Convert the image to HEIC format data.
+    /// - Parameter compressionQuality: Compression quality (0.0 - 1.0)
+    /// - Returns: The HEIC formatted image data (`Data?`), or `nil` if conversion fails.
     func heicData(compressionQuality: CGFloat) -> Data?
 }
 
 protocol WIImageOrientable {
+    
+    /// Corrects the orientation of the image.
     func correctOrientation()
 }
 
@@ -31,9 +38,8 @@ final class WIImageWrapper {
     }
 }
 
-// MARK: - WIImageResizing
-
 extension WIImageWrapper: WIImageResizing {
+    
     func resize(to targetSize: CGSize) -> UIImage? {
         let rendererFormat = UIGraphicsImageRendererFormat.default()
         rendererFormat.scale = 1.0
@@ -44,7 +50,6 @@ extension WIImageWrapper: WIImageResizing {
         }
     }
     
-    /// 按比例调整图片大小
     func resize(by ratio: Int) -> UIImage? {
         let targetWidth = CGFloat(max(Int(image.size.width) / ratio, 1))
         let targetHeight = CGFloat(max(Int(image.size.height) / ratio, 1))
@@ -53,10 +58,8 @@ extension WIImageWrapper: WIImageResizing {
     }
 }
 
-// MARK: - WIImageHEICConversion
 extension WIImageWrapper: WIImageHEICConversion {
     
-    /// 转换为 HEIC 格式数据
     func heicData(compressionQuality: CGFloat) -> Data? {
         guard let cgImage = image.cgImage else { return nil }
         
@@ -76,7 +79,6 @@ extension WIImageWrapper: WIImageHEICConversion {
     }
 }
 
-// MARK: - WIImageOrientable
 extension WIImageWrapper: WIImageOrientable {
     
     func correctOrientation() {
