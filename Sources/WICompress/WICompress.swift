@@ -43,7 +43,7 @@ extension WICompress {
     /// Resize Image By luban Algorithm
     /// - Parameter image: The image to be compressed
     /// - Returns: The resized `UIImage` if the operation succeeds, or the original image if resizing fails.
-    static func resizeImage(_ image: UIImage) -> UIImage {
+    public static func resizeImage(_ image: UIImage) -> UIImage {
         let width = Int(image.size.width)
         let height = Int(image.size.height)
         
@@ -60,7 +60,7 @@ extension WICompress {
     ///   - quality: Compression quality (0.0 - 1.0), default is 0.6
     ///   - formatData: Data used to determine the image format, defaults to .jpeg if nil
     /// - Returns: Compressed image data, or nil if conversion fails
-    static func compressImage(
+    public static func compressImage(
         _ image: UIImage,
         quality: CGFloat = 0.6,
         formatData: Data? = nil
