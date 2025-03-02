@@ -18,7 +18,6 @@ enum WIImageFormat {
             return
         }
         
-        // 判断图片格式
         if type.conforms(to: .jpeg) {
             self = .jpeg
         } else if type.conforms(to: .png) {
