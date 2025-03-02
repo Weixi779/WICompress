@@ -2,7 +2,7 @@ import Foundation
 import CoreImage
 import UniformTypeIdentifiers
 
-struct WICompress {
+public struct WICompress {
     
     private static func ensureEven(_ size: Int) -> Int {
         return size % 2 == 1 ? size + 1 : size
@@ -13,7 +13,7 @@ struct WICompress {
     ///   - width: The width of the image.
     ///   - height: The height of the image.
     /// - Returns: The computed compression ratio.
-    private static func calculateLubanRatio(width: Int, height: Int) -> Int {
+    public static func calculateLubanRatio(width: Int, height: Int) -> Int {
         let longSide = max(ensureEven(width), ensureEven(height))
         let shortSide = min(ensureEven(width), ensureEven(height))
         let aspectRatio = Double(shortSide) / Double(longSide)

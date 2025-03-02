@@ -2,7 +2,7 @@ import Foundation
 import CoreImage
 import UniformTypeIdentifiers
 
-enum WIImageFormat {
+public enum WIImageFormat {
     case jpeg
     case png
     case heif

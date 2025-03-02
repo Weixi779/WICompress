@@ -3,7 +3,7 @@
 import UIKit
 import UniformTypeIdentifiers
 
-final class WIImageProcessor {
+public final class WIImageProcessor {
     private var image: UIImage
     
     init(image: UIImage) {
