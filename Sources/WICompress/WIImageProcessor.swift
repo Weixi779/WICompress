@@ -4,7 +4,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 final class WIImageProcessor {
-    private var image: UIImage  // Changed to `private` to ensure encapsulation
+    private var image: UIImage
     
     init(image: UIImage) {
         self.image = image
@@ -28,7 +28,7 @@ final class WIImageProcessor {
         }
     }
     
-    /// **Resizes the image to a specific target size.**
+    /// Resizes the image to a specific target size.
     /// - Parameter targetSize: The desired size (`CGSize`), including width and height.
     /// - Returns: A new resized `UIImage`, or `nil` if resizing fails.
     public func resize(to targetSize: CGSize) -> UIImage? {
@@ -41,7 +41,7 @@ final class WIImageProcessor {
         }
     }
     
-    /// **Resizes the image by a given scale ratio.**
+    /// Resizes the image by a given scale ratio.
     /// - Parameter ratio: The scale ratio (`Int`) by which to resize the image.
     /// - Returns: A new resized `UIImage`, or `nil` if resizing fails.
     public func resize(by ratio: Int) -> UIImage? {
@@ -51,7 +51,7 @@ final class WIImageProcessor {
         return resize(to: CGSize(width: targetWidth, height: targetHeight))
     }
     
-    /// **Corrects the orientation of the image.**
+    /// Corrects the orientation of the image.
     /// - Returns: A `UIImage` with the correct orientation, or the original image if no correction is needed.
     func correctOrientation() -> UIImage? {
         guard image.imageOrientation != .up else { return image }
@@ -62,7 +62,7 @@ final class WIImageProcessor {
         }
     }
     
-    /// **Converts the image to HEIC format.**
+    /// Converts the image to HEIC format.
     /// - Parameter quality: Compression quality (`0.0 - 1.0`).
     /// - Returns: HEIC formatted `Data?`, or `nil` if conversion fails.
     func heicData(quality: CGFloat) -> Data? {
