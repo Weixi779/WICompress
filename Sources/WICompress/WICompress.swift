@@ -54,9 +54,9 @@ extension WICompress {
         let height = Int(image.size.height)
         
         let compressRatio = lubanFactor(width: width, height: height)
-        let wrapper = WIImageWrapper(image: image)
+        let processor = WIImageProcessor(image: image)
         
-        return wrapper.resize(by: compressRatio) ?? image
+        return processor.resize(by: compressRatio) ?? image
     }
     
     /// Compress the image to the specified format data
@@ -71,9 +71,9 @@ extension WICompress {
         quality: CGFloat = 0.6,
         formatData: Data? = nil
     ) -> Data? {
-        let wrapper = WIImageWrapper(image: image)
+        let processor = WIImageProcessor(image: image)
         let format = WIImageFormat.init(data: formatData ?? Data())
-        return wrapper.compress(format: format, quality: quality)
+        return processor.compress(format: format, quality: quality)
     }
 }
 #endif

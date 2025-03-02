@@ -3,7 +3,7 @@
 import UIKit
 import UniformTypeIdentifiers
 
-final class WIImageWrapper {
+final class WIImageProcessor {
     private var image: UIImage  // Changed to `private` to ensure encapsulation
     
     init(image: UIImage) {
