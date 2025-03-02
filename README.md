@@ -8,7 +8,7 @@
 
 * **支持 JPEG / PNG / HEIC** - 根据图片格式自动选择合适的压缩方法
 
-* ⚡ **高效快速** - 使用 `UIImage` 和 `CGImageDestination` 进行优化处理
+* **高效快速** - 使用 `UIImage` 和 `CGImageDestination` 进行优化处理
 
 ## 安装
 
@@ -40,6 +40,4 @@ let compressedData = WICompress.compressImage(originalImage, quality: 0.7, forma
 
 * **建议对 HEIC 图片提供 formatData，否则压缩效果可能较差**
 
-
-
-📢 **如果你觉得这个项目有帮助，欢迎 Star ⭐️ 支持！**
+#### 📢 **如果你觉得这个项目有帮助，欢迎 Star ⭐️ 支持！**
