@@ -29,25 +29,3 @@ enum WIImageFormat {
         }
     }
 }
-
-#if os(iOS)
-
-import UIKit
-
-extension WIImageFormat {
-    
-    func compress(image: UIImage, quality: CGFloat) -> Data? {
-        switch self {
-        case .jpeg:
-            return image.jpegData(compressionQuality: quality)
-        case .heif:
-            return image.heicData(compressionQuality: quality)
-        case .png:
-            return image.pngData()
-        case .unknown:
-            return image.jpegData(compressionQuality: quality)
-        }
-    }
-}
-
-#endif

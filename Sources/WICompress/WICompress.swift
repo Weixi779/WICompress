@@ -71,8 +71,9 @@ extension WICompress {
         quality: CGFloat = 0.6,
         formatData: Data? = nil
     ) -> Data? {
+        let wrapper = WIImageWrapper(image: image)
         let format = WIImageFormat.init(data: formatData ?? Data())
-        return format.compress(image: image, quality: quality)
+        return wrapper.compress(format: format, quality: quality)
     }
 }
 #endif
