@@ -50,6 +50,7 @@ public final class WIImageProcessor {
         
         return resize(to: CGSize(width: targetWidth, height: targetHeight))
     }
+    
     /// Converts the image to HEIC format.
     /// - Parameter quality: Compression quality (`0.0 - 1.0`).
     /// - Returns: HEIC formatted `Data?`, or `nil` if conversion fails.
