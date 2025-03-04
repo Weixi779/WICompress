@@ -50,25 +50,11 @@ public final class WIImageProcessor {
         
         return resize(to: CGSize(width: targetWidth, height: targetHeight))
     }
-    
-    /// Corrects the orientation of the image.
-    /// - Returns: A `UIImage` with the correct orientation, or the original image if no correction is needed.
-    func correctOrientation() -> UIImage? {
-        guard image.imageOrientation != .up else { return image }
-
-        let renderer = UIGraphicsImageRenderer(size: image.size)
-        return renderer.image { _ in
-            image.draw(in: CGRect(origin: .zero, size: image.size))
-        }
-    }
-    
     /// Converts the image to HEIC format.
     /// - Parameter quality: Compression quality (`0.0 - 1.0`).
     /// - Returns: HEIC formatted `Data?`, or `nil` if conversion fails.
     func heicData(quality: CGFloat) -> Data? {
-        let processedImage = correctOrientation() ?? image
-
-        guard let cgImage = processedImage.cgImage else { return nil }
+        guard let cgImage = image.cgImage else { return nil }
 
         let mutableData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(mutableData, UTType.heic.identifier as CFString, 1, nil) else {
