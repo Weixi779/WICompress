@@ -12,7 +12,7 @@ public enum WIImageFormat {
         return self == .heif
     }
     
-    init(data: Data) {
+    public init(data: Data) {
         guard
             let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
             let uti = CGImageSourceGetType(imageSource),
