@@ -31,30 +31,10 @@ public final class WIImageOrientation {
         }
         
         // Only correct if orientation is not up (1)
-        guard orientation != .up else { return image }
+        guard orientation != .up, let cgImage = image.cgImage else { return image }
         
-        guard let cgImage = image.cgImage else { return image }
-        
-        let transform = transformForOrientation(orientation, imageSize: image.size)
-        let size = transformedSize(originalSize: image.size, orientation: orientation)
-        
-        let rendererFormat = UIGraphicsImageRendererFormat.default()
-        rendererFormat.scale = image.scale
-        let renderer = UIGraphicsImageRenderer(size: size, format: rendererFormat)
-        
-        return renderer.image { context in
-            context.cgContext.concatenate(transform)
-            
-            let drawRect: CGRect
-            switch orientation {
-            case .left, .leftMirrored, .right, .rightMirrored:
-                drawRect = CGRect(x: -image.size.height, y: 0, width: image.size.height, height: image.size.width)
-            default:
-                drawRect = CGRect(x: -image.size.width, y: -image.size.height, width: image.size.width, height: image.size.height)
-            }
-            
-            context.cgContext.draw(cgImage, in: drawRect)
-        }
+        // Let UIImage handle the orientation correction automatically
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
     }
     
     /// Detects if the HEIC image is a Live Photo
@@ -89,48 +69,7 @@ public final class WIImageOrientation {
         
         return false
     }
-    
-    /// Calculates the transform needed for the given orientation
-    private static func transformForOrientation(_ orientation: CGImagePropertyOrientation, imageSize: CGSize) -> CGAffineTransform {
-        var transform = CGAffineTransform.identity
-        
-        switch orientation {
-        case .down, .downMirrored:
-            transform = transform.translatedBy(x: imageSize.width, y: imageSize.height)
-            transform = transform.rotated(by: .pi)
-        case .left, .leftMirrored:
-            transform = transform.translatedBy(x: imageSize.width, y: 0)
-            transform = transform.rotated(by: .pi / 2)
-        case .right, .rightMirrored:
-            transform = transform.translatedBy(x: 0, y: imageSize.height)
-            transform = transform.rotated(by: -.pi / 2)
-        default:
-            break
-        }
-        
-        switch orientation {
-        case .upMirrored, .downMirrored:
-            transform = transform.translatedBy(x: imageSize.width, y: 0)
-            transform = transform.scaledBy(x: -1, y: 1)
-        case .leftMirrored, .rightMirrored:
-            transform = transform.translatedBy(x: imageSize.height, y: 0)
-            transform = transform.scaledBy(x: -1, y: 1)
-        default:
-            break
-        }
-        
-        return transform
-    }
-    
-    /// Calculates the transformed size for the given orientation
-    private static func transformedSize(originalSize: CGSize, orientation: CGImagePropertyOrientation) -> CGSize {
-        switch orientation {
-        case .left, .leftMirrored, .right, .rightMirrored:
-            return CGSize(width: originalSize.height, height: originalSize.width)
-        default:
-            return originalSize
-        }
-    }
+
 }
 
 #endif
