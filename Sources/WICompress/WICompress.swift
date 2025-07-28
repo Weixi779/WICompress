@@ -4,35 +4,6 @@ import UniformTypeIdentifiers
 
 public struct WICompress {
     
-    private static func ensureEven(_ size: Int) -> Int {
-        return size % 2 == 1 ? size + 1 : size
-    }
-    
-    /// Calculates the compression ratio using the Luban algorithm.
-    /// - Parameters:
-    ///   - width: The width of the image.
-    ///   - height: The height of the image.
-    /// - Returns: The computed compression ratio.
-    public static func calculateLubanRatio(width: Int, height: Int) -> Int {
-        let longSide = max(ensureEven(width), ensureEven(height))
-        let shortSide = min(ensureEven(width), ensureEven(height))
-        let aspectRatio = Double(shortSide) / Double(longSide)
-
-        switch aspectRatio {
-        case 0.5625...1 where longSide < 1664:
-            return 1
-        case 0.5625...1 where longSide < 4990:
-            return 2
-        case 0.5625...1 where longSide < 10240:
-            return 4
-        case 0.5625...1:
-            return max(longSide / 1280, 1)
-        case 0.5..<0.5625:
-            return longSide > 1280 ? max(longSide / 1280, 1) : 1
-        default:
-            return Int(ceil(Double(longSide) / 1280.0))
-        }
-    }
 }
 
 #if os(iOS)
@@ -47,7 +18,7 @@ extension WICompress {
         let width = Int(image.size.width)
         let height = Int(image.size.height)
         
-        let resizeRatio = calculateLubanRatio(width: width, height: height)
+        let resizeRatio = WIImageUtils.calculateLubanRatio(width: width, height: height)
         let compressor = WIImageCompressor(image: image)
         
         return compressor.resize(by: resizeRatio) ?? image
