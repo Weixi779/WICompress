@@ -48,9 +48,9 @@ extension WICompress {
         let height = Int(image.size.height)
         
         let resizeRatio = calculateLubanRatio(width: width, height: height)
-        let processor = WIImageProcessor(image: image)
+        let compressor = WIImageCompressor(image: image)
         
-        return processor.resize(by: resizeRatio) ?? image
+        return compressor.resize(by: resizeRatio) ?? image
     }
     
     /// Compress the image to the specified format data
@@ -65,9 +65,16 @@ extension WICompress {
         quality: CGFloat = 0.6,
         formatData: Data? = nil
     ) -> Data? {
-        let processor = WIImageProcessor(image: image)
-        let format = WIImageFormat.init(data: formatData ?? Data())
-        return processor.compress(format: format, quality: quality)
+        let format = WIImageFormat(data: formatData ?? Data())
+        
+        let resizedImage = resizeImage(image)
+        
+        let finalImage = format.isHEIF ? 
+            WIImageOrientation.correctOrientation(for: resizedImage, using: formatData) : 
+            resizedImage
+        
+        let compressor = WIImageCompressor(image: finalImage)
+        return compressor.compress(format: format, quality: quality)
     }
 }
 #endif

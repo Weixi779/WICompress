@@ -8,6 +8,10 @@ public enum WIImageFormat {
     case heif
     case unknown
     
+    public var isHEIF: Bool {
+        return self == .heif
+    }
+    
     init(data: Data) {
         guard
             let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
