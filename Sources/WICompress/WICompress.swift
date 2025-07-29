@@ -40,11 +40,7 @@ extension WICompress {
         
         let resizedImage = resizeImage(image)
         
-        let finalImage = format.isHEIF ? 
-            WIImageOrientation.correctOrientation(for: resizedImage, using: formatData) : 
-            resizedImage
-        
-        let compressor = WIImageCompressor(image: finalImage)
+        let compressor = WIImageCompressor(image: resizedImage)
         return compressor.compress(format: format, quality: quality)
     }
 }
