@@ -163,7 +163,8 @@ struct WICompressExampleView: View {
         .photosPicker(
             isPresented: $viewModel.isPresentPicker, 
             selection: $viewModel.selectedItem, 
-            matching: .images
+            matching: .images,
+            preferredItemEncoding: .current
         )
     }
 }

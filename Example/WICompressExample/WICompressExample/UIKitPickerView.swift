@@ -50,6 +50,7 @@ struct ImagePickerView: UIViewControllerRepresentable {
         var configuration = PHPickerConfiguration()
         configuration.filter = .images
         configuration.selectionLimit = 1
+        configuration.preferredAssetRepresentationMode = .current
         
         let picker = PHPickerViewController(configuration: configuration)
         picker.delegate = context.coordinator
