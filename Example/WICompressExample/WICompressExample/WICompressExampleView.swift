@@ -117,11 +117,6 @@ struct WICompressExampleView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header
-                Text("WICompress Test")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
                 // Image Selection Button
                 Button {
                     viewModel.pickerToggle()
