@@ -1,4 +1,10 @@
 import Foundation
+import CoreGraphics
+import UniformTypeIdentifiers
+
+#if os(iOS)
+import UIKit
+#endif
 
 public struct WIImageUtils {
     
