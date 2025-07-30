@@ -64,6 +64,27 @@ let compressedData = WICompress.compressImage(
 2. **Resolution Adjustment**: Quality-compressed `Data` → `UIImage` → Resized `UIImage` (based on business requirements)
 3. **Format Conversion**: Convert `UIImage` to required `Data` format for backend processing
 
+## Example Project
+
+The repository includes a comprehensive SwiftUI example project demonstrating WICompress functionality:
+
+### Features Demonstrated
+- **PhotosPicker Integration**: Select images from photo library with HEIC format preservation
+- **PHPickerViewController**: UIKit-based picker for advanced use cases
+- **Real-time Comparison**: Side-by-side comparison of original vs compressed images
+- **Format Detection**: Automatic detection of JPEG, PNG, and HEIC formats
+- **Live Photo Support**: Special handling for HEIC Live Photos
+- **Compression Metrics**: File size reduction and compression ratio display
+
+### Running the Example
+1. Open `Example/WICompressExample/WICompressExample.xcodeproj`
+2. Build and run on iOS device or simulator
+3. Select images from your photo library to test compression
+
+The example includes two main tabs:
+- **PhotosPicker**: SwiftUI-based image selection
+- **PHPicker**: UIKit-based image selection with enhanced debugging
+
 ## Compression Results
 
 | PNG Result | HEIC Result 1 | HEIC Result 2 |
