@@ -2,6 +2,8 @@
 
 ![Platform](https://img.shields.io/badge/platform-iOS%2014.0%2B-blue) ![Swift](https://img.shields.io/badge/Swift-5.0%2B-orange) ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen) ![License](https://img.shields.io/github/license/Weixi779/WICompress)
 
+English | [简体中文](README_CN.md)
+
 `WICompress` is a lightweight iOS image compression library that supports **JPEG, PNG, and HEIC** formats, using the **Luban algorithm** for intelligent compression and efficient image processing.
 
 ## Features
