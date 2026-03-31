@@ -2,7 +2,7 @@ import Foundation
 import CoreImage
 import UniformTypeIdentifiers
 
-public struct WICompress {
+public struct WICompress: Sendable {
     
 }
 

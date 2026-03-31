@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 import UIKit
 #endif
 
-public struct WIImageUtils {
+public struct WIImageUtils: Sendable {
     
     /// Ensures a given size is even by adding 1 if it's odd
     /// - Parameter size: The size to ensure is even

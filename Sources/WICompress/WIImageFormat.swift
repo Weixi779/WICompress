@@ -1,8 +1,7 @@
 import Foundation
 import CoreImage
-import UniformTypeIdentifiers
 
-public enum WIImageFormat {
+public enum WIImageFormat: Sendable {
     case jpeg
     case png
     case heif
@@ -15,18 +14,18 @@ public enum WIImageFormat {
     public init(data: Data) {
         guard
             let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
-            let uti = CGImageSourceGetType(imageSource),
-            let type = UTType(uti as String)
+            let uti = CGImageSourceGetType(imageSource)
         else {
             self = .unknown
             return
         }
-        
-        if type.conforms(to: .jpeg) {
+
+        let utiString = (uti as String).lowercased()
+        if utiString.contains("jpeg") || utiString.contains("jpg") {
             self = .jpeg
-        } else if type.conforms(to: .png) {
+        } else if utiString.contains("png") {
             self = .png
-        } else if type.conforms(to: .heif) || type.conforms(to: .heic) {
+        } else if utiString.contains("heif") || utiString.contains("heic") {
             self = .heif
         } else {
             self = .unknown
