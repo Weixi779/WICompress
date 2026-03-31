@@ -1,6 +1,6 @@
 # WICompress
 
-![Platform](https://img.shields.io/badge/platform-iOS%2014.0%2B-blue) ![Swift](https://img.shields.io/badge/Swift-5.0%2B-orange) ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen) ![License](https://img.shields.io/github/license/Weixi779/WICompress)
+![Platform](https://img.shields.io/badge/platform-iOS%2014.0%2B-blue) ![Swift](https://img.shields.io/badge/Swift-6.0%2B-orange) ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen) ![License](https://img.shields.io/github/license/Weixi779/WICompress)
 
 [English](README.md) | 简体中文
 
@@ -15,6 +15,8 @@
 * **高效快速** - 使用 `UIImage` 和 `CGImageDestination` 进行优化处理
 
 * **iOS 14+ 兼容** - 使用 Swift Package Manager 构建，支持现代 iOS 开发
+
+* **Swift 6 已支持** - 已完成 Swift 6 迁移，包含并发/Sendable 兼容性优化
 
 ## 安装
 
@@ -96,7 +98,7 @@ let compressedData = WICompress.compressImage(
 ## 系统要求
 
 - iOS 14.0+
-- Swift 5.0+
+- Swift 6.0+
 - Xcode 12.0+
 
 ## 许可证

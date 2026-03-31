@@ -1,6 +1,6 @@
 # WICompress
 
-![Platform](https://img.shields.io/badge/platform-iOS%2014.0%2B-blue) ![Swift](https://img.shields.io/badge/Swift-5.0%2B-orange) ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen) ![License](https://img.shields.io/github/license/Weixi779/WICompress)
+![Platform](https://img.shields.io/badge/platform-iOS%2014.0%2B-blue) ![Swift](https://img.shields.io/badge/Swift-6.0%2B-orange) ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen) ![License](https://img.shields.io/github/license/Weixi779/WICompress)
 
 English | [简体中文](README_CN.md)
 
@@ -15,6 +15,8 @@ English | [简体中文](README_CN.md)
 * **High Performance** - Optimized processing using `UIImage` and `CGImageDestination`
 
 * **iOS 14+ Compatible** - Built with Swift Package Manager for modern iOS development
+
+* **Swift 6 Ready** - Migrated for Swift 6, including concurrency/sendability compatibility improvements
 
 ## Installation
 
