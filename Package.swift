@@ -22,7 +22,8 @@ let package = Package(
         .testTarget(
             name: "WICompressTests",
             dependencies: ["WICompress"],
-            path: "Tests"
+            path: "Tests",
+            resources: [.process("WICompressTests/Resources")]
         ),
     ]
 )
