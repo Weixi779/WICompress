@@ -50,4 +50,48 @@ The library consists of three main components:
 
 ## Testing Framework
 
-Uses Swift Testing framework (not XCTest) - tests are located in `Tests/WICompressTests/`
+Uses Swift Testing framework (not XCTest). Tests are located in `Tests/WICompressTests/`.
+
+### Test Organization
+
+Tests are organized by `@Suite` and filtered by `@Tag`:
+
+| Tag | Scope |
+|---|---|
+| `.luban` | Luban algorithm logic (`calculateLubanRatio`, `ensureEven`) |
+| `.format` | Image format detection (`WIImageFormat`) |
+| `.compression` | UIKit compression and resize behavior (`WICompress` public API) |
+| `.edgeCase` | Boundary values and edge inputs |
+
+Tag definitions live in `Tests/WICompressTests/Support/Tags.swift`.
+
+### Running Tests
+
+**Pure logic (macOS, no simulator needed):**
+```bash
+swift test
+```
+
+**Full suite including compression tests (iOS Simulator required):**
+```bash
+xcodebuild test \
+  -workspace .swiftpm/xcode/package.xcworkspace \
+  -scheme WICompress \
+  -destination 'platform=iOS Simulator,OS=18.4,name=iPhone 16 Pro Max' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+> `CODE_SIGNING_ALLOWED=NO` is required — without it, xcodebuild fails with a CodeSign error when testing SPM packages directly.
+
+### Test Categories
+
+**macOS (`swift test`)** — pure logic, no UIKit:
+- `LubanRatioTests` — parameterized tests covering all 7 Luban switch branches + `ensureEven` edge cases
+- `WIImageFormatTests` — format detection using CGContext-generated images (JPEG, PNG, unknown)
+
+**iOS Simulator (`xcodebuild`)** — UIKit-dependent, wrapped in `#if os(iOS)`:
+- `CompressionTests` — validates `compressImage` output (non-nil, size reduction, format preservation, quality effect) and `resizeImage` dimension behavior
+
+### Test Resources
+
+`Tests/WICompressTests/Resources/` is registered in `Package.swift` for future real-image assets. Load via `Bundle.module.url(forResource:withExtension:)` in tests.
