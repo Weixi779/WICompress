@@ -4,7 +4,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 public final class WIImageCompressor {
-    private var image: UIImage
+    private let image: UIImage
     
     init(image: UIImage) {
         self.image = image
@@ -16,15 +16,17 @@ public final class WIImageCompressor {
     ///   - quality: Compression quality (`0.0 - 1.0`).
     /// - Returns: Compressed `Data?`, or `nil` if compression fails.
     public func compress(format: WIImageFormat, quality: CGFloat) -> Data? {
+        let safeQuality = min(max(quality, 0.0), 1.0)
+
         switch format {
         case .jpeg:
-            return image.jpegData(compressionQuality: quality)
+            return image.jpegData(compressionQuality: safeQuality)
         case .heif:
-            return heicData(quality: quality)
+            return heicData(quality: safeQuality)
         case .png:
             return image.pngData()
         case .unknown:
-            return image.jpegData(compressionQuality: quality)
+            return image.jpegData(compressionQuality: safeQuality)
         }
     }
     
@@ -45,8 +47,9 @@ public final class WIImageCompressor {
     /// - Parameter ratio: The scale ratio (`Int`) by which to resize the image.
     /// - Returns: A new resized `UIImage`, or `nil` if resizing fails.
     public func resize(by ratio: Int) -> UIImage? {
-        let targetWidth = CGFloat(max(Int(image.size.width) / ratio, 1))
-        let targetHeight = CGFloat(max(Int(image.size.height) / ratio, 1))
+        let safeRatio = max(ratio, 1)
+        let targetWidth = CGFloat(max(Int(image.size.width) / safeRatio, 1))
+        let targetHeight = CGFloat(max(Int(image.size.height) / safeRatio, 1))
         
         return resize(to: CGSize(width: targetWidth, height: targetHeight))
     }

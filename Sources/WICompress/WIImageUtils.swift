@@ -12,7 +12,7 @@ public struct WIImageUtils: Sendable {
     /// - Parameter size: The size to ensure is even
     /// - Returns: An even integer
     static func ensureEven(_ size: Int) -> Int {
-        return size % 2 == 1 ? size + 1 : size
+        return size % 2 != 0 ? size + 1 : size
     }
     
     /// Calculates the compression ratio using the Luban algorithm.

@@ -10,17 +10,17 @@ public struct WICompress: Sendable {
 import UIKit
 
 extension WICompress {
-    
+
     /// Resize Image By luban Algorithm
     /// - Parameter image: The image to be compressed
     /// - Returns: The resized `UIImage` if the operation succeeds, or the original image if resizing fails.
     public static func resizeImage(_ image: UIImage) -> UIImage {
         let width = Int(image.size.width)
         let height = Int(image.size.height)
-        
+
         let resizeRatio = WIImageUtils.calculateLubanRatio(width: width, height: height)
         let compressor = WIImageCompressor(image: image)
-        
+
         return compressor.resize(by: resizeRatio) ?? image
     }
     
