@@ -66,5 +66,10 @@ struct LubanRatioTests {
         func zeroRemainsZero() {
             #expect(WIImageUtils.ensureEven(0) == 0)
         }
+
+        @Test("Negative odd number is incremented toward even", .tags(.edgeCase))
+        func negativeOddNumberIncremented() {
+            #expect(WIImageUtils.ensureEven(-3) == -2)
+        }
     }
 }

@@ -62,6 +62,22 @@ struct CompressionTests {
         #expect(lowQuality.count < highQuality.count)
     }
 
+    @Test("quality below 0 is clamped to 0", .tags(.edgeCase))
+    func qualityBelowZeroIsClamped() throws {
+        let (image, formatData) = makeLargeImage()
+        let clamped = try #require(WICompress.compressImage(image, quality: 0.0, formatData: formatData))
+        let belowRange = try #require(WICompress.compressImage(image, quality: -2.0, formatData: formatData))
+        #expect(clamped == belowRange)
+    }
+
+    @Test("quality above 1 is clamped to 1", .tags(.edgeCase))
+    func qualityAboveOneIsClamped() throws {
+        let (image, formatData) = makeLargeImage()
+        let clamped = try #require(WICompress.compressImage(image, quality: 1.0, formatData: formatData))
+        let aboveRange = try #require(WICompress.compressImage(image, quality: 3.0, formatData: formatData))
+        #expect(clamped == aboveRange)
+    }
+
     // MARK: - resizeImage
 
     @Suite("resizeImage", .tags(.compression, .luban))
