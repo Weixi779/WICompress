@@ -28,5 +28,11 @@ let package = Package(
             path: "Tests",
             resources: [.copy("WICompressTests/Resources")]
         ),
+        .executableTarget(
+            name: "WICompressDocAssetGenerator",
+            dependencies: ["WICompress"],
+            path: "scripts",
+            sources: ["generate-doc-assets.swift"]
+        ),
     ]
 )

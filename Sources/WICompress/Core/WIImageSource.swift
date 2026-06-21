@@ -6,7 +6,7 @@ final class WIImageSource {
     let cgImageSource: CGImageSource
     let info: WIImageInfo
 
-    init(data: Data) throws {
+    init(data: Data) throws(WICompressError) {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw WICompressError.invalidImageData
         }

@@ -1,7 +1,7 @@
 import Foundation
 
 enum WIWritePlanResolver {
-    static func resolve(options: WICompressOptions, info: WIImageInfo) throws -> WIWritePlan {
+    static func resolve(options: WICompressOptions, info: WIImageInfo) throws(WICompressError) -> WIWritePlan {
         guard info.sourceFormat != .unknown else {
             throw WICompressError.unsupportedSourceFormat(info.typeIdentifier)
         }

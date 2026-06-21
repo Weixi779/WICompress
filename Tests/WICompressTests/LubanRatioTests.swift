@@ -32,9 +32,15 @@ struct LubanRatioTests {
         // Branch 6: aspectRatio ∈ [0.5, 0.5625), longSide ≤ 1280 → 1
         RatioCase(width: 1200, height: 600, expected: 1, testDescription: "wide small image"),
         RatioCase(width: 1280, height: 640, expected: 1, testDescription: "wide image at longSide boundary 1280"),
-        // Branch 7: default (aspectRatio < 0.5) → ceil(longSide / 1280)
-        RatioCase(width: 2000, height: 500, expected: 2, testDescription: "very wide image"),
-        RatioCase(width: 2560, height: 256, expected: 2, testDescription: "panoramic image"),
+        // Branch 7: default (aspectRatio < 0.5) → ceil(shortSide / 1280)
+        // (original Luban constrains the SHORT side here; dividing the long side
+        // over-shrinks long images. See WIImageUtils default branch.)
+        RatioCase(width: 2000, height: 500, expected: 1, testDescription: "very wide image, short side 500"),
+        RatioCase(width: 2560, height: 256, expected: 1, testDescription: "panoramic image, short side 256"),
+        RatioCase(width: 1440, height: 3200, expected: 2, testDescription: "long screenshot, short side 1440"),
+        RatioCase(width: 3000, height: 8000, expected: 3, testDescription: "tall image, short side 3000"),
+        RatioCase(width: 12000, height: 5000, expected: 4, testDescription: "panorama, short side 5000"),
+        RatioCase(width: 1242, height: 22080, expected: 1, testDescription: "extreme long image stays unscaled"),
     ]
 
     @Test("Ratio calculation covers all branches", arguments: ratioCases)

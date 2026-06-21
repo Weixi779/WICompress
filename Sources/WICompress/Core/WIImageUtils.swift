@@ -31,7 +31,11 @@ public struct WIImageUtils: Sendable {
         case 0.5..<0.5625:
             return longSide > 1280 ? max(longSide / 1280, 1) : 1
         default:
-            return Int(ceil(Double(longSide) / 1280.0))
+            // Original Luban uses `ceil(longSide / (1280 / scale))` where
+            // `scale = shortSide / longSide`, which simplifies to
+            // `ceil(shortSide / 1280)`. Dividing the long side here over-shrinks
+            // very long images (e.g. panoramas / long screenshots).
+            return max(Int(ceil(Double(shortSide) / 1280.0)), 1)
         }
     }
 }

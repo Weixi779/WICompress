@@ -2,7 +2,7 @@ import Foundation
 import ImageIO
 
 enum WIImageEncoder {
-    static func encode(_ imageSource: WIImageSource, plan: WIWritePlan) throws -> Data {
+    static func encode(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
         switch plan.path {
         case .returnOriginal:
             return imageSource.data
@@ -13,7 +13,7 @@ enum WIImageEncoder {
         }
     }
 
-    private static func encodeFromSource(_ imageSource: WIImageSource, plan: WIWritePlan) throws -> Data {
+    private static func encodeFromSource(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
         let outputData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             outputData,
@@ -43,7 +43,7 @@ enum WIImageEncoder {
         return outputData as Data
     }
 
-    private static func encodeRedrawnBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws -> Data {
+    private static func encodeRedrawnBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
         var thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
