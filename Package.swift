@@ -23,7 +23,7 @@ let package = Package(
             name: "WICompressTests",
             dependencies: ["WICompress"],
             path: "Tests",
-            resources: [.process("WICompressTests/Resources")]
+            resources: [.copy("WICompressTests/Resources")]
         ),
     ]
 )
