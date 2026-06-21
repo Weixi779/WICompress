@@ -6,4 +6,5 @@ extension Tag {
     @Tag static var compression: Self
     @Tag static var edgeCase: Self
     @Tag static var publicAPI: Self
+    @Tag static var imageIOCore: Self
 }

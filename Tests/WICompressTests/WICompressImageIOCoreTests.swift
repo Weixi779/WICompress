@@ -1,0 +1,264 @@
+import Foundation
+import CoreGraphics
+import ImageIO
+import Testing
+@testable import WICompress
+
+@Suite("WICompress ImageIO Core", .tags(.imageIOCore, .compression))
+struct WICompressImageIOCoreTests {
+    private struct ImageInfo {
+        let width: Int
+        let height: Int
+        let orientation: Int
+        let hasGPS: Bool
+        let hasAlpha: Bool?
+
+        var displayWidth: Int {
+            swapsDimensions ? height : width
+        }
+
+        var displayHeight: Int {
+            swapsDimensions ? width : height
+        }
+
+        private var swapsDimensions: Bool {
+            [5, 6, 7, 8].contains(orientation)
+        }
+    }
+
+    private static func resource(_ name: String, extension ext: String) throws -> URL {
+        try #require(
+            Bundle.module.url(
+                forResource: name,
+                withExtension: ext,
+                subdirectory: "Resources"
+            ),
+            "Missing fixture: \(name).\(ext)"
+        )
+    }
+
+    private static func imageInfo(_ data: Data) throws -> ImageInfo {
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+        let properties = try #require(
+            CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        )
+        let width = try #require(properties.intValue(for: kCGImagePropertyPixelWidth))
+        let height = try #require(properties.intValue(for: kCGImagePropertyPixelHeight))
+        let orientation = properties.intValue(for: kCGImagePropertyOrientation) ?? 1
+
+        return ImageInfo(
+            width: width,
+            height: height,
+            orientation: orientation,
+            hasGPS: properties.dictionaryExists(for: kCGImagePropertyGPSDictionary),
+            hasAlpha: properties.boolValue(for: kCGImagePropertyHasAlpha)
+        )
+    }
+
+    private static func hasGainMap(_ data: Data) -> Bool {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return false
+        }
+
+        if #available(iOS 14.1, macOS 11.0, *) {
+            return CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                source,
+                0,
+                kCGImageAuxiliaryDataTypeHDRGainMap
+            ) != nil
+        }
+
+        return false
+    }
+
+    private static func orientationTaggedJPEG(width: Int, height: Int, orientation: Int) throws -> Data {
+        try solidImageData(
+            typeIdentifier: "public.jpeg",
+            width: width,
+            height: height,
+            properties: [kCGImagePropertyOrientation: orientation] as CFDictionary
+        )
+    }
+
+    private static func solidPNG(width: Int, height: Int) throws -> Data {
+        try solidImageData(
+            typeIdentifier: "public.png",
+            width: width,
+            height: height,
+            properties: nil
+        )
+    }
+
+    private static func solidImageData(
+        typeIdentifier: String,
+        width: Int,
+        height: Int,
+        properties: CFDictionary?
+    ) throws -> Data {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue
+        let context = try #require(
+            CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: bitmapInfo
+            )
+        )
+        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+        let image = try #require(context.makeImage())
+        let data = NSMutableData()
+        let destination = try #require(
+            CGImageDestinationCreateWithData(data, typeIdentifier as CFString, 1, nil)
+        )
+
+        CGImageDestinationAddImage(destination, image, properties)
+        try #require(CGImageDestinationFinalize(destination))
+
+        return data as Data
+    }
+
+    @Test("Default compression strips GPS, bakes orientation, and preserves display size contract")
+    func defaultCompressionUsesRedrawBehavior() throws {
+        let url = try Self.resource("real_heic_4032x3024_o6_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+
+        let outputData = try WICompress.compress(inputData)
+        let outputInfo = try Self.imageInfo(outputData)
+
+        let ratio = WIImageUtils.calculateLubanRatio(
+            width: inputInfo.displayWidth,
+            height: inputInfo.displayHeight
+        )
+
+        #expect(WIImageFormat(data: outputData) == WIImageFormat(data: inputData))
+        #expect(outputInfo.hasGPS == false)
+        #expect(outputInfo.orientation == 1)
+        #expect(outputInfo.displayWidth == max(inputInfo.displayWidth / ratio, 1))
+        #expect(outputInfo.displayHeight == max(inputInfo.displayHeight / ratio, 1))
+        #expect(outputData.count < inputData.count)
+    }
+
+    @Test("Preserve metadata keeps GPS and orientation tag when copying from source")
+    func preserveMetadataUsesCopyFromSourceBehavior() throws {
+        let url = try Self.resource("real_heic_4032x3024_o6_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .luban,
+                format: .preserve,
+                metadata: .preserve,
+                quality: .compression(0.6)
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        let ratio = WIImageUtils.calculateLubanRatio(
+            width: inputInfo.displayWidth,
+            height: inputInfo.displayHeight
+        )
+
+        #expect(WIImageFormat(data: outputData) == WIImageFormat(data: inputData))
+        #expect(outputInfo.hasGPS == true)
+        #expect(outputInfo.orientation == inputInfo.orientation)
+        #expect(outputInfo.displayWidth == max(inputInfo.displayWidth / ratio, 1))
+        #expect(outputInfo.displayHeight == max(inputInfo.displayHeight / ratio, 1))
+    }
+
+    @Test("PNG alpha survives redraw compression")
+    func pngAlphaSurvivesRedraw() throws {
+        let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")
+        let inputData = try Data(contentsOf: url)
+
+        let outputData = try WICompress.compress(inputData)
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .png)
+        #expect(outputInfo.hasAlpha == true)
+    }
+
+    @Test("Size guard may return original when preserve policies are already satisfied")
+    func sizeGuardReturnsOriginalForPreservePolicies() throws {
+        let inputData = try Self.solidPNG(width: 1, height: 1)
+        let inputSource = try WIImageSource(data: inputData)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .luban,
+                format: .preserve,
+                metadata: .preserve,
+                quality: .compression(0.6)
+            )
+        )
+
+        #expect(inputSource.info.orientation == 1)
+        #expect(outputData == inputData)
+    }
+
+    @Test("Size guard does not bypass orientation normalization for stripped metadata")
+    func sizeGuardDoesNotBypassOrientationNormalization() throws {
+        let inputData = try Self.orientationTaggedJPEG(width: 2, height: 4, orientation: 6)
+        let inputInfo = try Self.imageInfo(inputData)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .none,
+                format: .preserve,
+                metadata: .strip,
+                quality: .none
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(inputInfo.orientation == 6)
+        #expect(inputInfo.hasGPS == false)
+        #expect(outputInfo.orientation == 1)
+        #expect(outputInfo.displayWidth == inputInfo.displayWidth)
+        #expect(outputInfo.displayHeight == inputInfo.displayHeight)
+    }
+
+    // v1 documented behavior: `.preserve` keeps Exif/GPS/orientation but NOT the
+    // HDR gain map (the encoder does not set kCGImageDestinationPreserveGainMap).
+    // This locks the current trade-off; it will flip intentionally when gain-map
+    // preservation lands (see PLAN §8.3 / §17).
+    @Test("Preserve metadata drops the HDR gain map in v1")
+    func preserveMetadataDropsGainMap() throws {
+        let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+
+        #expect(Self.hasGainMap(inputData) == true)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .luban,
+                format: .preserve,
+                metadata: .preserve,
+                quality: .compression(0.6)
+            )
+        )
+
+        #expect(Self.hasGainMap(outputData) == false)
+    }
+
+    @Test("Animated images are rejected")
+    func animatedImageThrows() throws {
+        let url = try Self.resource("real_gif_555x555_4frames", extension: "gif")
+        let inputData = try Data(contentsOf: url)
+
+        #expect(throws: WICompressError.animatedSourceUnsupported(frameCount: 4)) {
+            _ = try WICompress.compress(inputData)
+        }
+    }
+}

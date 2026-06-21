@@ -1,6 +1,4 @@
 import Foundation
-import ImageIO
-import UniformTypeIdentifiers
 
 public struct WICompress: Sendable {
 
@@ -8,24 +6,17 @@ public struct WICompress: Sendable {
         _ data: Data,
         options: WICompressOptions = .default
     ) throws -> Data {
-        guard
-            let source = CGImageSourceCreateWithData(data as CFData, nil),
-            CGImageSourceGetCount(source) > 0,
-            CGImageSourceCopyPropertiesAtIndex(source, 0, nil) != nil
-        else {
-            throw WICompressError.invalidImageData
-        }
+        let imageSource = try WIImageSource(data: data)
+        let writePlan = try WIWritePlanResolver.resolve(options: options, info: imageSource.info)
+        let encodedData = try WIImageEncoder.encode(imageSource, plan: writePlan)
 
-        if options == WICompressOptions(
-            resize: .none,
-            format: .preserve,
-            metadata: .preserve,
-            quality: .none
-        ) {
+        if writePlan.path != .returnOriginal,
+           encodedData.count >= data.count,
+           WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: imageSource.info) {
             return data
         }
 
-        throw WICompressError.writePlanUnavailable
+        return encodedData
     }
 
     public static func compress(

@@ -1,5 +1,6 @@
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 
 public enum WIImageFormat: Sendable, Equatable {
     case jpeg
@@ -10,7 +11,36 @@ public enum WIImageFormat: Sendable, Equatable {
     public var isHEIF: Bool {
         return self == .heif
     }
-    
+
+    init(typeIdentifier: String?) {
+        guard
+            let typeIdentifier,
+            let type = UTType(typeIdentifier)
+        else {
+            self = .unknown
+            return
+        }
+
+        if type.conforms(to: .jpeg) {
+            self = .jpeg
+        } else if type.conforms(to: .png) {
+            self = .png
+        } else if type.conforms(to: .heic) || type.conforms(to: .heif) {
+            self = .heif
+        } else {
+            self = .unknown
+        }
+    }
+
+    var supportsLossyQuality: Bool {
+        switch self {
+        case .jpeg, .heif:
+            return true
+        case .png, .unknown:
+            return false
+        }
+    }
+
     public init(data: Data) {
         guard
             let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
@@ -20,15 +50,6 @@ public enum WIImageFormat: Sendable, Equatable {
             return
         }
 
-        let utiString = (uti as String).lowercased()
-        if utiString.contains("jpeg") || utiString.contains("jpg") {
-            self = .jpeg
-        } else if utiString.contains("png") {
-            self = .png
-        } else if utiString.contains("heif") || utiString.contains("heic") {
-            self = .heif
-        } else {
-            self = .unknown
-        }
+        self.init(typeIdentifier: uti as String)
     }
 }
