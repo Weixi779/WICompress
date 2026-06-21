@@ -12,6 +12,7 @@ struct WICompressImageIOCoreTests {
         let orientation: Int
         let hasGPS: Bool
         let hasAlpha: Bool?
+        let profileName: String?
 
         var displayWidth: Int {
             swapsDimensions ? height : width
@@ -51,7 +52,8 @@ struct WICompressImageIOCoreTests {
             height: height,
             orientation: orientation,
             hasGPS: properties.dictionaryExists(for: kCGImagePropertyGPSDictionary),
-            hasAlpha: properties.boolValue(for: kCGImagePropertyHasAlpha)
+            hasAlpha: properties.boolValue(for: kCGImagePropertyHasAlpha),
+            profileName: properties[kCGImagePropertyProfileName] as? String
         )
     }
 
@@ -181,6 +183,52 @@ struct WICompressImageIOCoreTests {
 
         #expect(WIImageFormat(data: outputData) == .png)
         #expect(outputInfo.hasAlpha == true)
+    }
+
+    @Test("Display P3 profile survives copyFromSource")
+    func displayP3ProfileSurvivesCopyFromSource() throws {
+        let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+        try #require(inputInfo.profileName == "Display P3", "Fixture should be Display P3")
+
+        let options = WICompressOptions(
+            resize: .luban,
+            format: .preserve,
+            metadata: .preserve,
+            quality: .compression(0.6)
+        )
+        let inputSource = try WIImageSource(data: inputData)
+        let writePlan = try WIWritePlanResolver.resolve(options: options, info: inputSource.info)
+
+        let outputData = try WICompress.compress(inputData, options: options)
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(writePlan.path == .copyFromSource)
+        #expect(outputInfo.profileName == inputInfo.profileName)
+    }
+
+    @Test("Display P3 profile survives redrawBitmap")
+    func displayP3ProfileSurvivesRedrawBitmap() throws {
+        let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+        try #require(inputInfo.profileName == "Display P3", "Fixture should be Display P3")
+
+        let options = WICompressOptions(
+            resize: .luban,
+            format: .preserve,
+            metadata: .strip,
+            quality: .compression(0.6)
+        )
+        let inputSource = try WIImageSource(data: inputData)
+        let writePlan = try WIWritePlanResolver.resolve(options: options, info: inputSource.info)
+
+        let outputData = try WICompress.compress(inputData, options: options)
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(writePlan.path == .redrawBitmap)
+        #expect(outputInfo.profileName == inputInfo.profileName)
     }
 
     @Test("Size guard may return original when preserve policies are already satisfied")
