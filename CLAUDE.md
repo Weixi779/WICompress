@@ -60,37 +60,34 @@ Tests are organized by `@Suite` and filtered by `@Tag`:
 |---|---|
 | `.luban` | Luban algorithm logic (`calculateLubanRatio`, `ensureEven`) |
 | `.format` | Image format detection (`WIImageFormat`) |
-| `.compression` | UIKit compression and resize behavior (`WICompress` public API) |
+| `.compression` | Compression and resize behavior (`WICompress` public API) |
+| `.imageIOCore` | ImageIO core: write-path resolution, encoder, real-image contracts |
+| `.publicAPI` | Public surface: options defaults, error mapping, entry points |
 | `.edgeCase` | Boundary values and edge inputs |
 
 Tag definitions live in `Tests/WICompressTests/Support/Tags.swift`.
 
 ### Running Tests
 
-**Pure logic (macOS, no simulator needed):**
+The core is UIKit-free, so **the entire suite runs on `swift test` (macOS, no
+simulator needed)** — including the real-image fixture tests:
 ```bash
 swift test
 ```
 
-**Full suite including compression tests (iOS Simulator required):**
-```bash
-xcodebuild test \
-  -workspace .swiftpm/xcode/package.xcworkspace \
-  -scheme WICompress \
-  -destination 'platform=iOS Simulator,OS=18.4,name=iPhone 16 Pro Max' \
-  CODE_SIGNING_ALLOWED=NO
-```
-
-> `CODE_SIGNING_ALLOWED=NO` is required — without it, xcodebuild fails with a CodeSign error when testing SPM packages directly.
+> An iOS Simulator is no longer required to test the library. `xcodebuild`/the
+> simulator is only relevant for building the `Example/` app, not the package
+> tests. If you do run the package under `xcodebuild` for SPM packages directly,
+> pass `CODE_SIGNING_ALLOWED=NO` (otherwise it fails with a CodeSign error).
 
 ### Test Categories
 
-**macOS (`swift test`)** — pure logic, no UIKit:
-- `LubanRatioTests` — parameterized tests covering all 7 Luban switch branches + `ensureEven` edge cases
-- `WIImageFormatTests` — format detection using CGContext-generated images (JPEG, PNG, unknown)
-
-**iOS Simulator (`xcodebuild`)** — UIKit-dependent, wrapped in `#if os(iOS)`:
-- `CompressionTests` — validates `compressImage` output (non-nil, size reduction, format preservation, quality effect) and `resizeImage` dimension behavior
+All suites run under `swift test` on macOS — none depend on UIKit:
+- `LubanRatioTests` — all 7 Luban switch branches + `ensureEven` edge cases
+- `WIImageFormatTests` — `UTType`-based format detection (JPEG, PNG, unknown)
+- `WICompressPublicSurfaceTests` — default options, no-op passthrough, error mapping
+- `WICompressImageIOCoreTests` — write-path behavior on real fixtures: GPS strip vs preserve, orientation baking, PNG alpha, gain-map drop in `.preserve`, animated rejection, size-guard correctness
+- `WICompressDataCharacterizationTests` — auto-discovers `Resources/` images and pins the format + display-dimension contract
 
 ### Test Resources
 

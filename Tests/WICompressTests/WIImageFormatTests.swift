@@ -8,6 +8,17 @@ import UniformTypeIdentifiers
 @Suite("WIImageFormat Detection", .tags(.format))
 struct WIImageFormatTests {
 
+    struct FormatCase: CustomTestStringConvertible, Sendable {
+        let type: UTType
+        let expected: WIImageFormat
+        let testDescription: String
+    }
+
+    static let knownFormatCases: [FormatCase] = [
+        FormatCase(type: .jpeg, expected: .jpeg, testDescription: "JPEG data"),
+        FormatCase(type: .png, expected: .png, testDescription: "PNG data"),
+    ]
+
     // MARK: - Helpers
 
     /// Renders a 1×1 CGImage into the given UTType using ImageIO.
@@ -35,16 +46,10 @@ struct WIImageFormatTests {
 
     // MARK: - Format detection
 
-    @Test("JPEG data is detected as .jpeg")
-    func jpegDataDetected() throws {
-        let data = try #require(Self.makeImageData(type: .jpeg))
-        #expect(WIImageFormat(data: data) == .jpeg)
-    }
-
-    @Test("PNG data is detected as .png")
-    func pngDataDetected() throws {
-        let data = try #require(Self.makeImageData(type: .png))
-        #expect(WIImageFormat(data: data) == .png)
+    @Test("Known image data is detected from its container type", arguments: knownFormatCases)
+    func knownImageDataDetected(_ formatCase: FormatCase) throws {
+        let data = try #require(Self.makeImageData(type: formatCase.type))
+        #expect(WIImageFormat(data: data) == formatCase.expected)
     }
 
     @Test("Empty data returns .unknown", .tags(.edgeCase))

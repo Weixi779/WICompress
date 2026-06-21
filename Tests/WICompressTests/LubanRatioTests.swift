@@ -6,7 +6,7 @@ struct LubanRatioTests {
 
     // MARK: - calculateLubanRatio
 
-    struct RatioCase: CustomTestStringConvertible {
+    struct RatioCase: CustomTestStringConvertible, Sendable {
         let width: Int
         let height: Int
         let expected: Int
@@ -45,31 +45,29 @@ struct LubanRatioTests {
 
     // MARK: - ensureEven
 
-    @Suite("ensureEven", .tags(.luban, .edgeCase))
+    @Suite("ensureEven", .tags(.luban))
     struct EnsureEvenTests {
 
-        @Test("Even number is unchanged")
-        func evenNumberUnchanged() {
-            #expect(WIImageUtils.ensureEven(4) == 4)
-            #expect(WIImageUtils.ensureEven(100) == 100)
-            #expect(WIImageUtils.ensureEven(1280) == 1280)
+        struct EnsureEvenCase: CustomTestStringConvertible, Sendable {
+            let value: Int
+            let expected: Int
+            let testDescription: String
         }
 
-        @Test("Odd number is incremented by 1")
-        func oddNumberIncremented() {
-            #expect(WIImageUtils.ensureEven(1) == 2)
-            #expect(WIImageUtils.ensureEven(99) == 100)
-            #expect(WIImageUtils.ensureEven(1279) == 1280)
-        }
+        static let ensureEvenCases: [EnsureEvenCase] = [
+            EnsureEvenCase(value: 4, expected: 4, testDescription: "even number 4 is unchanged"),
+            EnsureEvenCase(value: 100, expected: 100, testDescription: "even number 100 is unchanged"),
+            EnsureEvenCase(value: 1280, expected: 1280, testDescription: "even boundary 1280 is unchanged"),
+            EnsureEvenCase(value: 1, expected: 2, testDescription: "odd number 1 increments to 2"),
+            EnsureEvenCase(value: 99, expected: 100, testDescription: "odd number 99 increments to 100"),
+            EnsureEvenCase(value: 1279, expected: 1280, testDescription: "odd boundary 1279 increments to 1280"),
+            EnsureEvenCase(value: 0, expected: 0, testDescription: "zero remains zero"),
+            EnsureEvenCase(value: -3, expected: -2, testDescription: "negative odd increments toward even"),
+        ]
 
-        @Test("Zero remains zero", .tags(.edgeCase))
-        func zeroRemainsZero() {
-            #expect(WIImageUtils.ensureEven(0) == 0)
-        }
-
-        @Test("Negative odd number is incremented toward even", .tags(.edgeCase))
-        func negativeOddNumberIncremented() {
-            #expect(WIImageUtils.ensureEven(-3) == -2)
+        @Test("ensureEven returns the documented even value", arguments: ensureEvenCases)
+        func ensureEven(_ ensureEvenCase: EnsureEvenCase) {
+            #expect(WIImageUtils.ensureEven(ensureEvenCase.value) == ensureEvenCase.expected)
         }
     }
 }

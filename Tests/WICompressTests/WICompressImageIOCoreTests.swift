@@ -55,20 +55,17 @@ struct WICompressImageIOCoreTests {
         )
     }
 
+    @available(iOS 14.1, macOS 11.0, *)
     private static func hasGainMap(_ data: Data) -> Bool {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return false
         }
 
-        if #available(iOS 14.1, macOS 11.0, *) {
-            return CGImageSourceCopyAuxiliaryDataInfoAtIndex(
-                source,
-                0,
-                kCGImageAuxiliaryDataTypeHDRGainMap
-            ) != nil
-        }
-
-        return false
+        return CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+            source,
+            0,
+            kCGImageAuxiliaryDataTypeHDRGainMap
+        ) != nil
     }
 
     private static func orientationTaggedJPEG(width: Int, height: Int, orientation: Int) throws -> Data {
@@ -232,12 +229,13 @@ struct WICompressImageIOCoreTests {
     // HDR gain map (the encoder does not set kCGImageDestinationPreserveGainMap).
     // This locks the current trade-off; it will flip intentionally when gain-map
     // preservation lands (see PLAN §8.3 / §17).
+    @available(iOS 14.1, macOS 11.0, *)
     @Test("Preserve metadata drops the HDR gain map in v1")
     func preserveMetadataDropsGainMap() throws {
         let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
         let inputData = try Data(contentsOf: url)
 
-        #expect(Self.hasGainMap(inputData) == true)
+        try #require(Self.hasGainMap(inputData), "Fixture should contain an HDR gain map")
 
         let outputData = try WICompress.compress(
             inputData,

@@ -43,21 +43,24 @@ final class UIKitPickerViewModel {
         let hexString = dataPrefix.map { String(format: "%02x", $0) }.joined(separator: " ")
         logger.info("Raw data prefix: \(hexString)")
         
-        // Apply WICompress processing (resize + orientation correction + compression)
-        if let compressedData = WICompress.compressImage(
-            imageGroup.image, 
-            quality: 0.7, 
-            formatData: imageGroup.rawData
-        ), let compressedUIImage = UIImage(data: compressedData) {
-            
+        do {
+            let compressedData = try WICompress.compress(
+                imageGroup.rawData,
+                options: WICompressOptions(quality: .compression(0.7))
+            )
+            guard let compressedUIImage = UIImage(data: compressedData) else {
+                logger.error("Compression output could not be decoded!")
+                return
+            }
+
             self.compressedImageGroup = ImageGroup(
                 image: compressedUIImage, 
                 rawData: compressedData
             )
             logger.info("Compression successful!")
             logger.info("Compressed format: \(self.compressedImageGroup?.format ?? "unknown")")
-        } else {
-            logger.error("Compression failed!")
+        } catch {
+            logger.error("Compression failed: \(error.localizedDescription)")
         }
     }
     
