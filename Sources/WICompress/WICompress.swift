@@ -1,9 +1,46 @@
 import Foundation
-import CoreImage
+import ImageIO
 import UniformTypeIdentifiers
 
 public struct WICompress: Sendable {
-    
+
+    public static func compress(
+        _ data: Data,
+        options: WICompressOptions = .default
+    ) throws -> Data {
+        guard
+            let source = CGImageSourceCreateWithData(data as CFData, nil),
+            CGImageSourceGetCount(source) > 0,
+            CGImageSourceCopyPropertiesAtIndex(source, 0, nil) != nil
+        else {
+            throw WICompressError.invalidImageData
+        }
+
+        if options == WICompressOptions(
+            resize: .none,
+            format: .preserve,
+            metadata: .preserve,
+            quality: .none
+        ) {
+            return data
+        }
+
+        throw WICompressError.writePlanUnavailable
+    }
+
+    public static func compress(
+        contentsOf url: URL,
+        options: WICompressOptions = .default
+    ) throws -> Data {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw WICompressError.fileReadFailed(url)
+        }
+
+        return try compress(data, options: options)
+    }
 }
 
 #if os(iOS)

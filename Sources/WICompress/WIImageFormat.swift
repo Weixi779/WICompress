@@ -1,7 +1,7 @@
 import Foundation
-import CoreImage
+import ImageIO
 
-public enum WIImageFormat: Sendable {
+public enum WIImageFormat: Sendable, Equatable {
     case jpeg
     case png
     case heif
