@@ -8,8 +8,8 @@ duplicating the same instructions.
 
 WICompress is a lightweight ImageIO-based image compression library for JPEG,
 PNG, and HEIC/HEIF data. It uses the Luban resize strategy, preserves the source
-container format by default, and exposes a UIKit/AppKit-free core API. The
-package targets iOS 14+ and macOS 11+.
+container format by default, supports explicit JPEG/PNG/HEIC output control, and
+exposes a UIKit/AppKit-free core API. The package targets iOS 14+ and macOS 11+.
 
 ## Development Commands
 
@@ -86,7 +86,8 @@ Key types:
 1. **WICompress** - public API: `compress(_:options:) throws(WICompressError) -> Data`
    and `compress(contentsOf:options:)`.
 2. **WICompressOptions** - `resize` / `format` / `metadata` / `quality` policies
-   (see `WIResizePolicy`, `WIFormatPolicy`, `WIMetadataPolicy`, `WIQualityPolicy`).
+   (see `WIResizePolicy`, `WIFormatPolicy`, `WIJPEGBackground`,
+   `WIMetadataPolicy`, `WIQualityPolicy`).
 3. **WIImageSource** / **WIImageInfo** - ImageIO source wrapper and inspected facts
    (format, pixel size, orientation, frame count, alpha, gain map, writability).
 4. **WIWritePlanResolver** / **WIWritePlan** - the decision core. Picks one of
@@ -102,20 +103,26 @@ Key types:
   tags and is used for `.metadata(.preserve)`. `redrawBitmap` downsamples via
   `CGImageSourceCreateThumbnailAtIndex` with transform, bakes orientation, and
   resets the tag to 1; it is used for the default `.strip` upload path.
+- **Explicit format conversion**: `.format(.jpeg/.png/.heic)` always uses
+  `redrawBitmap` and never returns the original through the size guard. JPEG
+  conversion rejects transparent sources by default; callers must choose
+  `.jpeg(background: .white/.black)` to flatten alpha intentionally.
 - **UIKit-free / cross-platform core**: no `#if os(iOS)`, no UIKit/CoreImage.
   Builds and is fully tested on macOS via `swift test`.
 - **Typed throws**: the whole throwing surface uses `throws(WICompressError)`.
   Builds cleanly under Swift 6 language mode and strict concurrency; public
   types are `Sendable`.
-- **Luban resize**: ratio is computed from EXIF-oriented display dimensions. The
-  default long-image branch constrains the short side (`ceil(shortSide / 1280)`),
-  matching original Luban. Dividing the long side over-shrinks panoramas and
-  long screenshots.
+- **Resize policies**: Luban ratio is computed from EXIF-oriented display
+  dimensions. The default long-image branch constrains the short side
+  (`ceil(shortSide / 1280)`), matching original Luban. Dividing the long side
+  over-shrinks panoramas and long screenshots. `.maxPixel(Int)` caps the longest
+  display side and never upscales.
 - **Format/quality coupling**: quality is only written for lossy destinations
   (JPEG/HEIC). PNG ignores it. Writability is checked at runtime via
   `CGImageDestinationCopyTypeIdentifiers()`.
 - **Size guard**: never returns the original if it would violate a policy, for
-  example `.strip` must not hand back a GPS-bearing original.
+  example `.strip` must not hand back a GPS-bearing original, and explicit
+  destination formats must not hand back source-format bytes.
 - **Error handling**: throws `WICompressError`, never returns optional/nil.
 
 ## Code Style

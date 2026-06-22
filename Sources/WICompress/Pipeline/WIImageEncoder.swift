@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CoreGraphics
 import ImageIO
 
 enum WIImageEncoder {
@@ -64,13 +65,15 @@ enum WIImageEncoder {
             thumbnailOptions[kCGImageSourceThumbnailMaxPixelSize] = maxPixelSize
         }
 
-        guard let image = CGImageSourceCreateThumbnailAtIndex(
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
             imageSource.cgImageSource,
             0,
             thumbnailOptions as CFDictionary
         ) else {
             throw WICompressError.thumbnailCreationFailed
         }
+
+        let image = try destinationImage(from: thumbnail, plan: plan)
 
         let outputData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
@@ -82,7 +85,7 @@ enum WIImageEncoder {
             throw WICompressError.destinationCreationFailed(plan.destinationFormat)
         }
 
-        var properties = destinationProperties(for: plan)
+        var properties = destinationProperties(for: plan, imageSource: imageSource)
         // Reset the tag so readers do not rotate pixels that were already transformed.
         properties[kCGImagePropertyOrientation] = 1
 
@@ -95,13 +98,117 @@ enum WIImageEncoder {
         return outputData as Data
     }
 
-    private static func destinationProperties(for plan: WIWritePlan) -> [CFString: Any] {
+    private static func destinationProperties(
+        for plan: WIWritePlan,
+        imageSource: WIImageSource? = nil
+    ) -> [CFString: Any] {
         var properties: [CFString: Any] = [:]
+
+        if plan.metadataPolicy == .preserve, let imageSource {
+            properties.merge(preservedMetadataProperties(from: imageSource)) { _, new in new }
+        }
 
         if let quality = plan.quality {
             properties[kCGImageDestinationLossyCompressionQuality] = quality
         }
 
         return properties
+    }
+
+    private static func destinationImage(
+        from image: CGImage,
+        plan: WIWritePlan
+    ) throws(WICompressError) -> CGImage {
+        guard plan.destinationFormat == .jpeg else {
+            return image
+        }
+
+        switch plan.jpegBackground {
+        case .white:
+            return try flattenedJPEGImage(image, background: .white)
+        case .black:
+            return try flattenedJPEGImage(image, background: .black)
+        case .disallow, nil:
+            return image
+        }
+    }
+
+    private static func flattenedJPEGImage(
+        _ image: CGImage,
+        background: WIJPEGBackground
+    ) throws(WICompressError) -> CGImage {
+        let colorSpace = rgbColorSpace(from: image) ?? CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue
+        guard let context = CGContext(
+            data: nil,
+            width: image.width,
+            height: image.height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else {
+            throw WICompressError.thumbnailCreationFailed
+        }
+
+        let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        context.interpolationQuality = .high
+
+        switch background {
+        case .white:
+            context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        case .black:
+            context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        case .disallow:
+            break
+        }
+
+        context.fill(rect)
+        context.draw(image, in: rect)
+
+        guard let flattenedImage = context.makeImage() else {
+            throw WICompressError.thumbnailCreationFailed
+        }
+
+        return flattenedImage
+    }
+
+    private static func rgbColorSpace(from image: CGImage) -> CGColorSpace? {
+        guard let colorSpace = image.colorSpace, colorSpace.model == .rgb else {
+            return nil
+        }
+
+        return colorSpace
+    }
+
+    private static func preservedMetadataProperties(from imageSource: WIImageSource) -> [CFString: Any] {
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(
+            imageSource.cgImageSource,
+            0,
+            nil
+        ) as? [CFString: Any] else {
+            return [:]
+        }
+
+        let metadataKeys: [CFString] = [
+            kCGImagePropertyTIFFDictionary,
+            kCGImagePropertyExifDictionary,
+            kCGImagePropertyExifAuxDictionary,
+            kCGImagePropertyIPTCDictionary,
+            kCGImagePropertyGPSDictionary,
+            kCGImagePropertyMakerAppleDictionary,
+            kCGImagePropertyMakerCanonDictionary,
+            kCGImagePropertyMakerNikonDictionary,
+            kCGImagePropertyMakerMinoltaDictionary,
+            kCGImagePropertyMakerFujiDictionary,
+            kCGImagePropertyMakerOlympusDictionary,
+            kCGImagePropertyMakerPentaxDictionary
+        ]
+
+        return metadataKeys.reduce(into: [:]) { result, key in
+            if let value = properties[key] {
+                result[key] = value
+            }
+        }
     }
 }

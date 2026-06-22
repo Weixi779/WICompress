@@ -7,6 +7,42 @@ Versioning.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-22
+
+Adds explicit output control for callers that need a specific upload format or
+pixel cap while keeping the v1 data-first API intact.
+
+### Added
+
+- Explicit output format policies:
+  - `.format(.jpeg(background:))`
+  - `.format(.png)`
+  - `.format(.heic)`
+- `WIJPEGBackground` with `.disallow`, `.white`, and `.black` for intentional
+  transparent-source handling when encoding JPEG.
+- `.maxPixel(Int)` resize policy for caller-supplied longest-side caps without
+  upscaling smaller images.
+- `WICompressError.transparentSourceRequiresBackground` for transparent sources
+  encoded as JPEG without an explicit background.
+
+### Changed
+
+- Explicit format conversion always rewrites output instead of returning the
+  original data through the size guard.
+- JPEG encoding rejects transparent sources by default. Callers must choose
+  `.jpeg(background: .white)` or `.jpeg(background: .black)` to flatten alpha.
+- Format conversion with `.metadata(.preserve)` re-attaches ordinary metadata
+  dictionaries where ImageIO supports them.
+- Format conversion still bakes orientation into pixels and resets the
+  orientation tag to `1` on the redraw path.
+
+### Known Limitations
+
+- GPS-only metadata stripping is not included.
+- Target-byte-size compression is not included.
+- Automatic format selection is not included.
+- HDR gain-map preservation is not guaranteed.
+
 ## [1.0.0] - TBD
 
 Initial public release of the ImageIO-backed core.

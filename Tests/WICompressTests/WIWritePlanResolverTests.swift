@@ -21,6 +21,13 @@ struct WIWritePlanResolverTests {
         let testDescription: String
     }
 
+    struct ExplicitFormatCase: CustomTestStringConvertible, Sendable {
+        let format: WIFormatPolicy
+        let expectedFormat: WIImageFormat
+        let expectedCompressionQuality: Double?
+        let testDescription: String
+    }
+
     static let qualityCases: [QualityCase] = [
         QualityCase(
             resourceName: "real_jpeg_2098x1350_landscape",
@@ -42,6 +49,27 @@ struct WIWritePlanResolverTests {
             expectedFormat: .png,
             expectedCompressionQuality: nil,
             testDescription: "PNG ignores lossy quality"
+        ),
+    ]
+
+    static let explicitFormatCases: [ExplicitFormatCase] = [
+        ExplicitFormatCase(
+            format: .jpeg(background: .disallow),
+            expectedFormat: .jpeg,
+            expectedCompressionQuality: 0.4,
+            testDescription: "explicit JPEG uses lossy quality"
+        ),
+        ExplicitFormatCase(
+            format: .png,
+            expectedFormat: .png,
+            expectedCompressionQuality: nil,
+            testDescription: "explicit PNG ignores lossy quality"
+        ),
+        ExplicitFormatCase(
+            format: .heic,
+            expectedFormat: .heif,
+            expectedCompressionQuality: 0.4,
+            testDescription: "explicit HEIC uses lossy quality"
         ),
     ]
 
@@ -79,6 +107,109 @@ struct WIWritePlanResolverTests {
 
         #expect(info.sourceFormat == qualityCase.expectedFormat)
         #expect(plan.quality == qualityCase.expectedCompressionQuality)
+    }
+
+    @Test("Explicit destination formats force redraw and resolve quality by target format", arguments: explicitFormatCases)
+    func explicitDestinationFormatResolvesWritePlan(_ explicitFormatCase: ExplicitFormatCase) throws {
+        let info = try Self.imageInfo(
+            resourceName: "real_jpeg_2098x1350_landscape",
+            resourceExtension: "jpg"
+        )
+
+        let plan = try WIWritePlanResolver.resolve(
+            options: WICompressOptions(
+                resize: .none,
+                format: explicitFormatCase.format,
+                metadata: .preserve,
+                quality: .compression(0.4)
+            ),
+            info: info
+        )
+
+        #expect(plan.path == .redrawBitmap)
+        #expect(plan.destinationFormat == explicitFormatCase.expectedFormat)
+        #expect(plan.quality == explicitFormatCase.expectedCompressionQuality)
+    }
+
+    @Test("Transparent source requires an explicit JPEG background")
+    func transparentSourceRequiresJPEGBackground() throws {
+        let info = try Self.imageInfo(
+            resourceName: "real_png_1086x1630_alpha",
+            resourceExtension: "png"
+        )
+
+        #expect(throws: WICompressError.transparentSourceRequiresBackground(.png)) {
+            _ = try WIWritePlanResolver.resolve(
+                options: WICompressOptions(
+                    resize: .none,
+                    format: .jpeg(background: .disallow),
+                    metadata: .strip,
+                    quality: .compression(0.6)
+                ),
+                info: info
+            )
+        }
+    }
+
+    @Test(".maxPixel caps the longest side without upscaling")
+    func maxPixelResolvesCapWithoutUpscaling() throws {
+        let info = try Self.imageInfo(
+            resourceName: "real_jpeg_2098x1350_landscape",
+            resourceExtension: "jpg"
+        )
+
+        let cappedPlan = try WIWritePlanResolver.resolve(
+            options: WICompressOptions(
+                resize: .maxPixel(600),
+                format: .preserve,
+                metadata: .preserve,
+                quality: .none
+            ),
+            info: info
+        )
+        let noUpscalePlan = try WIWritePlanResolver.resolve(
+            options: WICompressOptions(
+                resize: .maxPixel(5000),
+                format: .preserve,
+                metadata: .preserve,
+                quality: .none
+            ),
+            info: info
+        )
+
+        #expect(cappedPlan.maxPixelSize == 600)
+        #expect(cappedPlan.path == .copyFromSource)
+        #expect(noUpscalePlan.maxPixelSize == nil)
+        #expect(noUpscalePlan.path == .returnOriginal)
+    }
+
+    @Test("Explicit format is never return-original eligible")
+    func explicitFormatIsNeverReturnOriginalEligible() throws {
+        let info = try Self.imageInfo(
+            resourceName: "real_png_814x386_wide",
+            resourceExtension: "png"
+        )
+
+        let plan = try WIWritePlanResolver.resolve(
+            options: WICompressOptions(
+                resize: .none,
+                format: .png,
+                metadata: .preserve,
+                quality: .none
+            ),
+            info: info
+        )
+
+        #expect(plan.path == .redrawBitmap)
+        #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(
+            options: WICompressOptions(
+                resize: .none,
+                format: .png,
+                metadata: .preserve,
+                quality: .none
+            ),
+            info: info
+        ) == false)
     }
 
     @Test("Non-writable preserve source can return original when policies are already satisfied")
@@ -141,13 +272,20 @@ struct WIWritePlanResolverTests {
     }
 
     private static func imageInfo(for qualityCase: QualityCase) throws -> WIImageInfo {
+        try imageInfo(
+            resourceName: qualityCase.resourceName,
+            resourceExtension: qualityCase.resourceExtension
+        )
+    }
+
+    private static func imageInfo(resourceName: String, resourceExtension: String) throws -> WIImageInfo {
         let url = try #require(
             Bundle.module.url(
-                forResource: qualityCase.resourceName,
-                withExtension: qualityCase.resourceExtension,
+                forResource: resourceName,
+                withExtension: resourceExtension,
                 subdirectory: "Resources"
             ),
-            "Missing fixture: \(qualityCase.resourceName).\(qualityCase.resourceExtension)"
+            "Missing fixture: \(resourceName).\(resourceExtension)"
         )
         let data = try Data(contentsOf: url)
         return try WIImageSource(data: data).info

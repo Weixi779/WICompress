@@ -15,6 +15,7 @@ struct WIWritePlan: Sendable, Equatable {
     var maxPixelSize: Int?
     var metadataPolicy: WIMetadataPolicy
     var quality: Double?
+    var jpegBackground: WIJPEGBackground?
 }
 
 enum WIWritePath: Sendable, Equatable {

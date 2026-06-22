@@ -7,35 +7,85 @@
 
 English | [简体中文](README_CN.md)
 
-`WICompress` is a lightweight ImageIO-based image compression library for
-JPEG, PNG, and HEIC/HEIF data. It uses the Luban resize strategy, preserves the
-source container format by default, and exposes a UIKit/AppKit-free core API.
+Compress images for upload with a small, predictable Swift API.
 
-## Highlights
+`WICompress` is an ImageIO-backed Swift image compression library that operates
+directly on original image `Data` or file `URL` input. ImageIO handles format
+inspection, orientation, alpha, metadata, color profiles, resizing, and encoding;
+the public API stays simple and returns compressed `Data`.
 
-- Data-first API: pass original `Data` or a file `URL`, receive compressed `Data`.
-- UIKit/AppKit-free core: suitable for iOS apps and macOS-side SwiftPM tests.
-- Format preservation: JPEG stays JPEG, PNG stays PNG, HEIC/HEIF stays HEIC/HEIF.
-- Luban resize policy: downsample large images while preserving display dimensions.
-- Metadata policy: strip Exif/GPS-style metadata by default, or preserve it explicitly.
-- Strong error model: failures are reported with `WICompressError`, not `nil`.
+It preserves JPEG/PNG/HEIC by default, can convert to an explicit output format
+when your upload endpoint requires it, strips metadata for privacy, and resizes
+large images without depending on `UIImage` or `NSImage`.
 
-## Requirements
+```swift
+let compressedData = try WICompress.compress(originalData)
+```
 
-- iOS 14.0+
-- macOS 11.0+
-- Swift 6.0+
+```swift
+let uploadData = try WICompress.compress(
+    originalData,
+    options: WICompressOptions(
+        resize: .maxPixel(1600),
+        format: .jpeg(background: .white),
+        metadata: .strip,
+        quality: .compression(0.7)
+    )
+)
+```
 
-## Installation
+## Why WICompress
 
-### Swift Package Manager
+- **Data in, Data out**: keep picker/file/network bytes and pass them directly
+  to the compressor.
+- **Upload-ready defaults**: Luban resize, metadata stripping, and JPEG/HEIC
+  lossy quality are configured for common app uploads.
+- **Format control**: preserve the source container or explicitly output JPEG,
+  PNG, or HEIC.
+- **Alpha-safe JPEG conversion**: transparent sources require an explicit white
+  or black background instead of silently flattening.
+- **Orientation-safe resizing**: display dimensions are resolved from ImageIO
+  metadata, then redraw paths bake orientation into pixels.
+- **UIKit/AppKit-free core**: the compression pipeline works in iOS apps,
+  macOS tools, and SwiftPM tests without UI image types.
+- **Typed failures**: errors are surfaced as `WICompressError`, not optional
+  `nil` results.
 
-1. Open your project in Xcode.
-2. Select **File** -> **Add Packages**.
-3. Enter the repository URL: `https://github.com/Weixi779/WICompress`.
-4. Select a version and add the `WICompress` product.
+## Compression Preview
 
-## Quick Start
+The comparison image below is generated from repository fixtures with
+`scripts/generate-doc-assets.swift`, so it can be regenerated when compression
+behavior changes.
+
+```bash
+swift run WICompressDocAssetGenerator
+```
+
+![WICompress compression comparison](docs/assets/compression-comparison.png)
+
+The preview uses the default API for every row. It shows three HEIC photos first
+because HEIC is the most important real-world case, then JPEG and PNG examples.
+PNG is not skipped: the panoramic screenshot shrinks when Luban resize is
+triggered, while the alpha PNG is a no-op case where the original data is
+already the better result.
+
+## Example Project
+
+The repository includes a SwiftUI example app:
+
+1. Open `Example/WICompressExample/WICompressExample.xcodeproj`.
+2. Build and run on an iOS device or simulator.
+3. Pick an image and compare the original data with the compressed data.
+
+The example demonstrates:
+
+- `PhotosPicker` and `PHPickerViewController` data loading
+- raw `Data` compression
+- format detection
+- original/compressed preview
+- file-size and compression-ratio display
+
+## API Examples
 
 ```swift
 import WICompress
@@ -62,24 +112,6 @@ let compressedData = try WICompress.compress(
     )
 )
 ```
-
-## Compression Preview
-
-The comparison image below is generated from repository fixtures with
-`scripts/generate-doc-assets.swift`, so it can be regenerated when compression
-behavior changes.
-
-```bash
-swift run WICompressDocAssetGenerator
-```
-
-![WICompress compression comparison](docs/assets/compression-comparison.png)
-
-The preview uses the default API for every row. It shows three HEIC photos first
-because HEIC is the most important real-world case, then JPEG and PNG examples.
-PNG is not skipped: the panoramic screenshot shrinks when Luban resize is
-triggered, while the alpha PNG is a no-op case where the original data is
-already the better result.
 
 ## Working With UIKit or AppKit
 
@@ -119,23 +151,40 @@ WICompressOptions(
 public enum WIResizePolicy {
     case none
     case luban
+    case maxPixel(Int)
 }
 ```
 
 - `.luban`: default. Downsamples large images using the Luban ratio.
+- `.maxPixel(value)`: caps the longest display side to `value` pixels and never
+  upscales smaller images.
 - `.none`: keeps the source display dimensions.
 
 ### Format
 
 ```swift
+public enum WIJPEGBackground {
+    case disallow
+    case white
+    case black
+}
+
 public enum WIFormatPolicy {
     case preserve
+    case jpeg(background: WIJPEGBackground = .disallow)
+    case png
+    case heic
 }
 ```
 
-The initial public release only supports `.preserve`. Explicit conversion such
-as PNG -> JPEG is not included because alpha flattening requires an explicit
-background policy.
+- `.preserve`: default. Keeps the source image container.
+- `.jpeg(background:)`: writes JPEG. Transparent sources require `.white` or
+  `.black`; `.disallow` throws instead of silently flattening alpha.
+- `.png`: writes PNG. The quality policy is ignored because PNG is lossless.
+- `.heic`: writes HEIC when the current platform can encode it.
+
+Explicit format conversion always rewrites the image. The size guard will not
+return original bytes when the caller requested a concrete destination format.
 
 ### Metadata
 
@@ -150,6 +199,11 @@ public enum WIMetadataPolicy {
   dictionaries when rewriting is required.
 - `.preserve`: keeps normal metadata and orientation tags by using the
   source-copy write path when possible.
+
+When format conversion forces the redraw path, `.preserve` re-attaches ordinary
+metadata dictionaries where ImageIO supports them. Orientation is still baked
+into pixels and reset to `1`, because preserving the original rotation tag after
+redraw would double-rotate readers.
 
 Color profiles are display semantics, not privacy metadata. Display P3 profiles
 are expected to survive both source-copy and redraw paths.
@@ -195,6 +249,7 @@ Common cases:
 - `imageInfoUnavailable`
 - `unsupportedSourceFormat`
 - `unsupportedDestinationFormat`
+- `transparentSourceRequiresBackground`
 - `animatedSourceUnsupported`
 - `thumbnailCreationFailed`
 - `destinationCreationFailed`
@@ -207,8 +262,7 @@ The initial public release intentionally does not include:
 - `UIImage` / `NSImage` convenience adapters
 - Live Photo compression
 - async API
-- explicit `.jpeg` / `.png` / `.heic` conversion policies
-- PNG -> JPEG alpha-background flattening
+- GPS-only metadata stripping
 - target-byte-size compression
 - HDR gain map preservation
 - animated image output
@@ -223,36 +277,6 @@ in a Photos-level workflow, not the v1 ImageIO core.
 WICompress 1.0.0 replaces the old `UIImage`-oriented API with the `Data`/`URL`
 core API shown above. See [CHANGELOG.md](CHANGELOG.md) for the breaking change
 summary.
-
-## Example Project
-
-The repository includes a SwiftUI example app:
-
-1. Open `Example/WICompressExample/WICompressExample.xcodeproj`.
-2. Build and run on an iOS device or simulator.
-3. Pick an image and compare the original data with the compressed data.
-
-The example demonstrates:
-
-- `PhotosPicker` and `PHPickerViewController` data loading
-- raw `Data` compression
-- format detection
-- original/compressed preview
-- file-size and compression-ratio display
-
-## Testing
-
-The core is covered by Swift Testing on macOS and by iOS simulator tests:
-
-```bash
-swift test
-xcrun simctl list devices available
-xcodebuild test \
-  -workspace .swiftpm/xcode/package.xcworkspace \
-  -scheme WICompress-Package \
-  -destination 'id=<UDID>' \
-  CODE_SIGNING_ALLOWED=NO
-```
 
 ## License
 

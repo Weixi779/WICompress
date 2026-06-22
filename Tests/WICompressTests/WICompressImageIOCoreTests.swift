@@ -14,6 +14,16 @@ import Testing
 
 @Suite("WICompress ImageIO Core", .tags(.imageIOCore, .compression))
 struct WICompressImageIOCoreTests {
+    struct JPEGBackgroundCase: CustomTestStringConvertible, Sendable {
+        let background: WIJPEGBackground
+        let testDescription: String
+    }
+
+    private static let jpegBackgroundCases: [JPEGBackgroundCase] = [
+        JPEGBackgroundCase(background: .white, testDescription: "white background"),
+        JPEGBackgroundCase(background: .black, testDescription: "black background"),
+    ]
+
     private struct ImageInfo {
         let width: Int
         let height: Int
@@ -191,6 +201,112 @@ struct WICompressImageIOCoreTests {
 
         #expect(WIImageFormat(data: outputData) == .png)
         #expect(outputInfo.hasAlpha == true)
+    }
+
+    @Test("Transparent PNG can be flattened to JPEG with an explicit background", arguments: jpegBackgroundCases)
+    func transparentPNGFlattensToJPEG(_ jpegBackgroundCase: JPEGBackgroundCase) throws {
+        let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+        try #require(inputInfo.hasAlpha == true, "Fixture should contain alpha")
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .none,
+                format: .jpeg(background: jpegBackgroundCase.background),
+                metadata: .strip,
+                quality: .compression(0.8)
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(outputInfo.hasAlpha != true)
+        #expect(outputInfo.orientation == 1)
+        #expect(outputInfo.displayWidth == inputInfo.displayWidth)
+        #expect(outputInfo.displayHeight == inputInfo.displayHeight)
+    }
+
+    @Test("Transparent PNG to JPEG disallow throws")
+    func transparentPNGToJPEGDisallowThrows() throws {
+        let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")
+        let inputData = try Data(contentsOf: url)
+
+        #expect(throws: WICompressError.transparentSourceRequiresBackground(.png)) {
+            _ = try WICompress.compress(
+                inputData,
+                options: WICompressOptions(
+                    resize: .none,
+                    format: .jpeg(background: .disallow),
+                    metadata: .strip,
+                    quality: .compression(0.8)
+                )
+            )
+        }
+    }
+
+    @Test("Explicit PNG conversion follows maxPixel cap")
+    func explicitPNGConversionFollowsMaxPixelCap() throws {
+        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
+        let inputData = try Data(contentsOf: url)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .maxPixel(600),
+                format: .png,
+                metadata: .strip,
+                quality: .compression(0.1)
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .png)
+        #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) <= 600)
+    }
+
+    @Test("Explicit same-format JPEG still rewrites instead of returning original")
+    func explicitSameFormatJPEGDoesNotReturnOriginal() throws {
+        let url = try Self.resource("real_jpeg_738x1302_recompressed", extension: "jpg")
+        let inputData = try Data(contentsOf: url)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .none,
+                format: .jpeg(background: .disallow),
+                metadata: .preserve,
+                quality: .compression(0.6)
+            )
+        )
+
+        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(outputData != inputData)
+    }
+
+    @Test("Metadata preserve keeps GPS while converting format")
+    func metadataPreserveKeepsGPSDuringFormatConversion() throws {
+        let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+        try #require(inputInfo.hasGPS == true, "Fixture should contain GPS metadata")
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .maxPixel(1200),
+                format: .jpeg(background: .disallow),
+                metadata: .preserve,
+                quality: .compression(0.7)
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(outputInfo.hasGPS == true)
+        #expect(outputInfo.orientation == 1)
+        #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) <= 1200)
     }
 
     @Test("Display P3 profile survives copyFromSource")

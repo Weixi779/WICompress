@@ -55,6 +55,10 @@ public enum WIImageFormat: Sendable, Equatable {
         }
     }
 
+    static func canWrite(typeIdentifier: String) -> Bool {
+        writableTypeIdentifiers.contains(typeIdentifier)
+    }
+
     /// Detects the image format from container bytes.
     public init(data: Data) {
         guard
@@ -67,4 +71,12 @@ public enum WIImageFormat: Sendable, Equatable {
 
         self.init(typeIdentifier: uti as String)
     }
+
+    private static let writableTypeIdentifiers: Set<String> = {
+        guard let writableTypes = CGImageDestinationCopyTypeIdentifiers() as? [String] else {
+            return []
+        }
+
+        return Set(writableTypes)
+    }()
 }

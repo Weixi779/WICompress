@@ -7,35 +7,73 @@
 
 [English](README.md) | 简体中文
 
-`WICompress` 是一个基于 ImageIO 的轻量级图片压缩库，支持 JPEG、PNG、
-HEIC/HEIF 数据压缩。核心入口不依赖 UIKit / AppKit，而是直接处理原始
-`Data` 或文件 `URL`。
+用一组简单、可预测的 Swift API 完成上传前图片压缩。
 
-## 特性
+`WICompress` 是一个基于 ImageIO 的 Swift 图片压缩库，直接处理原始图片
+`Data` 或文件 `URL`。底层由 ImageIO 负责格式识别、方向、alpha、metadata、
+色彩 profile、缩放和编码；public API 保持简单，最终返回压缩后的 `Data`。
 
-- Data-first API：输入原始 `Data` 或文件 `URL`，输出压缩后的 `Data`。
-- 核心不依赖 UIKit / AppKit：可在 iOS App 中使用，也可在 macOS 上跑 SwiftPM 测试。
-- 保持源格式：JPEG 仍输出 JPEG，PNG 仍输出 PNG，HEIC/HEIF 仍输出 HEIC/HEIF。
-- Luban 尺寸策略：对大图按 Luban 比例下采样，断言展示尺寸而不是裸编码像素。
-- Metadata 策略：默认剥离 Exif/GPS 这类上传场景不需要的信息，也可以显式保留。
-- 强类型错误：失败通过 `WICompressError` 表达，不再返回可空 `Data?`。
+默认保留 JPEG / PNG / HEIC 源格式，也可以在上传端要求固定容器时显式转成
+JPEG、PNG 或 HEIC；默认剥离隐私 metadata，并且不依赖 `UIImage` / `NSImage`。
 
-## 系统要求
+```swift
+let compressedData = try WICompress.compress(originalData)
+```
 
-- iOS 14.0+
-- macOS 11.0+
-- Swift 6.0+
+```swift
+let uploadData = try WICompress.compress(
+    originalData,
+    options: WICompressOptions(
+        resize: .maxPixel(1600),
+        format: .jpeg(background: .white),
+        metadata: .strip,
+        quality: .compression(0.7)
+    )
+)
+```
 
-## 安装
+## 为什么用 WICompress
 
-### Swift Package Manager
+- **Data in, Data out**：保留相册、文件或网络拿到的原始字节，直接传给压缩器。
+- **适合上传的默认值**：Luban resize、metadata strip、JPEG/HEIC 有损质量。
+- **格式可控**：默认保持源格式，也可以显式输出 JPEG、PNG 或 HEIC。
+- **透明图转 JPEG 更安全**：必须显式选择白底或黑底，不会偷偷铺底。
+- **方向安全**：基于 ImageIO 读取展示尺寸，redraw path 会把方向烘焙进像素。
+- **核心不依赖 UIKit / AppKit**：可在 iOS App、macOS 工具和 SwiftPM 测试中使用。
+- **强类型错误**：失败通过 `WICompressError` 表达，不再返回可空 `Data?`。
 
-1. 在 Xcode 中打开你的项目。
-2. 选择 **File** -> **Add Packages**。
-3. 输入仓库地址：`https://github.com/Weixi779/WICompress`。
-4. 选择版本并添加 `WICompress` product。
+## 压缩效果预览
 
-## 快速开始
+下面这张对比图由 `scripts/generate-doc-assets.swift` 基于仓库内的真图
+fixtures 生成。后续压缩行为变化时，可以重新生成这张图。
+
+```bash
+swift run WICompressDocAssetGenerator
+```
+
+![WICompress 压缩效果对比](docs/assets/compression-comparison.png)
+
+图里每一行都使用默认 API。前三行优先展示 HEIC，因为这是最值得被用户看到的
+真实场景；后面再展示 JPEG 和 PNG。PNG 不是被跳过：长截图触发 Luban resize
+后会变小，而 alpha PNG 这一行只是 no-op case，原图本身已经是更好的结果。
+
+## 示例项目
+
+仓库包含 SwiftUI 示例项目：
+
+1. 打开 `Example/WICompressExample/WICompressExample.xcodeproj`。
+2. 在 iOS 设备或模拟器上运行。
+3. 从相册选择图片，比较原始 data 和压缩后 data。
+
+示例覆盖：
+
+- `PhotosPicker` 和 `PHPickerViewController` 获取原始图片 `Data`
+- `WICompress.compress(_:)` 压缩
+- 格式检测
+- 原图 / 压缩图预览
+- 文件大小和压缩比展示
+
+## API 示例
 
 ```swift
 import WICompress
@@ -62,21 +100,6 @@ let compressedData = try WICompress.compress(
     )
 )
 ```
-
-## 压缩效果预览
-
-下面这张对比图由 `scripts/generate-doc-assets.swift` 基于仓库内的真图
-fixtures 生成。后续压缩行为变化时，可以重新生成这张图。
-
-```bash
-swift run WICompressDocAssetGenerator
-```
-
-![WICompress 压缩效果对比](docs/assets/compression-comparison.png)
-
-图里每一行都使用默认 API。前三行优先展示 HEIC，因为这是最值得被用户看到的
-真实场景；后面再展示 JPEG 和 PNG。PNG 不是被跳过：长截图触发 Luban resize
-后会变小，而 alpha PNG 这一行只是 no-op case，原图本身已经是更好的结果。
 
 ## 和 UIKit / AppKit 一起使用
 
@@ -115,23 +138,39 @@ WICompressOptions(
 public enum WIResizePolicy {
     case none
     case luban
+    case maxPixel(Int)
 }
 ```
 
 - `.luban`：默认值。按 Luban 策略对大图等比下采样。
+- `.maxPixel(value)`：把最长展示边限制到 `value` 像素，不会放大小图。
 - `.none`：保留源图展示尺寸。
 
 ### Format
 
 ```swift
+public enum WIJPEGBackground {
+    case disallow
+    case white
+    case black
+}
+
 public enum WIFormatPolicy {
     case preserve
+    case jpeg(background: WIJPEGBackground = .disallow)
+    case png
+    case heic
 }
 ```
 
-初始公开版只支持 `.preserve`。显式格式转换，例如 PNG -> JPEG，暂不包含。
-原因是 JPEG 不支持 alpha，PNG 转 JPEG 必须要求调用方明确选择背景色，而不
-应该偷偷铺白。
+- `.preserve`：默认值。保持源图容器格式。
+- `.jpeg(background:)`：输出 JPEG。透明源图需要显式选择 `.white` 或
+  `.black` 背景；`.disallow` 会抛错，避免偷偷铺底。
+- `.png`：输出 PNG。PNG 是无损格式，quality 策略会被忽略。
+- `.heic`：在当前平台支持 HEIC 写出时输出 HEIC。
+
+显式格式转换一定会重写图片。调用方指定了具体输出格式时，size guard 不会再
+返回原始字节。
 
 ### Metadata
 
@@ -144,6 +183,10 @@ public enum WIMetadataPolicy {
 
 - `.strip`：默认值。重写图片时剥离 Exif / GPS / TIFF / maker notes 等可剥离 metadata。
 - `.preserve`：尽量保留普通 metadata 和 orientation tag，内部会优先走 source-copy 写入路径。
+
+如果格式转换强制走 redraw path，`.preserve` 会尽量重新附加普通 metadata
+字典。方向信息仍会被烘焙进像素并重置为 `1`，否则读取方会对已经旋转过的像素
+再次旋转。
 
 色彩 profile 不是 Exif/GPS 这类隐私 metadata，而是显示语义的一部分。
 Display P3 profile 在 `copyFromSource` 和 `redrawBitmap` 两条路径下都应该保留。
@@ -186,6 +229,7 @@ do {
 - `imageInfoUnavailable`
 - `unsupportedSourceFormat`
 - `unsupportedDestinationFormat`
+- `transparentSourceRequiresBackground`
 - `animatedSourceUnsupported`
 - `thumbnailCreationFailed`
 - `destinationCreationFailed`
@@ -198,8 +242,7 @@ do {
 - `UIImage` / `NSImage` convenience adapter
 - Live Photo 压缩
 - async API
-- 显式 `.jpeg` / `.png` / `.heic` 格式转换策略
-- PNG -> JPEG 的 alpha 背景色合成
+- 只剥离 GPS 的 metadata 策略
 - target bytes / max file size 压缩
 - HDR gain map preserve
 - 动图写出
@@ -213,36 +256,6 @@ image data，不处理 Photos 层的资源配对。
 
 WICompress 1.0.0 用上文展示的 `Data` / `URL` 核心 API 替换旧的
 `UIImage` API。破坏性变更摘要见 [CHANGELOG.md](CHANGELOG.md)。
-
-## 示例项目
-
-仓库包含 SwiftUI 示例项目：
-
-1. 打开 `Example/WICompressExample/WICompressExample.xcodeproj`。
-2. 在 iOS 设备或模拟器上运行。
-3. 从相册选择图片，比较原始 data 和压缩后 data。
-
-示例覆盖：
-
-- `PhotosPicker` 和 `PHPickerViewController` 获取原始图片 `Data`
-- `WICompress.compress(_:)` 压缩
-- 格式检测
-- 原图 / 压缩图预览
-- 文件大小和压缩比展示
-
-## 测试
-
-核心使用 Swift Testing 覆盖，并同时跑 macOS host 与 iOS simulator：
-
-```bash
-swift test
-xcrun simctl list devices available
-xcodebuild test \
-  -workspace .swiftpm/xcode/package.xcworkspace \
-  -scheme WICompress-Package \
-  -destination 'id=<UDID>' \
-  CODE_SIGNING_ALLOWED=NO
-```
 
 ## 许可证
 

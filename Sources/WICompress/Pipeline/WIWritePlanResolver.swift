@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UniformTypeIdentifiers
 
 enum WIWritePlanResolver {
     static func resolve(options: WICompressOptions, info: WIImageInfo) throws(WICompressError) -> WIWritePlan {
@@ -14,11 +15,9 @@ enum WIWritePlanResolver {
             throw WICompressError.unsupportedSourceFormat(info.typeIdentifier)
         }
 
-        guard let destinationTypeIdentifier = info.typeIdentifier else {
-            throw WICompressError.unsupportedSourceFormat(nil)
-        }
-
-        let destinationFormat = info.sourceFormat
+        let destination = try resolvedDestination(for: options.format, info: info)
+        let destinationFormat = destination.format
+        let destinationTypeIdentifier = destination.typeIdentifier
         let maxPixelSize = resolvedMaxPixelSize(for: options.resize, info: info)
         let quality = resolvedQuality(for: options.quality, destinationFormat: destinationFormat)
 
@@ -29,11 +28,15 @@ enum WIWritePlanResolver {
                 destinationTypeIdentifier: destinationTypeIdentifier,
                 maxPixelSize: maxPixelSize,
                 metadataPolicy: options.metadata,
-                quality: quality
+                quality: quality,
+                jpegBackground: destination.jpegBackground
             )
         }
 
-        guard info.isSourceFormatWritable else {
+        let canWriteDestination = options.format == .preserve
+            ? info.isSourceFormatWritable
+            : WIImageFormat.canWrite(typeIdentifier: destinationTypeIdentifier)
+        guard canWriteDestination else {
             if canReturnOriginalForSizeGuard(options: options, info: info) {
                 return WIWritePlan(
                     path: .returnOriginal,
@@ -41,7 +44,8 @@ enum WIWritePlanResolver {
                     destinationTypeIdentifier: destinationTypeIdentifier,
                     maxPixelSize: maxPixelSize,
                     metadataPolicy: options.metadata,
-                    quality: quality
+                    quality: quality,
+                    jpegBackground: destination.jpegBackground
                 )
             }
 
@@ -50,10 +54,10 @@ enum WIWritePlanResolver {
 
         let path: WIWritePath
         // Metadata preservation chooses the write path because ImageIO ties it to the write call.
-        switch options.metadata {
-        case .preserve:
+        switch (options.format, options.metadata) {
+        case (.preserve, .preserve):
             path = .copyFromSource
-        case .strip:
+        case (.preserve, .strip), (.jpeg, _), (.png, _), (.heic, _):
             path = .redrawBitmap
         }
 
@@ -63,7 +67,8 @@ enum WIWritePlanResolver {
             destinationTypeIdentifier: destinationTypeIdentifier,
             maxPixelSize: maxPixelSize,
             metadataPolicy: options.metadata,
-            quality: quality
+            quality: quality,
+            jpegBackground: destination.jpegBackground
         )
     }
 
@@ -93,6 +98,10 @@ enum WIWritePlanResolver {
         case .luban:
             let displaySize = displayDimensions(for: info)
             return WILuban.ratio(width: displaySize.width, height: displaySize.height) == 1
+        case .maxPixel(let maxPixel):
+            let displaySize = displayDimensions(for: info)
+            let longSide = max(displaySize.width, displaySize.height)
+            return max(maxPixel, 1) >= longSide
         }
     }
 
@@ -100,6 +109,8 @@ enum WIWritePlanResolver {
         switch policy {
         case .preserve:
             return info.typeIdentifier != nil && info.sourceFormat != .unknown
+        case .jpeg, .png, .heic:
+            return false
         }
     }
 
@@ -151,6 +162,39 @@ enum WIWritePlanResolver {
 
             let maxPixelSize = max(max(displaySize.width, displaySize.height) / ratio, 1)
             return maxPixelSize == 1 ? 1 : WILuban.ensureEven(maxPixelSize)
+        case .maxPixel(let maxPixel):
+            let displaySize = displayDimensions(for: info)
+            let longSide = max(displaySize.width, displaySize.height)
+            let cappedMaxPixel = max(maxPixel, 1)
+            guard cappedMaxPixel < longSide else {
+                return nil
+            }
+
+            return cappedMaxPixel
+        }
+    }
+
+    private static func resolvedDestination(
+        for policy: WIFormatPolicy,
+        info: WIImageInfo
+    ) throws(WICompressError) -> (format: WIImageFormat, typeIdentifier: String, jpegBackground: WIJPEGBackground?) {
+        switch policy {
+        case .preserve:
+            guard let typeIdentifier = info.typeIdentifier else {
+                throw WICompressError.unsupportedSourceFormat(nil)
+            }
+
+            return (info.sourceFormat, typeIdentifier, nil)
+        case .jpeg(let background):
+            if background == .disallow, info.hasAlpha == true {
+                throw WICompressError.transparentSourceRequiresBackground(info.sourceFormat)
+            }
+
+            return (.jpeg, UTType.jpeg.identifier, background)
+        case .png:
+            return (.png, UTType.png.identifier, nil)
+        case .heic:
+            return (.heif, UTType.heic.identifier, nil)
         }
     }
 

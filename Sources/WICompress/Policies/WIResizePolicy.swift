@@ -14,4 +14,6 @@ public enum WIResizePolicy: Sendable, Equatable {
     case none
     /// Apply the Luban resize ratio.
     case luban
+    /// Cap the longest display side without upscaling smaller images.
+    case maxPixel(Int)
 }

@@ -62,16 +62,8 @@ final class WIImageSource {
     }
 
     private static func canWriteImageTypeIdentifier(_ typeIdentifier: String) -> Bool {
-        writableTypeIdentifiers.contains(typeIdentifier)
+        WIImageFormat.canWrite(typeIdentifier: typeIdentifier)
     }
-
-    private static let writableTypeIdentifiers: Set<String> = {
-        guard let writableTypes = CGImageDestinationCopyTypeIdentifiers() as? [String] else {
-            return []
-        }
-
-        return Set(writableTypes)
-    }()
 
     private static func hasStrippableMetadata(in properties: [CFString: Any]) -> Bool {
         // Color profiles and pixel geometry are display semantics, not privacy metadata.

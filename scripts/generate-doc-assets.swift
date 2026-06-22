@@ -55,6 +55,12 @@ enum GenerateDocAssets {
                 options: .default
             ),
             Sample(
+                title: "HEIC -> JPEG (forced format)",
+                filename: "real_heic_4032x3024_o6_gps_hdr.heic",
+                note: "Force JPEG output with .format(.jpeg); the HEIC source is transcoded and resized for upload endpoints that only accept JPEG",
+                options: WICompressOptions(format: .jpeg(background: .disallow))
+            ),
+            Sample(
                 title: "HEIC photo - large landscape",
                 filename: "real_heic_5712x4284_o6_gps_hdr.heic",
                 note: "Large HEIC photos get resized and re-encoded for upload",

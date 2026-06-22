@@ -20,6 +20,8 @@ public enum WICompressError: Error, Sendable, Equatable {
     case unsupportedSourceFormat(String?)
     /// The current platform cannot write the requested destination format.
     case unsupportedDestinationFormat(WIImageFormat)
+    /// Transparent source data needs an explicit background before JPEG encoding.
+    case transparentSourceRequiresBackground(WIImageFormat)
     /// Multi-frame image data is not supported.
     case animatedSourceUnsupported(frameCount: Int)
     /// The options and image facts could not produce a valid write plan.
@@ -45,6 +47,8 @@ extension WICompressError: LocalizedError {
             return "Unsupported source image format: \(identifier ?? "unknown")."
         case .unsupportedDestinationFormat(let format):
             return "The current environment cannot write the \(format) format."
+        case .transparentSourceRequiresBackground(let format):
+            return "Encoding transparent \(format) data as JPEG requires an explicit background."
         case .animatedSourceUnsupported(let frameCount):
             return "Animated images are not supported (\(frameCount) frames)."
         case .writePlanUnavailable:
