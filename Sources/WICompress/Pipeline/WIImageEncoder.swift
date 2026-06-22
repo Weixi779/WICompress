@@ -1,3 +1,11 @@
+//
+//  WIImageEncoder.swift
+//  WICompress
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import Foundation
 import ImageIO
 
@@ -14,6 +22,7 @@ enum WIImageEncoder {
     }
 
     private static func encodeFromSource(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
+        // This path lets ImageIO keep metadata and orientation tags coupled to the source.
         let outputData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             outputData,
@@ -44,6 +53,7 @@ enum WIImageEncoder {
     }
 
     private static func encodeRedrawnBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
+        // Thumbnail creation bakes orientation into pixels, which matches the default strip path.
         var thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
@@ -73,6 +83,7 @@ enum WIImageEncoder {
         }
 
         var properties = destinationProperties(for: plan)
+        // Reset the tag so readers do not rotate pixels that were already transformed.
         properties[kCGImagePropertyOrientation] = 1
 
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)

@@ -1,7 +1,17 @@
+//
+//  WICompress.swift
+//  WICompress
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import Foundation
 
+/// ImageIO-backed image compression entry point.
 public struct WICompress: Sendable {
 
+    /// Compresses image data according to the supplied options.
     public static func compress(
         _ data: Data,
         options: WICompressOptions = .default
@@ -13,12 +23,14 @@ public struct WICompress: Sendable {
         if writePlan.path != .returnOriginal,
            encodedData.count >= data.count,
            WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: imageSource.info) {
+            // Never trade policy correctness for bytes saved.
             return data
         }
 
         return encodedData
     }
 
+    /// Reads and compresses image data from a file URL.
     public static func compress(
         contentsOf url: URL,
         options: WICompressOptions = .default

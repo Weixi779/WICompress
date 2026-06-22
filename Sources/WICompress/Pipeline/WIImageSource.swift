@@ -1,3 +1,11 @@
+//
+//  WIImageSource.swift
+//  WICompress
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import Foundation
 import ImageIO
 
@@ -66,6 +74,7 @@ final class WIImageSource {
     }()
 
     private static func hasStrippableMetadata(in properties: [CFString: Any]) -> Bool {
+        // Color profiles and pixel geometry are display semantics, not privacy metadata.
         let metadataKeys: [CFString] = [
             kCGImagePropertyTIFFDictionary,
             kCGImagePropertyExifDictionary,

@@ -8,8 +8,8 @@
 [English](README.md) | 简体中文
 
 `WICompress` 是一个基于 ImageIO 的轻量级图片压缩库，支持 JPEG、PNG、
-HEIC/HEIF 数据压缩。v1.0.0 的核心入口不再依赖 UIKit / AppKit，而是直接
-处理原始 `Data` 或文件 `URL`。
+HEIC/HEIF 数据压缩。核心入口不依赖 UIKit / AppKit，而是直接处理原始
+`Data` 或文件 `URL`。
 
 ## 特性
 
@@ -129,7 +129,7 @@ public enum WIFormatPolicy {
 }
 ```
 
-v1.0.0 只支持 `.preserve`。显式格式转换，例如 PNG -> JPEG，暂不进入首版。
+初始公开版只支持 `.preserve`。显式格式转换，例如 PNG -> JPEG，暂不包含。
 原因是 JPEG 不支持 alpha，PNG 转 JPEG 必须要求调用方明确选择背景色，而不
 应该偷偷铺白。
 
@@ -148,8 +148,8 @@ public enum WIMetadataPolicy {
 色彩 profile 不是 Exif/GPS 这类隐私 metadata，而是显示语义的一部分。
 Display P3 profile 在 `copyFromSource` 和 `redrawBitmap` 两条路径下都应该保留。
 
-v1.0.0 不承诺保留 HDR gain map。Gain map 是辅助图像数据，不是普通 Exif/GPS
-字典，后续需要单独的 policy 和测试契约。
+初始公开版不承诺保留 HDR gain map。Gain map 是辅助图像数据，不是普通
+Exif/GPS 字典，后续需要单独的 policy 和测试契约。
 
 ### Quality
 
@@ -193,7 +193,7 @@ do {
 
 ## 当前边界
 
-v1.0.0 明确不包含：
+初始公开版明确不包含：
 
 - `UIImage` / `NSImage` convenience adapter
 - Live Photo 压缩
@@ -209,25 +209,10 @@ Live Photo 不是单张图片压缩。它至少包含 still photo resource、pai
 resource，以及二者之间的配对 metadata。首版 ImageIO core 只处理单张 still
 image data，不处理 Photos 层的资源配对。
 
-## 从 0.x 迁移
+## 从 0.x 升级
 
-v1.0.0 是 breaking change，旧 `UIImage` API 已删除：
-
-```swift
-WICompress.resizeImage(_:)
-WICompress.compressImage(_:quality:formatData:)
-```
-
-改为传入原始图片字节：
-
-```swift
-let compressedData = try WICompress.compress(
-    originalData,
-    options: WICompressOptions(quality: .compression(0.7))
-)
-```
-
-详细迁移说明见 [docs/MIGRATION_v1.0.0.md](docs/MIGRATION_v1.0.0.md)。
+WICompress 1.0.0 用上文展示的 `Data` / `URL` 核心 API 替换旧的
+`UIImage` API。破坏性变更摘要见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 示例项目
 
@@ -251,13 +236,14 @@ let compressedData = try WICompress.compress(
 
 ```bash
 swift test
+xcrun simctl list devices available
 xcodebuild test \
   -workspace .swiftpm/xcode/package.xcworkspace \
-  -scheme WICompress \
-  -destination 'platform=iOS Simulator,name=<device>' \
+  -scheme WICompress-Package \
+  -destination 'id=<UDID>' \
   CODE_SIGNING_ALLOWED=NO
 ```
 
 ## 许可证
 
-WICompress 基于 MIT 许可证开源。详情见 `LICENSE`。
+WICompress 基于 Apache-2.0 许可证开源。详情见 `LICENSE.txt`。

@@ -1,3 +1,11 @@
+//
+//  WIWritePlanResolver.swift
+//  WICompress
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import Foundation
 
 enum WIWritePlanResolver {
@@ -41,6 +49,7 @@ enum WIWritePlanResolver {
         }
 
         let path: WIWritePath
+        // Metadata preservation chooses the write path because ImageIO ties it to the write call.
         switch options.metadata {
         case .preserve:
             path = .copyFromSource
@@ -59,6 +68,7 @@ enum WIWritePlanResolver {
     }
 
     static func canReturnOriginalForSizeGuard(options: WICompressOptions, info: WIImageInfo) -> Bool {
+        // Size fallback is safe only when the original already satisfies observable policies.
         originalSatisfiesResize(options.resize, info: info)
             && originalSatisfiesFormat(options.format, info: info)
             && originalSatisfiesMetadata(options.metadata, info: info)
@@ -82,7 +92,7 @@ enum WIWritePlanResolver {
             return true
         case .luban:
             let displaySize = displayDimensions(for: info)
-            return WIImageUtils.calculateLubanRatio(width: displaySize.width, height: displaySize.height) == 1
+            return WILuban.ratio(width: displaySize.width, height: displaySize.height) == 1
         }
     }
 
@@ -103,6 +113,7 @@ enum WIWritePlanResolver {
     }
 
     private static func originalSatisfiesOrientation(_ policy: WIMetadataPolicy, info: WIImageInfo) -> Bool {
+        // Stripped output bakes orientation into pixels, so a rotation tag is not equivalent.
         switch policy {
         case .preserve:
             return true
@@ -133,13 +144,13 @@ enum WIWritePlanResolver {
             return nil
         case .luban:
             let displaySize = displayDimensions(for: info)
-            let ratio = WIImageUtils.calculateLubanRatio(width: displaySize.width, height: displaySize.height)
+            let ratio = WILuban.ratio(width: displaySize.width, height: displaySize.height)
             guard ratio > 1 else {
                 return nil
             }
 
             let maxPixelSize = max(max(displaySize.width, displaySize.height) / ratio, 1)
-            return maxPixelSize == 1 ? 1 : WIImageUtils.ensureEven(maxPixelSize)
+            return maxPixelSize == 1 ? 1 : WILuban.ensureEven(maxPixelSize)
         }
     }
 

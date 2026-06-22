@@ -1,3 +1,11 @@
+//
+//  generate-doc-assets.swift
+//  WICompressDocAssetGenerator
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import CoreGraphics
 import CoreText
 import Foundation

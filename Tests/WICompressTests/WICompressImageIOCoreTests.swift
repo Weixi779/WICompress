@@ -1,3 +1,11 @@
+//
+//  WICompressImageIOCoreTests.swift
+//  WICompressTests
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import Foundation
 import CoreGraphics
 import ImageIO
@@ -131,7 +139,7 @@ struct WICompressImageIOCoreTests {
         let outputData = try WICompress.compress(inputData)
         let outputInfo = try Self.imageInfo(outputData)
 
-        let ratio = WIImageUtils.calculateLubanRatio(
+        let ratio = WILuban.ratio(
             width: inputInfo.displayWidth,
             height: inputInfo.displayHeight
         )
@@ -161,7 +169,7 @@ struct WICompressImageIOCoreTests {
         )
         let outputInfo = try Self.imageInfo(outputData)
 
-        let ratio = WIImageUtils.calculateLubanRatio(
+        let ratio = WILuban.ratio(
             width: inputInfo.displayWidth,
             height: inputInfo.displayHeight
         )

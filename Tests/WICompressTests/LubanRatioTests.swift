@@ -1,10 +1,16 @@
+//
+//  LubanRatioTests.swift
+//  WICompressTests
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import Testing
 @testable import WICompress
 
 @Suite("Luban Ratio Policy", .tags(.luban))
 struct LubanRatioTests {
-
-    // MARK: - calculateLubanRatio
 
     struct RatioCase: CustomTestStringConvertible, Sendable {
         let width: Int
@@ -34,7 +40,7 @@ struct LubanRatioTests {
         RatioCase(width: 1280, height: 640, expected: 1, testDescription: "wide image at longSide boundary 1280"),
         // Branch 7: default (aspectRatio < 0.5) → ceil(shortSide / 1280)
         // (original Luban constrains the SHORT side here; dividing the long side
-        // over-shrinks long images. See WIImageUtils default branch.)
+        // over-shrinks long images. See WILuban default branch.)
         RatioCase(width: 2000, height: 500, expected: 1, testDescription: "very wide image, short side 500"),
         RatioCase(width: 2560, height: 256, expected: 1, testDescription: "panoramic image, short side 256"),
         RatioCase(width: 1440, height: 3200, expected: 2, testDescription: "long screenshot, short side 1440"),
@@ -45,11 +51,9 @@ struct LubanRatioTests {
 
     @Test("Ratio calculation covers all branches", arguments: ratioCases)
     func ratioForBranch(_ ratioCase: RatioCase) {
-        let ratio = WIImageUtils.calculateLubanRatio(width: ratioCase.width, height: ratioCase.height)
+        let ratio = WILuban.ratio(width: ratioCase.width, height: ratioCase.height)
         #expect(ratio == ratioCase.expected)
     }
-
-    // MARK: - ensureEven
 
     @Suite("ensureEven", .tags(.luban))
     struct EnsureEvenTests {
@@ -73,7 +77,7 @@ struct LubanRatioTests {
 
         @Test("ensureEven returns the documented even value", arguments: ensureEvenCases)
         func ensureEven(_ ensureEvenCase: EnsureEvenCase) {
-            #expect(WIImageUtils.ensureEven(ensureEvenCase.value) == ensureEvenCase.expected)
+            #expect(WILuban.ensureEven(ensureEvenCase.value) == ensureEvenCase.expected)
         }
     }
 }

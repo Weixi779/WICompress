@@ -133,8 +133,8 @@ public enum WIFormatPolicy {
 }
 ```
 
-v1.0.0 only supports `.preserve`. Explicit conversion such as PNG -> JPEG is
-not part of the initial release because alpha flattening requires an explicit
+The initial public release only supports `.preserve`. Explicit conversion such
+as PNG -> JPEG is not included because alpha flattening requires an explicit
 background policy.
 
 ### Metadata
@@ -154,9 +154,9 @@ public enum WIMetadataPolicy {
 Color profiles are display semantics, not privacy metadata. Display P3 profiles
 are expected to survive both source-copy and redraw paths.
 
-HDR gain maps are not preserved by v1.0.0. They require a separate policy and
-test contract because gain maps are auxiliary image data, not ordinary Exif/GPS
-metadata.
+HDR gain maps are not preserved by the initial public release. They require a
+separate policy and test contract because gain maps are auxiliary image data,
+not ordinary Exif/GPS metadata.
 
 ### Quality
 
@@ -202,7 +202,7 @@ Common cases:
 
 ## Current Limits
 
-v1.0.0 intentionally does not include:
+The initial public release intentionally does not include:
 
 - `UIImage` / `NSImage` convenience adapters
 - Live Photo compression
@@ -218,26 +218,11 @@ For Live Photos, compressing the still image resource alone is not enough: the
 paired video resource and pairing metadata also need to be handled. That belongs
 in a Photos-level workflow, not the v1 ImageIO core.
 
-## Migration From 0.x
+## Upgrading From 0.x
 
-v1.0.0 is a breaking API change. The old `UIImage` APIs have been removed:
-
-```swift
-WICompress.resizeImage(_:)
-WICompress.compressImage(_:quality:formatData:)
-```
-
-Use the original bytes instead:
-
-```swift
-let compressedData = try WICompress.compress(
-    originalData,
-    options: WICompressOptions(quality: .compression(0.7))
-)
-```
-
-See [docs/MIGRATION_v1.0.0.md](docs/MIGRATION_v1.0.0.md) for detailed migration
-notes.
+WICompress 1.0.0 replaces the old `UIImage`-oriented API with the `Data`/`URL`
+core API shown above. See [CHANGELOG.md](CHANGELOG.md) for the breaking change
+summary.
 
 ## Example Project
 
@@ -261,13 +246,14 @@ The core is covered by Swift Testing on macOS and by iOS simulator tests:
 
 ```bash
 swift test
+xcrun simctl list devices available
 xcodebuild test \
   -workspace .swiftpm/xcode/package.xcworkspace \
-  -scheme WICompress \
-  -destination 'platform=iOS Simulator,name=<device>' \
+  -scheme WICompress-Package \
+  -destination 'id=<UDID>' \
   CODE_SIGNING_ALLOWED=NO
 ```
 
 ## License
 
-WICompress is available under the MIT license. See `LICENSE` for details.
+WICompress is available under the Apache-2.0 license. See `LICENSE.txt` for details.

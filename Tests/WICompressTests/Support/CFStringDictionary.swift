@@ -1,3 +1,11 @@
+//
+//  CFStringDictionary.swift
+//  WICompressTests
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import Foundation
 
 /// Shared accessors for ImageIO property dictionaries (`[CFString: Any]`) used

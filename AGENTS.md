@@ -28,10 +28,49 @@ swift test
 swift package resolve
 ```
 
+## Repository Layout
+
+Use capitalized names for Swift/package roots (`Sources`, `Tests`, `Example`)
+and lowercase names for auxiliary repository directories (`docs`, `scripts`).
+
+## CodeGraph
+
+This repository is initialized for CodeGraph. The `.codegraph/` directory is a
+local index and is ignored by git.
+
+Use CodeGraph for structural questions:
+
+| Question | Tool |
+|---|---|
+| Where is a symbol defined? | `codegraph_search` |
+| What calls a symbol? | `codegraph_callers` |
+| What does a symbol call? | `codegraph_callees` |
+| How does one symbol reach another? | `codegraph_trace` |
+| What changes if this symbol changes? | `codegraph_impact` |
+| Show symbol signature/source/context | `codegraph_node`, `codegraph_context`, `codegraph_explore` |
+| What files exist under a path? | `codegraph_files` |
+
+Prefer `codegraph_context` first for architecture, feature, or bug-context
+questions. Prefer `codegraph_trace` for flow questions. Use `rg` for literal
+text, comments, log messages, or string contents. If CodeGraph reports pending
+sync for edited files, read those specific files directly before relying on the
+stale snippets.
+
 ## Architecture
 
-The core is a UIKit-free ImageIO pipeline under `Sources/WICompress/Core/`. The
-public entry point is `Data`/`URL` in, `Data` out:
+The core is a UIKit-free ImageIO pipeline under `Sources/WICompress/`, grouped
+by role:
+
+```text
+Sources/WICompress/
+  WICompress.swift
+  Model/
+  Policies/
+  Pipeline/
+  Algorithm/
+```
+
+The public entry point is `Data`/`URL` in, `Data` out:
 
 ```text
 Data / URL
@@ -54,7 +93,7 @@ Key types:
    `returnOriginal` / `copyFromSource` / `redrawBitmap`.
 5. **WIImageEncoder** - executes the plan via `CGImageDestination`.
 6. **WIImageFormat** - `UTType`-based container detection (JPEG/PNG/HEIF/unknown).
-7. **WIImageUtils** - Luban ratio math (`calculateLubanRatio`, `ensureEven`).
+7. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
 8. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
 
 ## Key Implementation Details
@@ -79,6 +118,34 @@ Key types:
   example `.strip` must not hand back a GPS-bearing original.
 - **Error handling**: throws `WICompressError`, never returns optional/nil.
 
+## Code Style
+
+Comments are minimalist:
+
+- Start Swift source files with the standard repository header:
+  filename, code scope, `Created by weixi on YYYY/M/D.`, and a one-line
+  copyright + Apache-2.0 license notice. Skip this header in `Package.swift`,
+  where `// swift-tools-version` must stay first. Use this shape:
+
+  ```swift
+  //
+  //  SomeFile.swift
+  //  WICompress
+  //
+  //  Created by weixi on 2026/6/22.
+  //  Copyright © 2024 weixi. Licensed under Apache-2.0.
+  //
+  ```
+
+- Document public API with a single-sentence `///` summary. Skip it when the
+  signature is already self-explanatory.
+- Do not add `- Parameter` / `- Returns` / `- Throws` boilerplate unless it states
+  something the signature does not.
+- Comment the non-obvious *why* (rationale, platform quirks, gotchas), never the
+  *what*. If a comment just restates the code, delete it or rename the code.
+- No decorative ASCII banners, extra dates, or changelog comments in source.
+- Prefer a clearer name over a comment.
+
 ## Testing Framework
 
 Uses Swift Testing framework, not XCTest. Tests are located in
@@ -90,7 +157,7 @@ Tests are organized by `@Suite` and filtered by `@Tag`:
 
 | Tag | Scope |
 |---|---|
-| `.luban` | Luban algorithm logic (`calculateLubanRatio`, `ensureEven`) |
+| `.luban` | Luban algorithm logic (`WILuban.ratio`, `WILuban.ensureEven`) |
 | `.format` | Image format detection (`WIImageFormat`) |
 | `.compression` | Compression and resize behavior (`WICompress` public API) |
 | `.imageIOCore` | ImageIO core: write-path resolution, encoder, real-image contracts |
@@ -144,7 +211,7 @@ xcodebuild build \
 
 All suites run under `swift test` on macOS; none depend on UIKit:
 
-- `LubanRatioTests` - Luban switch branches and `ensureEven` edge cases
+- `LubanRatioTests` - Luban switch branches and `WILuban.ensureEven` edge cases
 - `WIImageFormatTests` - `UTType`-based format detection (JPEG, PNG, unknown)
 - `WICompressPublicSurfaceTests` - default options, no-op passthrough, error mapping
 - `WICompressImageIOCoreTests` - write-path behavior on real fixtures: GPS strip

@@ -1,20 +1,19 @@
+//
+//  WILuban.swift
+//  WICompress
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
+
 import Foundation
 
-public struct WIImageUtils: Sendable {
-    
-    /// Ensures a given size is even by adding 1 if it's odd
-    /// - Parameter size: The size to ensure is even
-    /// - Returns: An even integer
+enum WILuban {
     static func ensureEven(_ size: Int) -> Int {
         return size % 2 != 0 ? size + 1 : size
     }
-    
-    /// Calculates the compression ratio using the Luban algorithm.
-    /// - Parameters:
-    ///   - width: The width of the image.
-    ///   - height: The height of the image.
-    /// - Returns: The computed compression ratio.
-    public static func calculateLubanRatio(width: Int, height: Int) -> Int {
+
+    static func ratio(width: Int, height: Int) -> Int {
         let longSide = max(ensureEven(width), ensureEven(height))
         let shortSide = min(ensureEven(width), ensureEven(height))
         let aspectRatio = Double(shortSide) / Double(longSide)
