@@ -42,6 +42,8 @@ let uploadData = try WICompress.compress(
   lossy quality are configured for common app uploads.
 - **Format control**: preserve the source container or explicitly output JPEG,
   PNG, or HEIC.
+- **Target compression**: request a hard byte limit and optional longest-side
+  cap for share/upload SDK constraints.
 - **Alpha-safe JPEG conversion**: transparent sources require an explicit white
   or black background instead of silently flattening.
 - **Orientation-safe resizing**: display dimensions are resolved from ImageIO
@@ -109,6 +111,20 @@ let compressedData = try WICompress.compress(
         format: .preserve,
         metadata: .strip,
         quality: .compression(0.7)
+    )
+)
+```
+
+Compress to final output constraints:
+
+```swift
+let thumbnailData = try WICompress.compress(
+    originalData,
+    to: WICompressionTarget(
+        maxBytes: 2 * 1024 * 1024,
+        maxLongSide: 512,
+        format: .jpeg(background: .white),
+        metadata: .strip
     )
 )
 ```
@@ -230,6 +246,35 @@ the write plan can safely return the original data.
 
 PNG is lossless; the quality policy is intentionally a no-op for PNG.
 
+## Target Compression
+
+Use `WICompressionTarget` when the result must satisfy final output limits.
+This mode owns the internal resolution and quality decisions.
+
+```swift
+public struct WICompressionTarget {
+    public var maxBytes: Int
+    public var maxLongSide: Int?
+    public var format: WIFormatPolicy
+    public var metadata: WIMetadataPolicy
+}
+```
+
+- `maxBytes`: hard upper bound for the returned `Data.count`.
+- `maxLongSide`: optional cap for the longest EXIF-oriented display side.
+- `format`: preserves the source container by default, or writes an explicit
+  JPEG, PNG, or HEIC destination.
+- `metadata`: strips privacy-heavy metadata by default.
+
+If the source already satisfies all target constraints, `format: .preserve` and
+`metadata: .preserve` may return the original data. Otherwise target mode
+searches for a valid output. JPEG and HEIC can adjust lossy quality and
+dimensions; PNG keeps PNG output and adjusts dimensions only.
+
+`maxBytes` is a hard limit. If no output can satisfy the requested format,
+metadata, dimension, and byte constraints, the API throws
+`WICompressError.targetBytesUnreachable`.
+
 ## Error Handling
 
 All public APIs throw `WICompressError`.
@@ -263,7 +308,6 @@ The initial public release intentionally does not include:
 - Live Photo compression
 - async API
 - GPS-only metadata stripping
-- target-byte-size compression
 - HDR gain map preservation
 - animated image output
 - WebP / JPEG XL writing

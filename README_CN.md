@@ -37,6 +37,7 @@ let uploadData = try WICompress.compress(
 - **Data in, Data out**：保留相册、文件或网络拿到的原始字节，直接传给压缩器。
 - **适合上传的默认值**：Luban resize、metadata strip、JPEG/HEIC 有损质量。
 - **格式可控**：默认保持源格式，也可以显式输出 JPEG、PNG 或 HEIC。
+- **目标压缩**：可以声明硬性字节上限和可选最长边，适配分享/上传 SDK 约束。
 - **透明图转 JPEG 更安全**：必须显式选择白底或黑底，不会偷偷铺底。
 - **方向安全**：基于 ImageIO 读取展示尺寸，redraw path 会把方向烘焙进像素。
 - **核心不依赖 UIKit / AppKit**：可在 iOS App、macOS 工具和 SwiftPM 测试中使用。
@@ -97,6 +98,20 @@ let compressedData = try WICompress.compress(
         format: .preserve,
         metadata: .strip,
         quality: .compression(0.7)
+    )
+)
+```
+
+压缩到最终输出约束：
+
+```swift
+let thumbnailData = try WICompress.compress(
+    originalData,
+    to: WICompressionTarget(
+        maxBytes: 2 * 1024 * 1024,
+        maxLongSide: 512,
+        format: .jpeg(background: .white),
+        metadata: .strip
     )
 )
 ```
@@ -211,6 +226,33 @@ public enum WIQualityPolicy {
 
 PNG 是无损格式，quality 对 PNG 不会被理解为有损压缩。
 
+## Target Compression
+
+当调用方需要最终结果满足硬性限制时，使用 `WICompressionTarget`。这个模式由
+库内部决定 resolution 和 quality。
+
+```swift
+public struct WICompressionTarget {
+    public var maxBytes: Int
+    public var maxLongSide: Int?
+    public var format: WIFormatPolicy
+    public var metadata: WIMetadataPolicy
+}
+```
+
+- `maxBytes`：返回 `Data.count` 的硬性上限。
+- `maxLongSide`：可选，限制 EXIF-oriented display long side。
+- `format`：默认保持源容器，也可以显式输出 JPEG、PNG 或 HEIC。
+- `metadata`：默认剥离隐私 metadata。
+
+如果源图已经满足所有 target 约束，且 `format: .preserve`、
+`metadata: .preserve`，target mode 可以直接返回原始 data。否则它会搜索合法
+输出。JPEG 和 HEIC 可以同时调整有损 quality 和尺寸；PNG 保持 PNG 输出，只
+调整尺寸。
+
+`maxBytes` 是硬限制。如果没有任何输出能同时满足格式、metadata、尺寸和字节
+约束，API 会抛出 `WICompressError.targetBytesUnreachable`。
+
 ## 错误处理
 
 public API 使用 `throws`：
@@ -243,7 +285,6 @@ do {
 - Live Photo 压缩
 - async API
 - 只剥离 GPS 的 metadata 策略
-- target bytes / max file size 压缩
 - HDR gain map preserve
 - 动图写出
 - WebP / JPEG XL 写出

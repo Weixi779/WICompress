@@ -44,4 +44,28 @@ public struct WICompress: Sendable {
 
         return try compress(data, options: options)
     }
+
+    /// Compresses image data until it satisfies the supplied output target.
+    public static func compress(
+        _ data: Data,
+        to target: WICompressionTarget
+    ) throws(WICompressError) -> Data {
+        let imageSource = try WIImageSource(data: data)
+        return try WITargetCompressionSolver.compress(imageSource, target: target)
+    }
+
+    /// Reads image data from a file URL and compresses it to the supplied output target.
+    public static func compress(
+        contentsOf url: URL,
+        to target: WICompressionTarget
+    ) throws(WICompressError) -> Data {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw WICompressError.fileReadFailed(url)
+        }
+
+        return try compress(data, to: target)
+    }
 }

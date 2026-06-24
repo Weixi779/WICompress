@@ -26,6 +26,10 @@ public enum WICompressError: Error, Sendable, Equatable {
     case animatedSourceUnsupported(frameCount: Int)
     /// The options and image facts could not produce a valid write plan.
     case writePlanUnavailable
+    /// The target compression constraints are invalid.
+    case invalidCompressionTarget
+    /// The encoder could not satisfy the requested byte limit.
+    case targetBytesUnreachable(maxBytes: Int, bestByteCount: Int?)
     /// ImageIO could not create the downsampled bitmap.
     case thumbnailCreationFailed
     /// ImageIO could not create an output destination.
@@ -53,6 +57,14 @@ extension WICompressError: LocalizedError {
             return "Animated images are not supported (\(frameCount) frames)."
         case .writePlanUnavailable:
             return "Could not resolve a valid write plan for the given options."
+        case .invalidCompressionTarget:
+            return "The compression target must use positive byte and dimension limits."
+        case .targetBytesUnreachable(let maxBytes, let bestByteCount):
+            if let bestByteCount {
+                return "Could not compress the image under \(maxBytes) bytes. Best attempt was \(bestByteCount) bytes."
+            }
+
+            return "Could not compress the image under \(maxBytes) bytes."
         case .thumbnailCreationFailed:
             return "Failed to create a downsampled image during compression."
         case .destinationCreationFailed(let format):

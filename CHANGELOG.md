@@ -7,6 +7,28 @@ Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `WICompressionTarget` for result-constrained compression with `maxBytes`,
+  optional `maxLongSide`, output format, and metadata policy.
+- `WICompress.compress(_:to:)` and `WICompress.compress(contentsOf:to:)` target
+  compression APIs.
+- Target compression solver that searches dimensions and lossy quality for
+  JPEG/HEIC while keeping PNG output in PNG and shrinking dimensions only.
+- `WICompressError.invalidCompressionTarget` for invalid target limits.
+- `WICompressError.targetBytesUnreachable` when no encoded output can satisfy
+  the requested byte limit and output constraints.
+
+### Changed
+
+- The documented current limits no longer list target-byte-size compression as
+  unsupported.
+
+### Known Limitations
+
+- Target compression does not perform PNG palette quantization.
+- Target compression does not silently switch formats to satisfy `maxBytes`.
+
 ## [1.1.0] - 2026-06-22
 
 Adds explicit output control for callers that need a specific upload format or
