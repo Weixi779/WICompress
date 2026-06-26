@@ -7,6 +7,16 @@ Versioning.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-26
+
+Fixes fit resize max-size handling for long screenshots and panoramic images.
+
+### Fixed
+
+- Fixed `WIResizePolicy.fit(minSize:maxSize:)` so `maxSize` is a hard bounding
+  box. Images now downscale when either side exceeds `maxSize`, not only when
+  both sides exceed it.
+
 ## [1.2.0] - 2026-06-26
 
 Adds alpha-aware output selection and range-based resize fitting while keeping

@@ -210,7 +210,7 @@ struct WIWritePlanResolverTests {
         #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: info) == false)
     }
 
-    @Test(".fit downscales only when both sides are above the maximum size")
+    @Test(".fit downscales into the maximum size")
     func fitDownscalesLargeImages() throws {
         let info = Self.syntheticInfo(width: 720, height: 1080)
         let options = WICompressOptions(
@@ -226,13 +226,13 @@ struct WIWritePlanResolverTests {
         let plan = try WIWritePlanResolver.resolve(options: options, info: info)
 
         #expect(plan.path == .copyFromSource)
-        #expect(plan.maxPixelSize == 600)
-        #expect(plan.targetPixelSize == WIPixelSize(width: 400, height: 600))
+        #expect(plan.maxPixelSize == 467)
+        #expect(plan.targetPixelSize == WIPixelSize(width: 311, height: 467))
         #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: info) == false)
     }
 
-    @Test(".fit leaves the asset unchanged when either side is already in range")
-    func fitLeavesImagesWithOneSideInRangeUnchanged() throws {
+    @Test(".fit leaves the asset unchanged when it is within max and not below min")
+    func fitLeavesImagesWithinMaxUnchanged() throws {
         let info = Self.syntheticInfo(width: 120, height: 20)
         let options = WICompressOptions(
             resize: .fit(
@@ -250,6 +250,29 @@ struct WIWritePlanResolverTests {
         #expect(plan.maxPixelSize == nil)
         #expect(plan.targetPixelSize == nil)
         #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: info) == true)
+    }
+
+    @Test(".fit downscales when only one side exceeds the maximum size")
+    func fitDownscalesSingleOversizedSide() throws {
+        let wideInfo = Self.syntheticInfo(width: 12000, height: 1000)
+        let tallInfo = Self.syntheticInfo(width: 1080, height: 20000)
+        let options = WICompressOptions(
+            resize: .fit(
+                minSize: WISize(width: 40, height: 50),
+                maxSize: WISize(width: 400, height: 467)
+            ),
+            format: .preserve,
+            metadata: .preserve,
+            quality: .none
+        )
+
+        let widePlan = try WIWritePlanResolver.resolve(options: options, info: wideInfo)
+        let tallPlan = try WIWritePlanResolver.resolve(options: options, info: tallInfo)
+
+        #expect(widePlan.targetPixelSize == WIPixelSize(width: 400, height: 33))
+        #expect(widePlan.maxPixelSize == 400)
+        #expect(tallPlan.targetPixelSize == WIPixelSize(width: 25, height: 467))
+        #expect(tallPlan.maxPixelSize == 467)
     }
 
     @Test(".fit uses EXIF-oriented display dimensions")

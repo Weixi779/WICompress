@@ -184,9 +184,10 @@ public enum WIResizePolicy {
 - `.maxPixel(value)`: caps the longest display side to `value` pixels and never
   upscales smaller images.
 - `.fit(minSize:maxSize:)`: keeps aspect ratio, upscales only when both display
-  sides are below `minSize`, downscales only when both sides are above `maxSize`,
-  and leaves the image unchanged when either side is already in range. This
-  policy can enlarge small bitmap assets; the core remains UIKit/AppKit-free.
+  sides are below `minSize`, downscales when either side exceeds `maxSize`, and
+  leaves the image unchanged when it is already within `maxSize` and not below
+  `minSize`. This policy can enlarge small bitmap assets; the core remains
+  UIKit/AppKit-free.
 - `.none`: keeps the source display dimensions.
 
 ### Format

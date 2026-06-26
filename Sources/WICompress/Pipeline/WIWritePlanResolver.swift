@@ -254,8 +254,8 @@ enum WIWritePlanResolver {
         let scale: Double
         if width < minWidth, height < minHeight {
             scale = min(minWidth / width, minHeight / height)
-        } else if width > maxWidth, height > maxHeight {
-            scale = max(maxWidth / width, maxHeight / height)
+        } else if width > maxWidth || height > maxHeight {
+            scale = min(maxWidth / width, maxHeight / height)
         } else {
             return nil
         }

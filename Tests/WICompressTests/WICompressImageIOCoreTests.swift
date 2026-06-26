@@ -356,8 +356,31 @@ struct WICompressImageIOCoreTests {
         let outputInfo = try Self.imageInfo(outputData)
 
         #expect(WIImageFormat(data: outputData) == .png)
+        #expect(outputInfo.displayWidth == 311)
+        #expect(outputInfo.displayHeight == 467)
+    }
+
+    @Test(".fit resize downscales assets with only one oversized side")
+    func fitResizeDownscalesSingleOversizedSide() throws {
+        let inputData = try Self.solidPNG(width: 1200, height: 100)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .fit(
+                    minSize: WISize(width: 40, height: 50),
+                    maxSize: WISize(width: 400, height: 467)
+                ),
+                format: .preserve,
+                metadata: .strip,
+                quality: .none
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .png)
         #expect(outputInfo.displayWidth == 400)
-        #expect(outputInfo.displayHeight == 600)
+        #expect(outputInfo.displayHeight == 33)
     }
 
     @Test("Explicit same-format JPEG still rewrites instead of returning original")

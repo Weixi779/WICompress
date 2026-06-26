@@ -170,9 +170,10 @@ public enum WIResizePolicy {
 
 - `.luban`：默认值。按 Luban 策略对大图等比下采样。
 - `.maxPixel(value)`：把最长展示边限制到 `value` 像素，不会放大小图。
-- `.fit(minSize:maxSize:)`：保持比例；只有宽高都小于 `minSize` 时才放大，
-  只有宽高都大于 `maxSize` 时才缩小；只要任意一边已经落在范围内就不额外缩放。
-  这个策略可以放大小图 bitmap，同时核心仍不依赖 UIKit / AppKit。
+- `.fit(minSize:maxSize:)`：保持比例；只有宽高都小于 `minSize` 时才放大；
+  只要任意一边超过 `maxSize` 就缩小，确保输出整体落进 `maxSize`；已经在
+  `maxSize` 内且不满足小图放大条件时不额外缩放。这个策略可以放大小图 bitmap，
+  同时核心仍不依赖 UIKit / AppKit。
 - `.none`：保留源图展示尺寸。
 
 ### Format
