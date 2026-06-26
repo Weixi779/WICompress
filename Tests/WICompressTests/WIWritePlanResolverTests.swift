@@ -189,6 +189,89 @@ struct WIWritePlanResolverTests {
         #expect(noUpscalePlan.path == .returnOriginal)
     }
 
+    @Test(".fit upscales only when both sides are below the minimum size")
+    func fitUpscalesSmallImages() throws {
+        let info = Self.syntheticInfo(width: 20, height: 20)
+        let options = WICompressOptions(
+            resize: .fit(
+                minSize: WISize(width: 40, height: 50),
+                maxSize: WISize(width: 400, height: 467)
+            ),
+            format: .preserve,
+            metadata: .preserve,
+            quality: .none
+        )
+
+        let plan = try WIWritePlanResolver.resolve(options: options, info: info)
+
+        #expect(plan.path == .redrawBitmap)
+        #expect(plan.maxPixelSize == nil)
+        #expect(plan.targetPixelSize == WIPixelSize(width: 40, height: 40))
+        #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: info) == false)
+    }
+
+    @Test(".fit downscales only when both sides are above the maximum size")
+    func fitDownscalesLargeImages() throws {
+        let info = Self.syntheticInfo(width: 720, height: 1080)
+        let options = WICompressOptions(
+            resize: .fit(
+                minSize: WISize(width: 40, height: 50),
+                maxSize: WISize(width: 400, height: 467)
+            ),
+            format: .preserve,
+            metadata: .preserve,
+            quality: .none
+        )
+
+        let plan = try WIWritePlanResolver.resolve(options: options, info: info)
+
+        #expect(plan.path == .copyFromSource)
+        #expect(plan.maxPixelSize == 600)
+        #expect(plan.targetPixelSize == WIPixelSize(width: 400, height: 600))
+        #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: info) == false)
+    }
+
+    @Test(".fit leaves the asset unchanged when either side is already in range")
+    func fitLeavesImagesWithOneSideInRangeUnchanged() throws {
+        let info = Self.syntheticInfo(width: 120, height: 20)
+        let options = WICompressOptions(
+            resize: .fit(
+                minSize: WISize(width: 40, height: 50),
+                maxSize: WISize(width: 400, height: 467)
+            ),
+            format: .preserve,
+            metadata: .preserve,
+            quality: .none
+        )
+
+        let plan = try WIWritePlanResolver.resolve(options: options, info: info)
+
+        #expect(plan.path == .returnOriginal)
+        #expect(plan.maxPixelSize == nil)
+        #expect(plan.targetPixelSize == nil)
+        #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: info) == true)
+    }
+
+    @Test(".fit uses EXIF-oriented display dimensions")
+    func fitUsesOrientedDisplayDimensions() throws {
+        let info = Self.syntheticInfo(width: 20, height: 30, orientation: 6)
+        let plan = try WIWritePlanResolver.resolve(
+            options: WICompressOptions(
+                resize: .fit(
+                    minSize: WISize(width: 40, height: 50),
+                    maxSize: WISize(width: 400, height: 467)
+                ),
+                format: .preserve,
+                metadata: .preserve,
+                quality: .none
+            ),
+            info: info
+        )
+
+        #expect(plan.path == .redrawBitmap)
+        #expect(plan.targetPixelSize == WIPixelSize(width: 40, height: 27))
+    }
+
     @Test("Explicit format is never return-original eligible")
     func explicitFormatIsNeverReturnOriginalEligible() throws {
         let info = try Self.imageInfo(
@@ -328,5 +411,25 @@ struct WIWritePlanResolverTests {
         )
         let data = try Data(contentsOf: url)
         return try WIImageSource(data: data).info
+    }
+
+    private static func syntheticInfo(
+        width: Int,
+        height: Int,
+        orientation: Int = 1
+    ) -> WIImageInfo {
+        WIImageInfo(
+            sourceFormat: .png,
+            typeIdentifier: "public.png",
+            pixelWidth: width,
+            pixelHeight: height,
+            orientation: orientation,
+            frameCount: 1,
+            isSourceFormatWritable: true,
+            hasMetadata: false,
+            hasGPS: false,
+            hasGainMap: false,
+            hasAlpha: true
+        )
     }
 }

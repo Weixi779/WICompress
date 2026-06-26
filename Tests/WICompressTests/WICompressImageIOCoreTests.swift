@@ -314,6 +314,52 @@ struct WICompressImageIOCoreTests {
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) <= 600)
     }
 
+    @Test(".fit resize upscales small assets")
+    func fitResizeUpscalesSmallAssets() throws {
+        let inputData = try Self.solidPNG(width: 20, height: 20)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .fit(
+                    minSize: WISize(width: 40, height: 50),
+                    maxSize: WISize(width: 400, height: 467)
+                ),
+                format: .preserve,
+                metadata: .strip,
+                quality: .none
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .png)
+        #expect(outputInfo.displayWidth == 40)
+        #expect(outputInfo.displayHeight == 40)
+    }
+
+    @Test(".fit resize downscales large assets")
+    func fitResizeDownscalesLargeAssets() throws {
+        let inputData = try Self.solidPNG(width: 720, height: 1080)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .fit(
+                    minSize: WISize(width: 40, height: 50),
+                    maxSize: WISize(width: 400, height: 467)
+                ),
+                format: .preserve,
+                metadata: .strip,
+                quality: .none
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .png)
+        #expect(outputInfo.displayWidth == 400)
+        #expect(outputInfo.displayHeight == 600)
+    }
+
     @Test("Explicit same-format JPEG still rewrites instead of returning original")
     func explicitSameFormatJPEGDoesNotReturnOriginal() throws {
         let url = try Self.resource("real_jpeg_738x1302_recompressed", extension: "jpg")

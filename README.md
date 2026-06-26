@@ -148,16 +148,25 @@ WICompressOptions(
 ### Resize
 
 ```swift
+public struct WISize {
+    public var width: Double
+    public var height: Double
+}
+
 public enum WIResizePolicy {
     case none
     case luban
     case maxPixel(Int)
+    case fit(minSize: WISize, maxSize: WISize)
 }
 ```
 
 - `.luban`: default. Downsamples large images using the Luban ratio.
 - `.maxPixel(value)`: caps the longest display side to `value` pixels and never
   upscales smaller images.
+- `.fit(minSize:maxSize:)`: keeps aspect ratio, upscales only when both display
+  sides are below `minSize`, downscales only when both sides are above `maxSize`,
+  and leaves the image unchanged when either side is already in range.
 - `.none`: keeps the source display dimensions.
 
 ### Format

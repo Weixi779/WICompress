@@ -13,9 +13,15 @@ struct WIWritePlan: Sendable, Equatable {
     var destinationFormat: WIImageFormat
     var destinationTypeIdentifier: String
     var maxPixelSize: Int?
+    var targetPixelSize: WIPixelSize?
     var metadataPolicy: WIMetadataPolicy
     var quality: Double?
     var jpegBackground: WIJPEGBackground?
+}
+
+struct WIPixelSize: Sendable, Equatable {
+    var width: Int
+    var height: Int
 }
 
 enum WIWritePath: Sendable, Equatable {

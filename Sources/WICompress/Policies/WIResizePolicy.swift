@@ -16,4 +16,6 @@ public enum WIResizePolicy: Sendable, Equatable {
     case luban
     /// Cap the longest display side without upscaling smaller images.
     case maxPixel(Int)
+    /// Fit display dimensions into the acceptable size range, allowing upscaling or downscaling.
+    case fit(minSize: WISize, maxSize: WISize)
 }

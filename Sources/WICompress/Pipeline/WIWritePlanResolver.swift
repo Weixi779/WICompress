@@ -18,7 +18,7 @@ enum WIWritePlanResolver {
         let destination = try resolvedDestination(for: options.format, info: info)
         let destinationFormat = destination.format
         let destinationTypeIdentifier = destination.typeIdentifier
-        let maxPixelSize = resolvedMaxPixelSize(for: options.resize, info: info)
+        let resize = resolvedResize(for: options.resize, info: info)
         let quality = resolvedQuality(for: options.quality, destinationFormat: destinationFormat)
 
         if canReturnOriginalUpfront(options: options, info: info) {
@@ -26,7 +26,8 @@ enum WIWritePlanResolver {
                 path: .returnOriginal,
                 destinationFormat: destinationFormat,
                 destinationTypeIdentifier: destinationTypeIdentifier,
-                maxPixelSize: maxPixelSize,
+                maxPixelSize: resize.maxPixelSize,
+                targetPixelSize: resize.targetPixelSize,
                 metadataPolicy: options.metadata,
                 quality: quality,
                 jpegBackground: destination.jpegBackground
@@ -42,7 +43,8 @@ enum WIWritePlanResolver {
                     path: .returnOriginal,
                     destinationFormat: destinationFormat,
                     destinationTypeIdentifier: destinationTypeIdentifier,
-                    maxPixelSize: maxPixelSize,
+                    maxPixelSize: resize.maxPixelSize,
+                    targetPixelSize: resize.targetPixelSize,
                     metadataPolicy: options.metadata,
                     quality: quality,
                     jpegBackground: destination.jpegBackground
@@ -55,6 +57,8 @@ enum WIWritePlanResolver {
         let path: WIWritePath
         // Metadata preservation chooses the write path because ImageIO ties it to the write call.
         switch (options.format, options.metadata) {
+        case (.preserve, .preserve) where resize.requiresRedraw:
+            path = .redrawBitmap
         case (.preserve, .preserve):
             path = .copyFromSource
         case (.preserve, .strip),
@@ -69,7 +73,8 @@ enum WIWritePlanResolver {
             path: path,
             destinationFormat: destinationFormat,
             destinationTypeIdentifier: destinationTypeIdentifier,
-            maxPixelSize: maxPixelSize,
+            maxPixelSize: resize.maxPixelSize,
+            targetPixelSize: resize.targetPixelSize,
             metadataPolicy: options.metadata,
             quality: quality,
             jpegBackground: destination.jpegBackground
@@ -106,6 +111,8 @@ enum WIWritePlanResolver {
             let displaySize = displayDimensions(for: info)
             let longSide = max(displaySize.width, displaySize.height)
             return max(maxPixel, 1) >= longSide
+        case .fit(let minSize, let maxSize):
+            return fitTargetPixelSize(for: info, minSize: minSize, maxSize: maxSize) == nil
         }
     }
 
@@ -153,28 +160,42 @@ enum WIWritePlanResolver {
         }
     }
 
-    private static func resolvedMaxPixelSize(for policy: WIResizePolicy, info: WIImageInfo) -> Int? {
+    private static func resolvedResize(for policy: WIResizePolicy, info: WIImageInfo) -> WIResolvedResize {
         switch policy {
         case .none:
-            return nil
+            return WIResolvedResize()
         case .luban:
             let displaySize = displayDimensions(for: info)
             let ratio = WILuban.ratio(width: displaySize.width, height: displaySize.height)
             guard ratio > 1 else {
-                return nil
+                return WIResolvedResize()
             }
 
             let maxPixelSize = max(max(displaySize.width, displaySize.height) / ratio, 1)
-            return maxPixelSize == 1 ? 1 : WILuban.ensureEven(maxPixelSize)
+            return WIResolvedResize(maxPixelSize: maxPixelSize == 1 ? 1 : WILuban.ensureEven(maxPixelSize))
         case .maxPixel(let maxPixel):
             let displaySize = displayDimensions(for: info)
             let longSide = max(displaySize.width, displaySize.height)
             let cappedMaxPixel = max(maxPixel, 1)
             guard cappedMaxPixel < longSide else {
-                return nil
+                return WIResolvedResize()
             }
 
-            return cappedMaxPixel
+            return WIResolvedResize(maxPixelSize: cappedMaxPixel)
+        case .fit(let minSize, let maxSize):
+            guard let targetPixelSize = fitTargetPixelSize(for: info, minSize: minSize, maxSize: maxSize) else {
+                return WIResolvedResize()
+            }
+
+            let displaySize = displayDimensions(for: info)
+            let targetLongSide = max(targetPixelSize.width, targetPixelSize.height)
+            let sourceLongSide = max(displaySize.width, displaySize.height)
+
+            return WIResolvedResize(
+                maxPixelSize: targetLongSide < sourceLongSide ? targetLongSide : nil,
+                targetPixelSize: targetPixelSize,
+                requiresRedraw: targetLongSide > sourceLongSide
+            )
         }
     }
 
@@ -215,5 +236,52 @@ enum WIWritePlanResolver {
         default:
             return (info.pixelWidth, info.pixelHeight)
         }
+    }
+
+    private static func fitTargetPixelSize(
+        for info: WIImageInfo,
+        minSize: WISize,
+        maxSize: WISize
+    ) -> WIPixelSize? {
+        let displaySize = displayDimensions(for: info)
+        let width = Double(max(displaySize.width, 1))
+        let height = Double(max(displaySize.height, 1))
+        let minWidth = positiveDimension(minSize.width)
+        let minHeight = positiveDimension(minSize.height)
+        let maxWidth = max(positiveDimension(maxSize.width), minWidth)
+        let maxHeight = max(positiveDimension(maxSize.height), minHeight)
+
+        let scale: Double
+        if width < minWidth, height < minHeight {
+            scale = min(minWidth / width, minHeight / height)
+        } else if width > maxWidth, height > maxHeight {
+            scale = max(maxWidth / width, maxHeight / height)
+        } else {
+            return nil
+        }
+
+        let targetWidth = max(Int((width * scale).rounded(.toNearestOrAwayFromZero)), 1)
+        let targetHeight = max(Int((height * scale).rounded(.toNearestOrAwayFromZero)), 1)
+        return WIPixelSize(width: targetWidth, height: targetHeight)
+    }
+
+    private static func positiveDimension(_ value: Double) -> Double {
+        value.isFinite ? max(value, 1.0) : 1.0
+    }
+}
+
+private struct WIResolvedResize: Sendable, Equatable {
+    var maxPixelSize: Int?
+    var targetPixelSize: WIPixelSize?
+    var requiresRedraw: Bool
+
+    init(
+        maxPixelSize: Int? = nil,
+        targetPixelSize: WIPixelSize? = nil,
+        requiresRedraw: Bool = false
+    ) {
+        self.maxPixelSize = maxPixelSize
+        self.targetPixelSize = targetPixelSize
+        self.requiresRedraw = requiresRedraw
     }
 }

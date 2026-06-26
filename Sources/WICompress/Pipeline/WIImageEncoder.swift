@@ -73,7 +73,11 @@ enum WIImageEncoder {
             throw WICompressError.thumbnailCreationFailed
         }
 
-        let image = try destinationImage(from: thumbnail, plan: plan)
+        var image = thumbnail
+        if let targetPixelSize = plan.targetPixelSize {
+            image = try resizedImage(image, targetPixelSize: targetPixelSize)
+        }
+        image = try destinationImage(from: image, plan: plan)
 
         let outputData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
@@ -171,6 +175,55 @@ enum WIImageEncoder {
         }
 
         return flattenedImage
+    }
+
+    private static func resizedImage(
+        _ image: CGImage,
+        targetPixelSize: WIPixelSize
+    ) throws(WICompressError) -> CGImage {
+        guard image.width != targetPixelSize.width || image.height != targetPixelSize.height else {
+            return image
+        }
+
+        let colorSpace = rgbColorSpace(from: image) ?? CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = resizedBitmapInfo(for: image)
+        guard let context = CGContext(
+            data: nil,
+            width: targetPixelSize.width,
+            height: targetPixelSize.height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else {
+            throw WICompressError.thumbnailCreationFailed
+        }
+
+        let rect = CGRect(
+            x: 0,
+            y: 0,
+            width: targetPixelSize.width,
+            height: targetPixelSize.height
+        )
+        context.interpolationQuality = .high
+        context.draw(image, in: rect)
+
+        guard let resizedImage = context.makeImage() else {
+            throw WICompressError.thumbnailCreationFailed
+        }
+
+        return resizedImage
+    }
+
+    private static func resizedBitmapInfo(for image: CGImage) -> UInt32 {
+        switch image.alphaInfo {
+        case .first, .last, .premultipliedFirst, .premultipliedLast, .alphaOnly:
+            return CGImageAlphaInfo.premultipliedLast.rawValue
+        case .none, .noneSkipFirst, .noneSkipLast:
+            return CGImageAlphaInfo.noneSkipLast.rawValue
+        @unknown default:
+            return CGImageAlphaInfo.premultipliedLast.rawValue
+        }
     }
 
     private static func rgbColorSpace(from image: CGImage) -> CGColorSpace? {
