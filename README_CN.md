@@ -14,7 +14,8 @@
 色彩 profile、缩放和编码；public API 保持简单，最终返回压缩后的 `Data`。
 
 默认保留 JPEG / PNG / HEIC 源格式，也可以在上传端要求固定容器时显式转成
-JPEG、PNG 或 HEIC；默认剥离隐私 metadata，并且不依赖 `UIImage` / `NSImage`。
+JPEG、PNG 或 HEIC，或者按 alpha 通道自动选择 PNG / JPEG；默认剥离隐私
+metadata，并且不依赖 `UIImage` / `NSImage`。
 
 ```swift
 let compressedData = try WICompress.compress(originalData)
@@ -36,7 +37,9 @@ let uploadData = try WICompress.compress(
 
 - **Data in, Data out**：保留相册、文件或网络拿到的原始字节，直接传给压缩器。
 - **适合上传的默认值**：Luban resize、metadata strip、JPEG/HEIC 有损质量。
-- **格式可控**：默认保持源格式，也可以显式输出 JPEG、PNG 或 HEIC。
+- **Resize 策略灵活**：支持 Luban、最长边限制，以及按最小/最大展示尺寸区间 fit。
+- **格式可控**：默认保持源格式，也可以显式输出 JPEG、PNG、HEIC，或按 alpha
+  通道有无选择 PNG / JPEG。
 - **透明图转 JPEG 更安全**：必须显式选择白底或黑底，不会偷偷铺底。
 - **方向安全**：基于 ImageIO 读取展示尺寸，redraw path 会把方向烘焙进像素。
 - **核心不依赖 UIKit / AppKit**：可在 iOS App、macOS 工具和 SwiftPM 测试中使用。
@@ -101,6 +104,23 @@ let compressedData = try WICompress.compress(
 )
 ```
 
+把图片资产 fit 到调用方定义的展示尺寸区间：
+
+```swift
+let assetData = try WICompress.compress(
+    originalData,
+    options: WICompressOptions(
+        resize: .fit(
+            minSize: WISize(width: 40, height: 50),
+            maxSize: WISize(width: 400, height: 467)
+        ),
+        format: .pngIfAlphaOtherwiseJPEG,
+        metadata: .strip,
+        quality: .compression(0.7)
+    )
+)
+```
+
 ## 和 UIKit / AppKit 一起使用
 
 `WICompress` 不接收 `UIImage` 或 `NSImage`。业务层应该保留从相册、文件、
@@ -135,15 +155,24 @@ WICompressOptions(
 ### Resize
 
 ```swift
+public struct WISize {
+    public var width: Double
+    public var height: Double
+}
+
 public enum WIResizePolicy {
     case none
     case luban
     case maxPixel(Int)
+    case fit(minSize: WISize, maxSize: WISize)
 }
 ```
 
 - `.luban`：默认值。按 Luban 策略对大图等比下采样。
 - `.maxPixel(value)`：把最长展示边限制到 `value` 像素，不会放大小图。
+- `.fit(minSize:maxSize:)`：保持比例；只有宽高都小于 `minSize` 时才放大，
+  只有宽高都大于 `maxSize` 时才缩小；只要任意一边已经落在范围内就不额外缩放。
+  这个策略可以放大小图 bitmap，同时核心仍不依赖 UIKit / AppKit。
 - `.none`：保留源图展示尺寸。
 
 ### Format
@@ -158,6 +187,7 @@ public enum WIJPEGBackground {
 public enum WIFormatPolicy {
     case preserve
     case jpeg(background: WIJPEGBackground = .disallow)
+    case pngIfAlphaOtherwiseJPEG
     case png
     case heic
 }
@@ -166,11 +196,12 @@ public enum WIFormatPolicy {
 - `.preserve`：默认值。保持源图容器格式。
 - `.jpeg(background:)`：输出 JPEG。透明源图需要显式选择 `.white` 或
   `.black` 背景；`.disallow` 会抛错，避免偷偷铺底。
+- `.pngIfAlphaOtherwiseJPEG`：源图有 alpha 通道时输出 PNG，否则输出 JPEG。
 - `.png`：输出 PNG。PNG 是无损格式，quality 策略会被忽略。
 - `.heic`：在当前平台支持 HEIC 写出时输出 HEIC。
 
-显式格式转换一定会重写图片。调用方指定了具体输出格式时，size guard 不会再
-返回原始字节。
+显式格式转换和按 alpha 自动选择格式都会重写图片。调用方指定了非 preserve 的
+目标格式策略时，size guard 不会再返回原始字节。
 
 ### Metadata
 
@@ -237,7 +268,7 @@ do {
 
 ## 当前边界
 
-初始公开版明确不包含：
+WICompress 目前明确不包含：
 
 - `UIImage` / `NSImage` convenience adapter
 - Live Photo 压缩

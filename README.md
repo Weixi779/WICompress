@@ -15,8 +15,8 @@ inspection, orientation, alpha, metadata, color profiles, resizing, and encoding
 the public API stays simple and returns compressed `Data`.
 
 It preserves JPEG/PNG/HEIC by default, can convert to an explicit output format
-when your upload endpoint requires it, strips metadata for privacy, and resizes
-large images without depending on `UIImage` or `NSImage`.
+or choose PNG/JPEG from alpha-channel presence, strips metadata for privacy, and
+resizes images without depending on `UIImage` or `NSImage`.
 
 ```swift
 let compressedData = try WICompress.compress(originalData)
@@ -40,8 +40,10 @@ let uploadData = try WICompress.compress(
   to the compressor.
 - **Upload-ready defaults**: Luban resize, metadata stripping, and JPEG/HEIC
   lossy quality are configured for common app uploads.
+- **Flexible resize policies**: use Luban, cap the longest side, or fit an image
+  into caller-supplied minimum/maximum display dimensions.
 - **Format control**: preserve the source container or explicitly output JPEG,
-  PNG, or HEIC.
+  PNG, HEIC, or choose PNG for alpha-channel sources and JPEG otherwise.
 - **Alpha-safe JPEG conversion**: transparent sources require an explicit white
   or black background instead of silently flattening.
 - **Orientation-safe resizing**: display dimensions are resolved from ImageIO
@@ -113,6 +115,23 @@ let compressedData = try WICompress.compress(
 )
 ```
 
+Fit image assets into a caller-defined display-size range:
+
+```swift
+let assetData = try WICompress.compress(
+    originalData,
+    options: WICompressOptions(
+        resize: .fit(
+            minSize: WISize(width: 40, height: 50),
+            maxSize: WISize(width: 400, height: 467)
+        ),
+        format: .pngIfAlphaOtherwiseJPEG,
+        metadata: .strip,
+        quality: .compression(0.7)
+    )
+)
+```
+
 ## Working With UIKit or AppKit
 
 `WICompress` does not take `UIImage` or `NSImage`. Keep the original image data
@@ -166,7 +185,8 @@ public enum WIResizePolicy {
   upscales smaller images.
 - `.fit(minSize:maxSize:)`: keeps aspect ratio, upscales only when both display
   sides are below `minSize`, downscales only when both sides are above `maxSize`,
-  and leaves the image unchanged when either side is already in range.
+  and leaves the image unchanged when either side is already in range. This
+  policy can enlarge small bitmap assets; the core remains UIKit/AppKit-free.
 - `.none`: keeps the source display dimensions.
 
 ### Format
@@ -270,7 +290,7 @@ Common cases:
 
 ## Current Limits
 
-The initial public release intentionally does not include:
+WICompress intentionally does not include:
 
 - `UIImage` / `NSImage` convenience adapters
 - Live Photo compression

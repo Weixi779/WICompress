@@ -7,6 +7,33 @@ Versioning.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-26
+
+Adds alpha-aware output selection and range-based resize fitting while keeping
+the data-first v1 API compatible.
+
+### Added
+
+- `WIFormatPolicy.pngIfAlphaOtherwiseJPEG`, which writes PNG when the source has
+  an alpha channel and JPEG otherwise.
+- `WISize` for width/height policy values.
+- `WIResizePolicy.fit(minSize:maxSize:)`, which:
+  - upscales only when both display sides are below `minSize`;
+  - downscales only when both display sides are above `maxSize`;
+  - leaves the image unchanged when either side is already in range.
+- Redraw support for fit-based upscaling, since ImageIO thumbnail max-size
+  options only cover downscaling.
+- Swift Testing coverage for alpha-aware format selection and fit resize paths,
+  including real ImageIO output dimensions.
+
+### Changed
+
+- The resolver can now carry an exact target pixel size in addition to ImageIO's
+  longest-side cap so resize policies can express both downscale and upscale
+  outcomes.
+- Documentation now describes alpha-aware format selection and range-based fit
+  resizing in both English and Simplified Chinese.
+
 ## [1.1.0] - 2026-06-22
 
 Adds explicit output control for callers that need a specific upload format or

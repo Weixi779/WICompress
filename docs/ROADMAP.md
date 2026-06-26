@@ -1,6 +1,6 @@
 # WICompress Roadmap Notes
 
-This document captures future design discussion. It is not part of the v1.1.0
+This document captures future design discussion. It is not part of the v1.2.0
 release contract.
 
 ## Target Byte Size
@@ -122,7 +122,7 @@ public struct WIColor: Sendable, Equatable {
 ```
 
 This area should ship as a dedicated feature version with CMYK and custom
-background fixtures, not as a v1.1.0 release tweak.
+background fixtures, not as a v1.2.0 release tweak.
 
 ## Photos Adapter
 
