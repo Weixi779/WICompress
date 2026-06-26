@@ -246,6 +246,54 @@ struct WICompressImageIOCoreTests {
         }
     }
 
+    @Test("Alpha-aware format keeps transparent sources as PNG")
+    func alphaAwareFormatKeepsTransparentSourcesAsPNG() throws {
+        let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+        try #require(inputInfo.hasAlpha == true, "Fixture should contain alpha")
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .none,
+                format: .pngIfAlphaOtherwiseJPEG,
+                metadata: .strip,
+                quality: .compression(0.8)
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .png)
+        #expect(outputInfo.hasAlpha == true)
+        #expect(outputInfo.displayWidth == inputInfo.displayWidth)
+        #expect(outputInfo.displayHeight == inputInfo.displayHeight)
+    }
+
+    @Test("Alpha-aware format converts opaque sources to JPEG")
+    func alphaAwareFormatConvertsOpaqueSourcesToJPEG() throws {
+        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+        try #require(inputInfo.hasAlpha != true, "Fixture should be opaque")
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .none,
+                format: .pngIfAlphaOtherwiseJPEG,
+                metadata: .strip,
+                quality: .compression(0.8)
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(outputInfo.hasAlpha != true)
+        #expect(outputInfo.displayWidth == inputInfo.displayWidth)
+        #expect(outputInfo.displayHeight == inputInfo.displayHeight)
+    }
+
     @Test("Explicit PNG conversion follows maxPixel cap")
     func explicitPNGConversionFollowsMaxPixelCap() throws {
         let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")

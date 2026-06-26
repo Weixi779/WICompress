@@ -57,7 +57,11 @@ enum WIWritePlanResolver {
         switch (options.format, options.metadata) {
         case (.preserve, .preserve):
             path = .copyFromSource
-        case (.preserve, .strip), (.jpeg, _), (.png, _), (.heic, _):
+        case (.preserve, .strip),
+             (.jpeg, _),
+             (.pngIfAlphaOtherwiseJPEG, _),
+             (.png, _),
+             (.heic, _):
             path = .redrawBitmap
         }
 
@@ -109,7 +113,7 @@ enum WIWritePlanResolver {
         switch policy {
         case .preserve:
             return info.typeIdentifier != nil && info.sourceFormat != .unknown
-        case .jpeg, .png, .heic:
+        case .jpeg, .pngIfAlphaOtherwiseJPEG, .png, .heic:
             return false
         }
     }
@@ -191,6 +195,12 @@ enum WIWritePlanResolver {
             }
 
             return (.jpeg, UTType.jpeg.identifier, background)
+        case .pngIfAlphaOtherwiseJPEG:
+            if info.hasAlpha == true {
+                return (.png, UTType.png.identifier, nil)
+            }
+
+            return (.jpeg, UTType.jpeg.identifier, .disallow)
         case .png:
             return (.png, UTType.png.identifier, nil)
         case .heic:

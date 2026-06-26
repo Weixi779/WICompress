@@ -172,6 +172,7 @@ public enum WIJPEGBackground {
 public enum WIFormatPolicy {
     case preserve
     case jpeg(background: WIJPEGBackground = .disallow)
+    case pngIfAlphaOtherwiseJPEG
     case png
     case heic
 }
@@ -180,11 +181,14 @@ public enum WIFormatPolicy {
 - `.preserve`: default. Keeps the source image container.
 - `.jpeg(background:)`: writes JPEG. Transparent sources require `.white` or
   `.black`; `.disallow` throws instead of silently flattening alpha.
+- `.pngIfAlphaOtherwiseJPEG`: writes PNG when the source has an alpha channel,
+  otherwise writes JPEG.
 - `.png`: writes PNG. The quality policy is ignored because PNG is lossless.
 - `.heic`: writes HEIC when the current platform can encode it.
 
-Explicit format conversion always rewrites the image. The size guard will not
-return original bytes when the caller requested a concrete destination format.
+Explicit format conversion and alpha-aware format selection always rewrite the
+image. The size guard will not return original bytes when the caller requested a
+non-preserving destination policy.
 
 ### Metadata
 

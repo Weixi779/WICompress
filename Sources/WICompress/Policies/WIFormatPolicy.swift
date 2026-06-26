@@ -24,6 +24,8 @@ public enum WIFormatPolicy: Sendable, Equatable {
     case preserve
     /// Encode the output as JPEG.
     case jpeg(background: WIJPEGBackground = .disallow)
+    /// Encode alpha-channel sources as PNG and opaque sources as JPEG.
+    case pngIfAlphaOtherwiseJPEG
     /// Encode the output as PNG.
     case png
     /// Encode the output as HEIC.

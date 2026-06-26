@@ -60,6 +60,12 @@ struct WIWritePlanResolverTests {
             testDescription: "explicit JPEG uses lossy quality"
         ),
         ExplicitFormatCase(
+            format: .pngIfAlphaOtherwiseJPEG,
+            expectedFormat: .jpeg,
+            expectedCompressionQuality: 0.4,
+            testDescription: "alpha-aware format uses JPEG for opaque sources"
+        ),
+        ExplicitFormatCase(
             format: .png,
             expectedFormat: .png,
             expectedCompressionQuality: nil,
@@ -210,6 +216,39 @@ struct WIWritePlanResolverTests {
             ),
             info: info
         ) == false)
+        #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(
+            options: WICompressOptions(
+                resize: .none,
+                format: .pngIfAlphaOtherwiseJPEG,
+                metadata: .preserve,
+                quality: .none
+            ),
+            info: info
+        ) == false)
+    }
+
+    @Test("Alpha-aware format uses PNG for transparent sources")
+    func alphaAwareFormatUsesPNGForTransparentSource() throws {
+        let info = try Self.imageInfo(
+            resourceName: "real_png_1086x1630_alpha",
+            resourceExtension: "png"
+        )
+        try #require(info.hasAlpha == true, "Fixture should contain alpha")
+
+        let plan = try WIWritePlanResolver.resolve(
+            options: WICompressOptions(
+                resize: .none,
+                format: .pngIfAlphaOtherwiseJPEG,
+                metadata: .preserve,
+                quality: .compression(0.4)
+            ),
+            info: info
+        )
+
+        #expect(plan.path == .redrawBitmap)
+        #expect(plan.destinationFormat == .png)
+        #expect(plan.quality == nil)
+        #expect(plan.jpegBackground == nil)
     }
 
     @Test("Non-writable preserve source can return original when policies are already satisfied")
