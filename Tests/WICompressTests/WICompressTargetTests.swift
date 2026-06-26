@@ -154,7 +154,7 @@ struct WICompressTargetTests {
     func impossibleTargetThrows() throws {
         let inputData = try Self.resourceData("synthetic_tiny_1x1", extension: "png")
 
-        do {
+        let error = try #require(throws: WICompressError.self) {
             _ = try WICompress.compress(
                 inputData,
                 to: WICompressionTarget(
@@ -163,11 +163,16 @@ struct WICompressTargetTests {
                     metadata: .preserve
                 )
             )
-            #expect(Bool(false), "Expected targetBytesUnreachable")
-        } catch WICompressError.targetBytesUnreachable(let maxBytes, let bestByteCount) {
-            #expect(maxBytes == 1)
-            #expect((bestByteCount ?? 0) > 1)
         }
+
+        guard case .targetBytesUnreachable(let maxBytes, let bestByteCount) = error else {
+            Issue.record("Expected targetBytesUnreachable")
+            return
+        }
+
+        let unwrappedBestByteCount = try #require(bestByteCount)
+        #expect(maxBytes == 1)
+        #expect(unwrappedBestByteCount > 1)
     }
 
     @Test("Target preserve policies may return the original data")

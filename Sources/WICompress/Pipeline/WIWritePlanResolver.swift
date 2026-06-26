@@ -96,12 +96,9 @@ enum WIWritePlanResolver {
         case .none:
             return true
         case .luban:
-            let displaySize = displayDimensions(for: info)
-            return WILuban.ratio(width: displaySize.width, height: displaySize.height) == 1
+            return WILuban.ratio(width: info.displayWidth, height: info.displayHeight) == 1
         case .maxPixel(let maxPixel):
-            let displaySize = displayDimensions(for: info)
-            let longSide = max(displaySize.width, displaySize.height)
-            return max(maxPixel, 1) >= longSide
+            return max(maxPixel, 1) >= info.displayLongSide
         }
     }
 
@@ -154,19 +151,16 @@ enum WIWritePlanResolver {
         case .none:
             return nil
         case .luban:
-            let displaySize = displayDimensions(for: info)
-            let ratio = WILuban.ratio(width: displaySize.width, height: displaySize.height)
+            let ratio = WILuban.ratio(width: info.displayWidth, height: info.displayHeight)
             guard ratio > 1 else {
                 return nil
             }
 
-            let maxPixelSize = max(max(displaySize.width, displaySize.height) / ratio, 1)
+            let maxPixelSize = max(info.displayLongSide / ratio, 1)
             return maxPixelSize == 1 ? 1 : WILuban.ensureEven(maxPixelSize)
         case .maxPixel(let maxPixel):
-            let displaySize = displayDimensions(for: info)
-            let longSide = max(displaySize.width, displaySize.height)
             let cappedMaxPixel = max(maxPixel, 1)
-            guard cappedMaxPixel < longSide else {
+            guard cappedMaxPixel < info.displayLongSide else {
                 return nil
             }
 
@@ -198,12 +192,4 @@ enum WIWritePlanResolver {
         }
     }
 
-    private static func displayDimensions(for info: WIImageInfo) -> (width: Int, height: Int) {
-        switch info.orientation {
-        case 5, 6, 7, 8:
-            return (info.pixelHeight, info.pixelWidth)
-        default:
-            return (info.pixelWidth, info.pixelHeight)
-        }
-    }
 }
