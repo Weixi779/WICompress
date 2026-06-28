@@ -834,6 +834,125 @@ struct WICompressImageIOCoreTests {
         #expect(outputInfo.displayHeight == 320)
     }
 
+    @Test("Lossy target searches quality for fixed canvas geometry")
+    func lossyTargetSearchesQualityForFixedCanvasGeometry() throws {
+        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
+        let inputData = try Data(contentsOf: url)
+        let result = try WICompress.compress(
+            inputData,
+            to: WICompressionTarget(
+                maxBytes: 12_000,
+                geometry: .fill(size: WISize(width: 320, height: 320)),
+                output: WICompressionOutput(format: .jpeg(background: .disallow))
+            )
+        )
+        let outputInfo = try Self.imageInfo(result.data)
+
+        #expect(result.format == .jpeg)
+        #expect(result.byteCount <= 12_000)
+        #expect(result.pixelSize == WISize(width: 320, height: 320))
+        #expect(outputInfo.displayWidth == 320)
+        #expect(outputInfo.displayHeight == 320)
+    }
+
+    @Test("Lossy target fails when fixed geometry cannot meet byte limit")
+    func lossyTargetFailsWhenFixedGeometryCannotMeetByteLimit() throws {
+        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
+        let inputData = try Data(contentsOf: url)
+        let target = WICompressionTarget(
+            maxBytes: 1,
+            geometry: .fill(size: WISize(width: 320, height: 320)),
+            output: WICompressionOutput(format: .jpeg(background: .disallow))
+        )
+
+        do {
+            _ = try WICompress.compress(inputData, to: target)
+            Issue.record("Expected targetUnsatisfiable")
+        } catch WICompressError.targetUnsatisfiable(let smallestByteCount) {
+            #expect((smallestByteCount ?? 0) > target.maxBytes)
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    @Test("Lossy target lowers soft geometry dimensions when quality is not enough")
+    func lossyTargetLowersSoftGeometryDimensions() throws {
+        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
+        let inputData = try Data(contentsOf: url)
+        let result = try WICompress.compress(
+            inputData,
+            to: WICompressionTarget(
+                maxBytes: 10_000,
+                geometry: .fit(maxLongSide: 1200),
+                output: WICompressionOutput(format: .jpeg(background: .disallow))
+            )
+        )
+        let outputInfo = try Self.imageInfo(result.data)
+
+        #expect(result.format == .jpeg)
+        #expect(result.byteCount <= 10_000)
+        #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) < 1200)
+        #expect(result.pixelSize == WISize(
+            width: Double(outputInfo.displayWidth),
+            height: Double(outputInfo.displayHeight)
+        ))
+    }
+
+    @Test("Lossy target returns existing candidate when attempt budget cannot cover another size")
+    func lossyTargetReturnsExistingCandidateWhenAttemptBudgetCannotCoverAnotherSize() throws {
+        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
+        let inputData = try Data(contentsOf: url)
+        let imageSource = try WIImageSource(data: inputData)
+        let target = WICompressionTarget(
+            maxBytes: 60_000,
+            geometry: .fit(maxLongSide: 1200),
+            output: WICompressionOutput(format: .jpeg(background: .disallow))
+        )
+
+        let outputData = try WICompressionSolver.compress(
+            imageSource,
+            to: target,
+            sourceColorSpace: nil,
+            maxEncodeAttempts: 12
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(outputData.count <= target.maxBytes)
+        #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) == 1200)
+    }
+
+    @Test("Target candidate ranking applies compression preference")
+    func targetCandidateRankingAppliesCompressionPreference() {
+        let largeLowQuality = WISolvedCompressionCandidate(
+            data: Data(count: 80),
+            pixelSize: WIPixelSize(width: 1_000, height: 1_000),
+            format: .jpeg,
+            quality: 0.45
+        )
+        let smallerHighQuality = WISolvedCompressionCandidate(
+            data: Data(count: 70),
+            pixelSize: WIPixelSize(width: 800, height: 800),
+            format: .jpeg,
+            quality: 0.72
+        )
+        let referencePixelSize = WIPixelSize(width: 1_000, height: 1_000)
+        let candidates = [largeLowQuality, smallerHighQuality]
+
+        let resolutionCandidate = WICompressionSolver.bestCandidate(
+            candidates,
+            preference: .preserveResolution,
+            referencePixelSize: referencePixelSize
+        )
+        let fidelityCandidate = WICompressionSolver.bestCandidate(
+            candidates,
+            preference: .preserveFidelity,
+            referencePixelSize: referencePixelSize
+        )
+
+        #expect(resolutionCandidate == largeLowQuality)
+        #expect(fidelityCandidate == smallerHighQuality)
+    }
+
     @Test("Target fill left crop keeps left source content")
     func targetFillLeftCropKeepsLeftSourceContent() throws {
         let inputData = try Self.quadrantJPEG(width: 8, height: 4, orientation: 1)

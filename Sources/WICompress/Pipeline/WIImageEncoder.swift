@@ -18,10 +18,31 @@ enum WIImageEncoder {
         case .copyFromSource:
             return try encodeFromSource(imageSource, plan: plan)
         case .redrawBitmap:
-            return try encodeRedrawnBitmap(imageSource, plan: plan)
+            let image = try render(imageSource, plan: plan)
+            return try encodeRendered(image, imageSource: imageSource, plan: plan)
         case .redrawCanvas:
-            return try encodeCanvasBitmap(imageSource, plan: plan)
+            let image = try render(imageSource, plan: plan)
+            return try encodeRendered(image, imageSource: imageSource, plan: plan)
         }
+    }
+
+    static func render(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> CGImage {
+        switch plan.path {
+        case .redrawBitmap:
+            return try renderRedrawnBitmap(imageSource, plan: plan)
+        case .redrawCanvas:
+            return try renderCanvasBitmap(imageSource, plan: plan)
+        case .returnOriginal, .copyFromSource:
+            throw WICompressError.writePlanUnavailable
+        }
+    }
+
+    static func encodeRendered(
+        _ image: CGImage,
+        imageSource: WIImageSource,
+        plan: WIWritePlan
+    ) throws(WICompressError) -> Data {
+        try encodeRenderedImage(image, imageSource: imageSource, plan: plan)
     }
 
     private static func encodeFromSource(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
@@ -55,7 +76,7 @@ enum WIImageEncoder {
         return outputData as Data
     }
 
-    private static func encodeRedrawnBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
+    private static func renderRedrawnBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> CGImage {
         // Thumbnail creation bakes orientation into pixels, which matches the default strip path.
         var thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -75,12 +96,10 @@ enum WIImageEncoder {
             throw WICompressError.thumbnailCreationFailed
         }
 
-        let image = try renderBitmap(thumbnail, plan: plan)
-
-        return try encodeRenderedImage(image, imageSource: imageSource, plan: plan)
+        return try renderBitmap(thumbnail, plan: plan)
     }
 
-    private static func encodeCanvasBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
+    private static func renderCanvasBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> CGImage {
         guard let renderGeometry = plan.renderGeometry else {
             throw WICompressError.writePlanUnavailable
         }
@@ -96,8 +115,7 @@ enum WIImageEncoder {
         let normalizedImage = imageSource.info.orientation == 1
             ? decodedImage
             : try renderOrientationNormalizedBitmap(decodedImage, info: imageSource.info)
-        let image = try renderBitmap(normalizedImage, plan: plan, renderGeometry: renderGeometry)
-        return try encodeRenderedImage(image, imageSource: imageSource, plan: plan)
+        return try renderBitmap(normalizedImage, plan: plan, renderGeometry: renderGeometry)
     }
 
     private static func destinationProperties(
