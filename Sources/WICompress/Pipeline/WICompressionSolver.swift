@@ -27,6 +27,16 @@ enum WICompressionSolver {
 
         guard initialPlan.destinationFormat.supportsLossyQuality,
               initialPlan.quality != nil else {
+            if initialPlan.destinationFormat == .png {
+                return try solveLossless(
+                    imageSource,
+                    target: target,
+                    sourceColorSpace: sourceColorSpace,
+                    initialPlan: initialPlan,
+                    maxEncodeAttempts: maxEncodeAttempts
+                )
+            }
+
             return try WIImageEncoder.encode(imageSource, plan: initialPlan)
         }
 
@@ -132,6 +142,59 @@ enum WICompressionSolver {
             currentLongSide = nextLongSide
             longSideOverride = nextLongSide
             highQuality = profile.qAnchor
+        }
+    }
+
+    private static func solveLossless(
+        _ imageSource: WIImageSource,
+        target: WICompressionTarget,
+        sourceColorSpace: WISourceColorSpaceInfo?,
+        initialPlan: WIWritePlan,
+        maxEncodeAttempts: Int
+    ) throws(WICompressError) -> Data {
+        let allowsDimensionSearch = allowsDimensionSearch(for: target.geometry)
+        var currentLongSide = initialLongSide(for: target.geometry, info: imageSource.info, plan: initialPlan)
+        var longSideOverride: Int?
+        var attemptCount = 0
+        var smallestByteCount: Int?
+
+        while true {
+            let plan = try writePlan(
+                for: target,
+                info: imageSource.info,
+                sourceColorSpace: sourceColorSpace,
+                maxLongSide: longSideOverride
+            )
+            let renderedImage = try renderedImageIfNeeded(imageSource, plan: plan)
+            let data = try encode(
+                imageSource,
+                plan: plan,
+                renderedImage: renderedImage,
+                quality: nil,
+                attemptCount: &attemptCount,
+                maxEncodeAttempts: maxEncodeAttempts
+            )
+
+            if data.count <= target.maxBytes {
+                return data
+            }
+
+            smallestByteCount = minByteCount(smallestByteCount, data.count)
+            guard allowsDimensionSearch else {
+                throw WICompressError.targetUnsatisfiable(smallestByteCount: smallestByteCount)
+            }
+
+            guard let nextLongSide = nextLongSide(
+                current: currentLongSide,
+                encodedBytes: data.count,
+                maxBytes: target.maxBytes,
+                format: plan.destinationFormat
+            ) else {
+                throw WICompressError.targetUnsatisfiable(smallestByteCount: smallestByteCount)
+            }
+
+            currentLongSide = nextLongSide
+            longSideOverride = nextLongSide
         }
     }
 
@@ -291,7 +354,7 @@ enum WICompressionSolver {
         _ imageSource: WIImageSource,
         plan: WIWritePlan,
         renderedImage: CGImage?,
-        quality: Double,
+        quality: Double?,
         attemptCount: inout Int,
         maxEncodeAttempts: Int
     ) throws(WICompressError) -> Data {

@@ -921,6 +921,49 @@ struct WICompressImageIOCoreTests {
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) == 1200)
     }
 
+    @Test("PNG target lowers soft geometry dimensions")
+    func pngTargetLowersSoftGeometryDimensions() throws {
+        let url = try Self.resource("real_png_1928x464_pano", extension: "png")
+        let inputData = try Data(contentsOf: url)
+        let result = try WICompress.compress(
+            inputData,
+            to: WICompressionTarget(
+                maxBytes: 100_000,
+                geometry: .fit(maxLongSide: 1200),
+                output: WICompressionOutput(format: .png)
+            )
+        )
+        let outputInfo = try Self.imageInfo(result.data)
+
+        #expect(result.format == .png)
+        #expect(result.byteCount <= 100_000)
+        #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) < 1200)
+        #expect(result.pixelSize == WISize(
+            width: Double(outputInfo.displayWidth),
+            height: Double(outputInfo.displayHeight)
+        ))
+    }
+
+    @Test("PNG target fails when hard geometry cannot meet byte limit")
+    func pngTargetFailsWhenHardGeometryCannotMeetByteLimit() throws {
+        let url = try Self.resource("real_png_814x386_wide", extension: "png")
+        let inputData = try Data(contentsOf: url)
+        let target = WICompressionTarget(
+            maxBytes: 1,
+            geometry: .fill(size: WISize(width: 320, height: 320)),
+            output: WICompressionOutput(format: .png)
+        )
+
+        do {
+            _ = try WICompress.compress(inputData, to: target)
+            Issue.record("Expected targetUnsatisfiable")
+        } catch WICompressError.targetUnsatisfiable(let smallestByteCount) {
+            #expect((smallestByteCount ?? 0) > target.maxBytes)
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
     @Test("Target candidate ranking applies compression preference")
     func targetCandidateRankingAppliesCompressionPreference() {
         let largeLowQuality = WISolvedCompressionCandidate(
