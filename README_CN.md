@@ -37,6 +37,8 @@ let uploadData = try WICompress.compress(
 
 - **Data in, Data out**：保留相册、文件或网络拿到的原始字节，直接传给压缩器。
 - **适合上传的默认值**：Luban resize、metadata strip、JPEG/HEIC 有损质量。
+- **目标约束压缩**：当 SDK 或后端要求明确字节上限时，可以用 `maxBytes`
+  搭配 geometry 表达目标。
 - **Resize 策略灵活**：支持 Luban、最长边限制，以及按最小/最大展示尺寸区间 fit。
 - **格式可控**：默认保持源格式，也可以显式输出 JPEG、PNG、HEIC，或按 alpha
   通道有无选择 PNG / JPEG。
@@ -56,7 +58,8 @@ swift run WICompressDocAssetGenerator
 
 ![WICompress 压缩效果对比](docs/assets/compression-comparison.png)
 
-图里每一行都使用默认 API。前三行优先展示 HEIC，因为这是最值得被用户看到的
+图里大多数行使用默认 API，同时包含一行用显式 `WICompressionTarget` 生成的
+target API 分享缩略图示例。前三行优先展示 HEIC，因为这是最值得被用户看到的
 真实场景；后面再展示 JPEG 和 PNG。PNG 不是被跳过：长截图触发 Luban resize
 后会变小，而 alpha PNG 这一行只是 no-op case，原图本身已经是更好的结果。
 
@@ -119,6 +122,26 @@ let assetData = try WICompress.compress(
         quality: .compression(0.7)
     )
 )
+```
+
+压缩到明确的字节目标：
+
+```swift
+let thumbnail = try WICompress.compress(
+    originalData,
+    to: WICompressionTarget(
+        maxBytes: 32 * 1024,
+        geometry: .fill(size: WISize(width: 200, height: 200)),
+        output: WICompressionOutput(
+            format: .jpeg(background: .white),
+            metadata: .strip,
+            colorSpace: .convert(to: .sRGB)
+        )
+    )
+)
+
+print(thumbnail.byteCount)
+print(thumbnail.pixelSize)
 ```
 
 ## 和 UIKit / AppKit 一起使用
@@ -277,6 +300,47 @@ public enum WIQualityPolicy {
 
 PNG 是无损格式，quality 对 PNG 不会被理解为有损压缩。
 
+## Target Compression
+
+`WICompressionTarget` 用来表达“输出必须满足某个目标契约”的压缩，例如
+“缩略图 data 必须小于 32KB”。它和 `WICompressOptions` 分开建模，因为这类
+压缩需要库在内部控制 quality、尺寸和尝试次数。
+
+```swift
+public struct WICompressionTarget {
+    public var maxBytes: Int
+    public var geometry: WICompressionGeometry
+    public var output: WICompressionOutput
+    public var preference: WICompressionPreference
+}
+```
+
+geometry 表达视觉意图：
+
+- `.original`：从源图展示尺寸开始，只在需要满足 `maxBytes` 时缩小。
+- `.fit(maxLongSide:)`：保持比例，限制最长边。
+- `.fitInside(box:)`：保持比例，放进指定 box。
+- `.fill(size:crop:)`：输出精确尺寸，允许缩放裁剪。
+- `.exactCanvas(size:placement:background:)`：输出精确画布尺寸，可以留白铺底。
+
+`preference` 只在已经满足 `maxBytes`、`geometry`、`output` 的候选之间做排序，
+不会放松这些硬约束：
+
+- `.balanced`：像素面积与画质并重（默认）。
+- `.preserveResolution`：候选接近时优先更大尺寸。
+- `.preserveFidelity`：优先更高画质，可以接受更小的图。
+
+JPEG 和 HEIC target 会先搜索 quality，必要时再在允许的 geometry 下缩尺寸。
+PNG target 保持无损，只在允许的 geometry 下缩尺寸。`.fill` 和 `.exactCanvas`
+这类硬 geometry 不会偷偷改变像素尺寸；如果无法满足字节目标，会抛
+`WICompressError.targetUnsatisfiable`。
+
+Target compression 返回 `WICompressionResult`，包含输出 `Data`、容器格式、
+整数像素尺寸和字节数。
+
+WICompress 不内置平台分享 preset。分享 SDK 的限制和推荐值会变化，业务代码应
+根据当前接入的平台文档和产品需求，自行定义 `WICompressionTarget`。
+
 ## 错误处理
 
 public API 使用 `throws`：
@@ -301,7 +365,11 @@ do {
 - `colorConversionFailed`
 - `nonOpaqueJPEGBackground`
 - `animatedSourceUnsupported`
+- `invalidTarget`
+- `targetUnsatisfiable`
+- `resourceLimitExceeded`
 - `thumbnailCreationFailed`
+- `imageDecodeFailed`
 - `destinationCreationFailed`
 - `encodeFailed`
 
@@ -313,7 +381,6 @@ WICompress 目前明确不包含：
 - Live Photo 压缩
 - async API
 - 只剥离 GPS 的 metadata 策略
-- target bytes / max file size 压缩
 - HDR gain map preserve
 - 动图写出
 - WebP / JPEG XL 写出

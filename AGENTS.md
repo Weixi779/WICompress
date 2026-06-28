@@ -70,7 +70,8 @@ Sources/WICompress/
   Algorithm/
 ```
 
-The public entry point is `Data`/`URL` in, `Data` out:
+There are two public entry points. Process-based `compress(_:options:)` is
+`Data`/`URL` in, `Data` out:
 
 ```text
 Data / URL
@@ -79,6 +80,20 @@ Data / URL
   -> WIImageEncoder (Execute)       run the chosen write path
   -> size guard                     return original if re-encode did not help and policy allows
   -> Data
+```
+
+Target-based `compress(_:to:)` declares an output contract (`maxBytes` plus
+geometry/output) and returns a `WICompressionResult`:
+
+```text
+Data / URL + WICompressionTarget
+  -> WICompressionTargetValidator   reject illegal targets up front
+  -> passthrough check              return original when it already satisfies the target
+  -> WICompressionSolver            iterative search: shrink (outer) + quality (inner)
+       uses WICompressionTargetResolver to build each WIWritePlan
+       uses Algorithm/ math (size estimation, layout, ranking)
+  -> hard byte check                never return data above maxBytes
+  -> WICompressionResult
 ```
 
 Key types:
@@ -91,11 +106,19 @@ Key types:
 3. **WIImageSource** / **WIImageInfo** - ImageIO source wrapper and inspected facts
    (format, pixel size, orientation, frame count, alpha, gain map, writability).
 4. **WIWritePlanResolver** / **WIWritePlan** - the decision core. Picks one of
-   `returnOriginal` / `copyFromSource` / `redrawBitmap`.
+   `returnOriginal` / `copyFromSource` / `redrawBitmap` / `redrawCanvas`
+   (the last bakes fit/fill/exact-canvas geometry for the target API).
 5. **WIImageEncoder** - executes the plan via `CGImageDestination`.
 6. **WIImageFormat** - `UTType`-based container detection (JPEG/PNG/HEIF/unknown).
 7. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
 8. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
+9. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
+   (`geometry` / `output` / `preference`) returning `WICompressionResult`.
+   `WICompressionTargetValidator` checks legality, `WICompressionTargetResolver`
+   builds the write plan, and `WICompressionSolver` runs the byte-budget search.
+   Pure math lives in `Algorithm/`: `WICompressionSizeEstimation` (shrink +
+   quality profile), `WICompressionLayout` (canvas placement), and
+   `WICompressionRanking` (preference-weighted candidate selection).
 
 ## Key Implementation Details
 

@@ -3,41 +3,46 @@
 This document captures future design discussion. It is not part of the v1.2.0
 release contract.
 
-## Target Byte Size
+## Target-Based Compression
 
-Some upload paths need a hard output-size ceiling, for example "the final image
-must be under 2 MB." This is a different contract from Luban. Luban is a fast,
-one-pass visual-size heuristic; target-bytes compression is an iterative search
-that trades CPU time for a stronger byte-size guarantee.
+Some upload and sharing paths need a hard output-size ceiling, for example
+"the final thumbnail must be under 32 KB." This is a different contract from
+Luban. Luban is a fast, one-pass visual-size heuristic; target-based compression
+is an iterative search that trades CPU time for a stronger byte-size guarantee.
 
-Likely direction:
+Current direction:
 
-- Add a target-byte policy that composes with explicit output format control.
+- Keep the target API separate from `WICompressOptions`.
+- Use `WICompressionTarget(maxBytes:geometry:output:preference:)` for hard byte
+  contracts.
 - Prefer quality search first for lossy destinations such as JPEG and HEIC.
 - Reduce dimensions when quality search cannot satisfy the target or when the
-  destination format has no lossy quality knob.
-- Keep upper bounds on attempts, minimum dimensions, and quality floors so the
-  API fails predictably instead of looping forever or producing unusable output.
-- Keep Luban as the default upload heuristic; target bytes should be opt-in
+  destination format has no lossy quality knob, such as PNG.
+- Keep upper bounds on attempts and quality floors so the API fails predictably
+  instead of looping forever or producing unusable output.
+- Keep Luban as the default upload heuristic; target compression is opt-in
   because it is slower and less visually predictable.
 
-Open API sketch:
+Implemented API shape:
 
 ```swift
-public enum WITargetBytesPolicy: Sendable, Equatable {
-    case none
-    case max(Int)
+public struct WICompressionTarget: Sendable, Equatable {
+    public var maxBytes: Int
+    public var geometry: WICompressionGeometry
+    public var output: WICompressionOutput
+    public var preference: WICompressionPreference
 }
 ```
 
-Open design questions:
+Follow-up design questions:
 
-- Whether target bytes belongs inside `WICompressOptions` directly or inside a
-  higher-level preset.
-- Whether failure should throw when the target cannot be reached above minimum
-  quality/dimensions, or return the smallest acceptable attempt with diagnostics.
-- Whether the dimension search should be binary search on longest side, repeated
-  halving, or a hybrid that starts from the already-resolved resize policy.
+- Whether to expose diagnostics for why a target result was returned: original
+  passthrough, quality search, dimension reduction, metadata rewrite, format
+  conversion, or fallback.
+- Whether PNG target compression should add an optional refinement pass between
+  the last too-large size and the first fitting size.
+- Whether future lossy PNG behavior, such as palette quantization, should be
+  modeled as a separate explicit policy.
 
 ## Metadata Control
 
@@ -119,8 +124,9 @@ stable.
 
 Possible directions:
 
-- Versioned presets for common workflows such as upload, social sharing,
-  thumbnails, and archival preservation.
+- Documentation examples for composing application-owned targets. WICompress
+  should not ship platform-specific sharing presets; applications should define
+  targets from the current SDK documentation they integrate with.
 - Strategy protocols for resize, target bytes, metadata handling, and encoding
   so each feature can evolve without making the resolver monolithic.
 - More fixture-driven characterization tests for edge formats such as uncommon

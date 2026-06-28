@@ -22,7 +22,12 @@ struct Sample {
     let title: String
     let filename: String
     let note: String
-    let options: WICompressOptions
+    let compression: SampleCompression
+}
+
+enum SampleCompression {
+    case options(WICompressOptions)
+    case target(WICompressionTarget)
 }
 
 struct ImageSummary {
@@ -52,43 +57,59 @@ enum GenerateDocAssets {
                 title: "HEIC photo - flowers",
                 filename: "real_heic_4032x3024_o6_gps_hdr.heic",
                 note: "Default compression keeps HEIC and preserves the display result",
-                options: .default
+                compression: .options(.default)
             ),
             Sample(
                 title: "HEIC -> JPEG (forced format)",
                 filename: "real_heic_4032x3024_o6_gps_hdr.heic",
                 note: "Force JPEG output with .format(.jpeg); the HEIC source is transcoded and resized for upload endpoints that only accept JPEG",
-                options: WICompressOptions(format: .jpeg(background: .disallow))
+                compression: .options(WICompressOptions(format: .jpeg(background: .disallow)))
             ),
             Sample(
                 title: "HEIC photo - large landscape",
                 filename: "real_heic_5712x4284_o6_gps_hdr.heic",
                 note: "Large HEIC photos get resized and re-encoded for upload",
-                options: .default
+                compression: .options(.default)
             ),
             Sample(
                 title: "HEIC photo - circle cutout",
                 filename: "real_heic_3001x2458_alpha_circle.heic",
                 note: "Transparent HEIC artwork stays clean while file size drops",
-                options: .default
+                compression: .options(.default)
             ),
             Sample(
                 title: "JPEG - landscape photo",
                 filename: "real_jpeg_2098x1350_landscape.jpg",
                 note: "JPEG gets the expected upload-style size reduction",
-                options: .default
+                compression: .options(.default)
+            ),
+            Sample(
+                title: "Target API - share thumbnail",
+                filename: "real_jpeg_2098x1350_landscape.jpg",
+                note: "A WICompressionTarget solves bytes and geometry together for a 32 KB square thumbnail",
+                compression: .target(
+                    WICompressionTarget(
+                        maxBytes: 32 * 1024,
+                        geometry: .fill(size: WISize(width: 200, height: 200)),
+                        output: WICompressionOutput(
+                            format: .jpeg(background: .white),
+                            metadata: .strip,
+                            colorSpace: .convert(to: .sRGB)
+                        )
+                    )
+                )
             ),
             Sample(
                 title: "PNG - panoramic screenshot",
                 filename: "real_png_1928x464_pano.png",
                 note: "Long PNG keeps full resolution - Luban sizes by the short side, so long images are not over-shrunk",
-                options: .default
+                compression: .options(.default)
             ),
             Sample(
                 title: "PNG - alpha no-op case",
                 filename: "real_png_1086x1630_alpha.png",
                 note: "This PNG does not need resize; size guard returns original and alpha remains",
-                options: .default
+                compression: .options(.default)
             ),
         ]
         let canvasHeight = headerHeight + samples.count * rowHeight + bottomPadding
@@ -101,7 +122,13 @@ enum GenerateDocAssets {
         let renderedSamples = try samples.map { sample in
             let inputURL = fixtureURL.appendingPathComponent(sample.filename)
             let inputData = try Data(contentsOf: inputURL)
-            let outputData = try WICompress.compress(inputData, options: sample.options)
+            let outputData: Data
+            switch sample.compression {
+            case .options(let options):
+                outputData = try WICompress.compress(inputData, options: options)
+            case .target(let target):
+                outputData = try WICompress.compress(inputData, to: target).data
+            }
             return RenderedSample(
                 sample: sample,
                 inputData: inputData,
@@ -128,7 +155,7 @@ enum GenerateDocAssets {
         context.fill(CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight))
 
         drawText(
-            "WICompress v1.0.0 - Data API compression comparison",
+            "WICompress - Data and target API compression comparison",
             in: topRect(x: 60, y: 38, width: 1480, height: 44, canvasHeight: canvasHeight),
             fontName: "HelveticaNeue-Bold",
             size: 30,
@@ -136,7 +163,7 @@ enum GenerateDocAssets {
             context: context
         )
         drawText(
-            "Generated from repository fixtures with the default WICompress.compress(_:) API.",
+            "Generated from repository fixtures with options-based compression and target-based compression.",
             in: topRect(x: 60, y: 82, width: 1480, height: 24, canvasHeight: canvasHeight),
             fontName: "HelveticaNeue",
             size: 16,

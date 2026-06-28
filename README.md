@@ -40,6 +40,8 @@ let uploadData = try WICompress.compress(
   to the compressor.
 - **Upload-ready defaults**: Luban resize, metadata stripping, and JPEG/HEIC
   lossy quality are configured for common app uploads.
+- **Target contracts**: use `maxBytes` with geometry intent when an SDK or
+  backend requires a hard byte ceiling.
 - **Flexible resize policies**: use Luban, cap the longest side, or fit an image
   into caller-supplied minimum/maximum display dimensions.
 - **Format control**: preserve the source container or explicitly output JPEG,
@@ -65,11 +67,12 @@ swift run WICompressDocAssetGenerator
 
 ![WICompress compression comparison](docs/assets/compression-comparison.png)
 
-The preview uses the default API for every row. It shows three HEIC photos first
-because HEIC is the most important real-world case, then JPEG and PNG examples.
-PNG is not skipped: the panoramic screenshot shrinks when Luban resize is
-triggered, while the alpha PNG is a no-op case where the original data is
-already the better result.
+The preview uses the default API for most rows and includes one target-based
+sharing thumbnail row built from an explicit `WICompressionTarget`. It shows
+three HEIC photos first because HEIC is the most important real-world case, then
+JPEG and PNG examples. PNG is not skipped: the panoramic screenshot shrinks when
+Luban resize is triggered, while the alpha PNG is a no-op case where the
+original data is already the better result.
 
 ## Example Project
 
@@ -130,6 +133,26 @@ let assetData = try WICompress.compress(
         quality: .compression(0.7)
     )
 )
+```
+
+Compress to a hard byte target:
+
+```swift
+let thumbnail = try WICompress.compress(
+    originalData,
+    to: WICompressionTarget(
+        maxBytes: 32 * 1024,
+        geometry: .fill(size: WISize(width: 200, height: 200)),
+        output: WICompressionOutput(
+            format: .jpeg(background: .white),
+            metadata: .strip,
+            colorSpace: .convert(to: .sRGB)
+        )
+    )
+)
+
+print(thumbnail.byteCount)
+print(thumbnail.pixelSize)
 ```
 
 ## Working With UIKit or AppKit
@@ -303,6 +326,52 @@ the write plan can safely return the original data.
 
 PNG is lossless; the quality policy is intentionally a no-op for PNG.
 
+## Target Compression
+
+`WICompressionTarget` is for APIs that need output bytes to satisfy a contract,
+for example "thumbnail data must be under 32 KB." It is separate from
+`WICompressOptions` because the compressor controls quality, dimensions, and
+attempt count internally.
+
+```swift
+public struct WICompressionTarget {
+    public var maxBytes: Int
+    public var geometry: WICompressionGeometry
+    public var output: WICompressionOutput
+    public var preference: WICompressionPreference
+}
+```
+
+Geometry expresses visual intent:
+
+- `.original`: start from the source display dimensions and reduce only when
+  needed to satisfy `maxBytes`.
+- `.fit(maxLongSide:)`: preserve aspect ratio and cap the longest side.
+- `.fitInside(box:)`: preserve aspect ratio and fit inside a box.
+- `.fill(size:crop:)`: output the exact size by scaling and cropping.
+- `.exactCanvas(size:placement:background:)`: output the exact canvas size,
+  optionally adding background padding.
+
+`preference` only breaks ties between candidates that already satisfy `maxBytes`,
+`geometry`, and `output`; it never relaxes those constraints:
+
+- `.balanced`: weigh pixel area and visual fidelity evenly (the default).
+- `.preserveResolution`: prefer larger dimensions when candidates are close.
+- `.preserveFidelity`: prefer higher quality, accepting a smaller image.
+
+JPEG and HEIC targets search quality first, then reduce dimensions when geometry
+allows it. PNG targets stay lossless and reduce dimensions when geometry allows
+it. Hard geometry such as `.fill` and `.exactCanvas` does not silently change
+pixel size; if the byte target cannot be met, WICompress throws
+`WICompressError.targetUnsatisfiable`.
+
+Target compression returns `WICompressionResult`, including the encoded `Data`,
+container format, integer pixel size, and byte count.
+
+WICompress does not ship platform-specific sharing presets. Sharing SDK rules
+and recommendations change over time, so application code should define its own
+targets from the current SDK documentation and product requirements.
+
 ## Error Handling
 
 All public APIs throw `WICompressError`.
@@ -328,7 +397,11 @@ Common cases:
 - `colorConversionFailed`
 - `nonOpaqueJPEGBackground`
 - `animatedSourceUnsupported`
+- `invalidTarget`
+- `targetUnsatisfiable`
+- `resourceLimitExceeded`
 - `thumbnailCreationFailed`
+- `imageDecodeFailed`
 - `destinationCreationFailed`
 - `encodeFailed`
 
@@ -340,7 +413,6 @@ WICompress intentionally does not include:
 - Live Photo compression
 - async API
 - GPS-only metadata stripping
-- target-byte-size compression
 - HDR gain map preservation
 - animated image output
 - WebP / JPEG XL writing
