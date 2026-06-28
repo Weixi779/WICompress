@@ -61,6 +61,7 @@ struct WICompressPublicSurfaceTests {
         #expect(WICompressOptions.default.format == .preserve)
         #expect(WICompressOptions.default.metadata == .strip)
         #expect(WICompressOptions.default.quality == .compression(0.6))
+        #expect(WICompressOptions.default.colorSpace == .preserve)
     }
 
     @Test("No-op policy returns the original data")

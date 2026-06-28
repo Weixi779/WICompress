@@ -160,7 +160,8 @@ WICompressOptions(
     resize: .luban,
     format: .preserve,
     metadata: .strip,
-    quality: .compression(0.6)
+    quality: .compression(0.6),
+    colorSpace: .preserve
 )
 ```
 
@@ -197,6 +198,7 @@ public enum WIJPEGBackground {
     case disallow
     case white
     case black
+    case color(WIColor)
 }
 
 public enum WIFormatPolicy {
@@ -209,8 +211,9 @@ public enum WIFormatPolicy {
 ```
 
 - `.preserve`: default. Keeps the source image container.
-- `.jpeg(background:)`: writes JPEG. Transparent sources require `.white` or
-  `.black`; `.disallow` throws instead of silently flattening alpha.
+- `.jpeg(background:)`: writes JPEG. Transparent sources require `.white`,
+  `.black`, or `.color(WIColor)`; `.disallow` throws instead of silently
+  flattening alpha.
 - `.pngIfAlphaOtherwiseJPEG`: writes PNG when the source has an alpha channel,
   otherwise writes JPEG.
 - `.png`: writes PNG. The quality policy is ignored because PNG is lossless.
@@ -245,6 +248,42 @@ are expected to survive both source-copy and redraw paths.
 HDR gain maps are not preserved by the initial public release. They require a
 separate policy and test contract because gain maps are auxiliary image data,
 not ordinary Exif/GPS metadata.
+
+### Color Space
+
+```swift
+public enum WIColorSpace {
+    case sRGB
+    case displayP3
+    case iccProfile(Data)
+}
+
+public enum WIOutputColorSpace {
+    case preserve
+    case convert(to: WIColorSpace)
+    case preserveIfSupported(Set<WIColorSpace>, otherwise: WIColorSpace)
+}
+
+public struct WIColor {
+    public var red: Double
+    public var green: Double
+    public var blue: Double
+    public var alpha: Double
+    public var colorSpace: WIColorSpace
+}
+```
+
+- `.preserve`: default. Keeps normal source display semantics. RGB profiles
+  such as Display P3 survive copy and redraw paths when ImageIO can represent
+  them.
+- `.convert(to:)`: redraws into the requested color space. Explicit conversion
+  is never bypassed by the size guard.
+- `.preserveIfSupported(_:otherwise:)`: keeps known supported spaces, such as
+  sRGB and Display P3, and converts unsupported or unknown sources to the
+  fallback.
+
+Color-space inspection is lazy. The default `.preserve` policy does not decode
+pixels only to identify the source profile.
 
 ### Quality
 
@@ -284,6 +323,10 @@ Common cases:
 - `unsupportedSourceFormat`
 - `unsupportedDestinationFormat`
 - `transparentSourceRequiresBackground`
+- `unsupportedColorSpace`
+- `invalidICCProfile`
+- `colorConversionFailed`
+- `nonOpaqueJPEGBackground`
 - `animatedSourceUnsupported`
 - `thumbnailCreationFailed`
 - `destinationCreationFailed`

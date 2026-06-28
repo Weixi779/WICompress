@@ -148,7 +148,8 @@ WICompressOptions(
     resize: .luban,
     format: .preserve,
     metadata: .strip,
-    quality: .compression(0.6)
+    quality: .compression(0.6),
+    colorSpace: .preserve
 )
 ```
 
@@ -183,6 +184,7 @@ public enum WIJPEGBackground {
     case disallow
     case white
     case black
+    case color(WIColor)
 }
 
 public enum WIFormatPolicy {
@@ -195,8 +197,8 @@ public enum WIFormatPolicy {
 ```
 
 - `.preserve`：默认值。保持源图容器格式。
-- `.jpeg(background:)`：输出 JPEG。透明源图需要显式选择 `.white` 或
-  `.black` 背景；`.disallow` 会抛错，避免偷偷铺底。
+- `.jpeg(background:)`：输出 JPEG。透明源图需要显式选择 `.white`、
+  `.black` 或 `.color(WIColor)` 背景；`.disallow` 会抛错，避免偷偷铺底。
 - `.pngIfAlphaOtherwiseJPEG`：源图有 alpha 通道时输出 PNG，否则输出 JPEG。
 - `.png`：输出 PNG。PNG 是无损格式，quality 策略会被忽略。
 - `.heic`：在当前平台支持 HEIC 写出时输出 HEIC。
@@ -225,6 +227,38 @@ Display P3 profile 在 `copyFromSource` 和 `redrawBitmap` 两条路径下都应
 
 初始公开版不承诺保留 HDR gain map。Gain map 是辅助图像数据，不是普通
 Exif/GPS 字典，后续需要单独的 policy 和测试契约。
+
+### Color Space
+
+```swift
+public enum WIColorSpace {
+    case sRGB
+    case displayP3
+    case iccProfile(Data)
+}
+
+public enum WIOutputColorSpace {
+    case preserve
+    case convert(to: WIColorSpace)
+    case preserveIfSupported(Set<WIColorSpace>, otherwise: WIColorSpace)
+}
+
+public struct WIColor {
+    public var red: Double
+    public var green: Double
+    public var blue: Double
+    public var alpha: Double
+    public var colorSpace: WIColorSpace
+}
+```
+
+- `.preserve`：默认值。保留正常的源图显示语义。ImageIO 能表达时，
+  Display P3 这类 RGB profile 会在 copy 和 redraw 路径下保留。
+- `.convert(to:)`：重绘到指定色彩空间。显式色彩转换不会被 size guard 绕过。
+- `.preserveIfSupported(_:otherwise:)`：保留已知支持的色彩空间，例如 sRGB 和
+  Display P3；不支持或未知的源图会转换到 fallback。
+
+色彩空间检查是惰性的。默认 `.preserve` 策略不会为了识别源 profile 额外解码像素。
 
 ### Quality
 
@@ -262,6 +296,10 @@ do {
 - `unsupportedSourceFormat`
 - `unsupportedDestinationFormat`
 - `transparentSourceRequiresBackground`
+- `unsupportedColorSpace`
+- `invalidICCProfile`
+- `colorConversionFailed`
+- `nonOpaqueJPEGBackground`
 - `animatedSourceUnsupported`
 - `thumbnailCreationFailed`
 - `destinationCreationFailed`

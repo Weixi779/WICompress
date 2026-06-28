@@ -157,6 +157,30 @@ struct WIWritePlanResolverTests {
         }
     }
 
+    @Test("Custom JPEG background must be opaque")
+    func customJPEGBackgroundMustBeOpaque() throws {
+        let info = try Self.imageInfo(
+            resourceName: "real_png_1086x1630_alpha",
+            resourceExtension: "png"
+        )
+
+        #expect(throws: WICompressError.nonOpaqueJPEGBackground) {
+            _ = try WIWritePlanResolver.resolve(
+                options: WICompressOptions(
+                    resize: .none,
+                    format: .jpeg(
+                        background: .color(
+                            WIColor(red: 1, green: 0, blue: 0, alpha: 0.5)
+                        )
+                    ),
+                    metadata: .strip,
+                    quality: .compression(0.6)
+                ),
+                info: info
+            )
+        }
+    }
+
     @Test(".maxPixel caps the longest side without upscaling")
     func maxPixelResolvesCapWithoutUpscaling() throws {
         let info = try Self.imageInfo(
@@ -357,6 +381,111 @@ struct WIWritePlanResolverTests {
         #expect(plan.jpegBackground == nil)
     }
 
+    @Test("Color conversion forces redraw for copy-from-source eligible images")
+    func colorConversionForcesRedrawForCopyEligibleImage() throws {
+        let info = Self.syntheticInfo(width: 120, height: 120, hasAlpha: false)
+        let sourceColorSpace = WISourceColorSpaceInfo(colorSpace: .displayP3)
+        let options = WICompressOptions(
+            resize: .none,
+            format: .preserve,
+            metadata: .preserve,
+            quality: .compression(0.6),
+            colorSpace: .convert(to: .sRGB)
+        )
+
+        let plan = try WIWritePlanResolver.resolve(
+            options: options,
+            info: info,
+            sourceColorSpace: sourceColorSpace
+        )
+
+        #expect(plan.path == .redrawBitmap)
+        #expect(plan.outputColorSpace.target == .sRGB)
+        #expect(plan.outputColorSpace.requiresConversion == true)
+        #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(
+            options: options,
+            info: info,
+            sourceColorSpace: sourceColorSpace
+        ) == false)
+    }
+
+    @Test("Matching color conversion target can return original when other policies allow it")
+    func matchingColorConversionTargetAllowsOriginal() throws {
+        let info = Self.syntheticInfo(width: 120, height: 120, hasAlpha: false)
+        let sourceColorSpace = WISourceColorSpaceInfo(colorSpace: .sRGB)
+        let options = WICompressOptions(
+            resize: .none,
+            format: .preserve,
+            metadata: .preserve,
+            quality: .none,
+            colorSpace: .convert(to: .sRGB)
+        )
+
+        let plan = try WIWritePlanResolver.resolve(
+            options: options,
+            info: info,
+            sourceColorSpace: sourceColorSpace
+        )
+
+        #expect(plan.path == .returnOriginal)
+        #expect(plan.outputColorSpace.target == nil)
+        #expect(plan.outputColorSpace.requiresConversion == false)
+        #expect(WIWritePlanResolver.canReturnOriginalForSizeGuard(
+            options: options,
+            info: info,
+            sourceColorSpace: sourceColorSpace
+        ) == true)
+    }
+
+    @Test("Compatibility color policy preserves supported spaces and converts unknown sources")
+    func compatibilityColorPolicyResolvesSupportedAndFallbackCases() throws {
+        let info = Self.syntheticInfo(width: 120, height: 120, hasAlpha: false)
+        let options = WICompressOptions(
+            resize: .none,
+            format: .preserve,
+            metadata: .preserve,
+            quality: .none,
+            colorSpace: .preserveIfSupported([.sRGB, .displayP3], otherwise: .sRGB)
+        )
+
+        let supportedPlan = try WIWritePlanResolver.resolve(
+            options: options,
+            info: info,
+            sourceColorSpace: WISourceColorSpaceInfo(colorSpace: .displayP3)
+        )
+        let unknownPlan = try WIWritePlanResolver.resolve(
+            options: options,
+            info: info,
+            sourceColorSpace: WISourceColorSpaceInfo(colorSpace: nil)
+        )
+
+        #expect(supportedPlan.path == .returnOriginal)
+        #expect(supportedPlan.outputColorSpace.target == nil)
+        #expect(supportedPlan.outputColorSpace.requiresConversion == false)
+        #expect(unknownPlan.path == .redrawBitmap)
+        #expect(unknownPlan.outputColorSpace.target == .sRGB)
+        #expect(unknownPlan.outputColorSpace.requiresConversion == true)
+    }
+
+    @Test("Invalid ICC profiles fail during resolution")
+    func invalidICCProfileFailsDuringResolution() {
+        let info = Self.syntheticInfo(width: 120, height: 120, hasAlpha: false)
+
+        #expect(throws: WICompressError.invalidICCProfile) {
+            _ = try WIWritePlanResolver.resolve(
+                options: WICompressOptions(
+                    resize: .none,
+                    format: .preserve,
+                    metadata: .preserve,
+                    quality: .none,
+                    colorSpace: .convert(to: .iccProfile(Data([0x00, 0x01])))
+                ),
+                info: info,
+                sourceColorSpace: WISourceColorSpaceInfo(colorSpace: .sRGB)
+            )
+        }
+    }
+
     @Test("Non-writable preserve source can return original when policies are already satisfied")
     func nonWritableSourceReturnsOriginalWhenPoliciesAllowIt() throws {
         let info = WIImageInfo(
@@ -439,7 +568,8 @@ struct WIWritePlanResolverTests {
     private static func syntheticInfo(
         width: Int,
         height: Int,
-        orientation: Int = 1
+        orientation: Int = 1,
+        hasAlpha: Bool? = true
     ) -> WIImageInfo {
         WIImageInfo(
             sourceFormat: .png,
@@ -452,7 +582,7 @@ struct WIWritePlanResolverTests {
             hasMetadata: false,
             hasGPS: false,
             hasGainMap: false,
-            hasAlpha: true
+            hasAlpha: hasAlpha
         )
     }
 }

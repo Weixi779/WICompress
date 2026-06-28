@@ -17,12 +17,21 @@ public struct WICompress: Sendable {
         options: WICompressOptions = .default
     ) throws(WICompressError) -> Data {
         let imageSource = try WIImageSource(data: data)
-        let writePlan = try WIWritePlanResolver.resolve(options: options, info: imageSource.info)
+        let sourceColorSpace = try imageSource.colorSpaceInfoIfNeeded(for: options.colorSpace)
+        let writePlan = try WIWritePlanResolver.resolve(
+            options: options,
+            info: imageSource.info,
+            sourceColorSpace: sourceColorSpace
+        )
         let encodedData = try WIImageEncoder.encode(imageSource, plan: writePlan)
 
         if writePlan.path != .returnOriginal,
            encodedData.count >= data.count,
-           WIWritePlanResolver.canReturnOriginalForSizeGuard(options: options, info: imageSource.info) {
+           WIWritePlanResolver.canReturnOriginalForSizeGuard(
+                options: options,
+                info: imageSource.info,
+                sourceColorSpace: sourceColorSpace
+           ) {
             // Never trade policy correctness for bytes saved.
             return data
         }

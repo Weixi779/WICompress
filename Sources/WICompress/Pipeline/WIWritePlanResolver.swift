@@ -10,7 +10,11 @@ import Foundation
 import UniformTypeIdentifiers
 
 enum WIWritePlanResolver {
-    static func resolve(options: WICompressOptions, info: WIImageInfo) throws(WICompressError) -> WIWritePlan {
+    static func resolve(
+        options: WICompressOptions,
+        info: WIImageInfo,
+        sourceColorSpace: WISourceColorSpaceInfo? = nil
+    ) throws(WICompressError) -> WIWritePlan {
         guard info.sourceFormat != .unknown else {
             throw WICompressError.unsupportedSourceFormat(info.typeIdentifier)
         }
@@ -20,17 +24,21 @@ enum WIWritePlanResolver {
         let destinationTypeIdentifier = destination.typeIdentifier
         let resize = resolvedResize(for: options.resize, info: info)
         let quality = resolvedQuality(for: options.quality, destinationFormat: destinationFormat)
+        let colorSpace = try resolvedColorSpace(
+            for: options.colorSpace,
+            sourceColorSpace: sourceColorSpace
+        )
 
-        if canReturnOriginalUpfront(options: options, info: info) {
-            return WIWritePlan(
+        if canReturnOriginalUpfront(options: options, info: info, sourceColorSpace: sourceColorSpace) {
+            return writePlan(
                 path: .returnOriginal,
                 destinationFormat: destinationFormat,
                 destinationTypeIdentifier: destinationTypeIdentifier,
-                maxPixelSize: resize.maxPixelSize,
-                targetPixelSize: resize.targetPixelSize,
+                resize: resize,
                 metadataPolicy: options.metadata,
                 quality: quality,
-                jpegBackground: destination.jpegBackground
+                jpegBackground: destination.jpegBackground,
+                outputColorSpace: colorSpace
             )
         }
 
@@ -38,16 +46,16 @@ enum WIWritePlanResolver {
             ? info.isSourceFormatWritable
             : WIImageFormat.canWrite(typeIdentifier: destinationTypeIdentifier)
         guard canWriteDestination else {
-            if canReturnOriginalForSizeGuard(options: options, info: info) {
-                return WIWritePlan(
+            if canReturnOriginalForSizeGuard(options: options, info: info, sourceColorSpace: sourceColorSpace) {
+                return writePlan(
                     path: .returnOriginal,
                     destinationFormat: destinationFormat,
                     destinationTypeIdentifier: destinationTypeIdentifier,
-                    maxPixelSize: resize.maxPixelSize,
-                    targetPixelSize: resize.targetPixelSize,
+                    resize: resize,
                     metadataPolicy: options.metadata,
                     quality: quality,
-                    jpegBackground: destination.jpegBackground
+                    jpegBackground: destination.jpegBackground,
+                    outputColorSpace: colorSpace
                 )
             }
 
@@ -55,9 +63,10 @@ enum WIWritePlanResolver {
         }
 
         let path: WIWritePath
+        let requiresRedraw = resize.requiresRedraw || colorSpace.requiresConversion
         // Metadata preservation chooses the write path because ImageIO ties it to the write call.
         switch (options.format, options.metadata) {
-        case (.preserve, .preserve) where resize.requiresRedraw:
+        case (.preserve, .preserve) where requiresRedraw:
             path = .redrawBitmap
         case (.preserve, .preserve):
             path = .copyFromSource
@@ -69,27 +78,36 @@ enum WIWritePlanResolver {
             path = .redrawBitmap
         }
 
-        return WIWritePlan(
+        return writePlan(
             path: path,
             destinationFormat: destinationFormat,
             destinationTypeIdentifier: destinationTypeIdentifier,
-            maxPixelSize: resize.maxPixelSize,
-            targetPixelSize: resize.targetPixelSize,
+            resize: resize,
             metadataPolicy: options.metadata,
             quality: quality,
-            jpegBackground: destination.jpegBackground
+            jpegBackground: destination.jpegBackground,
+            outputColorSpace: colorSpace
         )
     }
 
-    static func canReturnOriginalForSizeGuard(options: WICompressOptions, info: WIImageInfo) -> Bool {
+    static func canReturnOriginalForSizeGuard(
+        options: WICompressOptions,
+        info: WIImageInfo,
+        sourceColorSpace: WISourceColorSpaceInfo? = nil
+    ) -> Bool {
         // Size fallback is safe only when the original already satisfies observable policies.
         originalSatisfiesResize(options.resize, info: info)
             && originalSatisfiesFormat(options.format, info: info)
             && originalSatisfiesMetadata(options.metadata, info: info)
             && originalSatisfiesOrientation(options.metadata, info: info)
+            && originalSatisfiesColorSpace(options.colorSpace, sourceColorSpace: sourceColorSpace)
     }
 
-    private static func canReturnOriginalUpfront(options: WICompressOptions, info: WIImageInfo) -> Bool {
+    private static func canReturnOriginalUpfront(
+        options: WICompressOptions,
+        info: WIImageInfo,
+        sourceColorSpace: WISourceColorSpaceInfo? = nil
+    ) -> Bool {
         guard options.quality == .none else {
             return false
         }
@@ -98,6 +116,7 @@ enum WIWritePlanResolver {
             && originalSatisfiesFormat(options.format, info: info)
             && originalSatisfiesMetadata(options.metadata, info: info)
             && originalSatisfiesOrientation(options.metadata, info: info)
+            && originalSatisfiesColorSpace(options.colorSpace, sourceColorSpace: sourceColorSpace)
     }
 
     private static func originalSatisfiesResize(_ policy: WIResizePolicy, info: WIImageInfo) -> Bool {
@@ -144,6 +163,24 @@ enum WIWritePlanResolver {
         }
     }
 
+    private static func originalSatisfiesColorSpace(
+        _ policy: WIOutputColorSpace,
+        sourceColorSpace: WISourceColorSpaceInfo?
+    ) -> Bool {
+        switch policy {
+        case .preserve:
+            return true
+        case .convert(let target):
+            return sourceColorSpace?.colorSpace == target
+        case .preserveIfSupported(let supportedColorSpaces, otherwise: _):
+            guard let sourceColorSpace = sourceColorSpace?.colorSpace else {
+                return false
+            }
+
+            return supportedColorSpaces.contains(sourceColorSpace)
+        }
+    }
+
     private static func resolvedQuality(
         for policy: WIQualityPolicy,
         destinationFormat: WIImageFormat
@@ -157,6 +194,36 @@ enum WIWritePlanResolver {
             return nil
         case .compression(let value):
             return min(max(value, 0.0), 1.0)
+        }
+    }
+
+    private static func resolvedColorSpace(
+        for policy: WIOutputColorSpace,
+        sourceColorSpace: WISourceColorSpaceInfo?
+    ) throws(WICompressError) -> WIResolvedOutputColorSpace {
+        switch policy {
+        case .preserve:
+            return WIResolvedOutputColorSpace(
+                target: nil
+            )
+        case .convert(let target):
+            _ = try target.makeCGColorSpace()
+            let requiresConversion = sourceColorSpace?.colorSpace != target
+            return WIResolvedOutputColorSpace(
+                target: requiresConversion ? target : nil
+            )
+        case .preserveIfSupported(let supportedColorSpaces, otherwise: let fallback):
+            if let sourceColorSpace = sourceColorSpace?.colorSpace,
+               supportedColorSpaces.contains(sourceColorSpace) {
+                return WIResolvedOutputColorSpace(
+                    target: nil
+                )
+            }
+
+            _ = try fallback.makeCGColorSpace()
+            return WIResolvedOutputColorSpace(
+                target: fallback
+            )
         }
     }
 
@@ -211,6 +278,7 @@ enum WIWritePlanResolver {
 
             return (info.sourceFormat, typeIdentifier, nil)
         case .jpeg(let background):
+            try validateJPEGBackground(background)
             if background == .disallow, info.hasAlpha == true {
                 throw WICompressError.transparentSourceRequiresBackground(info.sourceFormat)
             }
@@ -226,6 +294,21 @@ enum WIWritePlanResolver {
             return (.png, UTType.png.identifier, nil)
         case .heic:
             return (.heif, UTType.heic.identifier, nil)
+        }
+    }
+
+    private static func validateJPEGBackground(_ background: WIJPEGBackground) throws(WICompressError) {
+        guard case .color(let color) = background else {
+            return
+        }
+
+        guard color.alpha.isFinite, color.alpha >= 1 else {
+            throw WICompressError.nonOpaqueJPEGBackground
+        }
+
+        let colorSpace = try color.colorSpace.makeCGColorSpace()
+        guard colorSpace.model == .rgb else {
+            throw WICompressError.unsupportedColorSpace
         }
     }
 
@@ -267,6 +350,29 @@ enum WIWritePlanResolver {
 
     private static func positiveDimension(_ value: Double) -> Double {
         value.isFinite ? max(value, 1.0) : 1.0
+    }
+
+    private static func writePlan(
+        path: WIWritePath,
+        destinationFormat: WIImageFormat,
+        destinationTypeIdentifier: String,
+        resize: WIResolvedResize,
+        metadataPolicy: WIMetadataPolicy,
+        quality: Double?,
+        jpegBackground: WIJPEGBackground?,
+        outputColorSpace: WIResolvedOutputColorSpace
+    ) -> WIWritePlan {
+        WIWritePlan(
+            path: path,
+            destinationFormat: destinationFormat,
+            destinationTypeIdentifier: destinationTypeIdentifier,
+            maxPixelSize: resize.maxPixelSize,
+            targetPixelSize: resize.targetPixelSize,
+            metadataPolicy: metadataPolicy,
+            quality: quality,
+            jpegBackground: jpegBackground,
+            outputColorSpace: outputColorSpace
+        )
     }
 }
 

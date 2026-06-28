@@ -22,6 +22,14 @@ public enum WICompressError: Error, Sendable, Equatable {
     case unsupportedDestinationFormat(WIImageFormat)
     /// Transparent source data needs an explicit background before JPEG encoding.
     case transparentSourceRequiresBackground(WIImageFormat)
+    /// The requested color space is not available on the current platform.
+    case unsupportedColorSpace
+    /// The supplied ICC profile could not create a color space.
+    case invalidICCProfile
+    /// Image rendering into the requested color space failed.
+    case colorConversionFailed
+    /// JPEG background colors must be fully opaque.
+    case nonOpaqueJPEGBackground
     /// Multi-frame image data is not supported.
     case animatedSourceUnsupported(frameCount: Int)
     /// The options and image facts could not produce a valid write plan.
@@ -49,6 +57,14 @@ extension WICompressError: LocalizedError {
             return "The current environment cannot write the \(format) format."
         case .transparentSourceRequiresBackground(let format):
             return "Encoding transparent \(format) data as JPEG requires an explicit background."
+        case .unsupportedColorSpace:
+            return "The requested color space is not available on this platform."
+        case .invalidICCProfile:
+            return "The supplied ICC profile could not create a color space."
+        case .colorConversionFailed:
+            return "Failed to render the image into the requested color space."
+        case .nonOpaqueJPEGBackground:
+            return "Encoding JPEG with a custom background requires an opaque color."
         case .animatedSourceUnsupported(let frameCount):
             return "Animated images are not supported (\(frameCount) frames)."
         case .writePlanUnavailable:

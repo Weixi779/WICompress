@@ -73,11 +73,7 @@ enum WIImageEncoder {
             throw WICompressError.thumbnailCreationFailed
         }
 
-        var image = thumbnail
-        if let targetPixelSize = plan.targetPixelSize {
-            image = try resizedImage(image, targetPixelSize: targetPixelSize)
-        }
-        image = try destinationImage(from: image, plan: plan)
+        let image = try renderBitmap(thumbnail, plan: plan)
 
         let outputData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
@@ -119,100 +115,86 @@ enum WIImageEncoder {
         return properties
     }
 
-    private static func destinationImage(
-        from image: CGImage,
+    private static func renderBitmap(
+        _ image: CGImage,
         plan: WIWritePlan
     ) throws(WICompressError) -> CGImage {
-        guard plan.destinationFormat == .jpeg else {
-            return image
-        }
+        let colorSpace = try outputColorSpace(for: image, plan: plan)
+        let alphaMode = try renderAlphaMode(for: plan)
+        let bitmapInfo = bitmapInfo(for: image, alphaMode: alphaMode)
+        let size = plan.targetPixelSize ?? WIPixelSize(width: image.width, height: image.height)
 
-        switch plan.jpegBackground {
-        case .white:
-            return try flattenedJPEGImage(image, background: .white)
-        case .black:
-            return try flattenedJPEGImage(image, background: .black)
-        case .disallow, nil:
-            return image
-        }
-    }
-
-    private static func flattenedJPEGImage(
-        _ image: CGImage,
-        background: WIJPEGBackground
-    ) throws(WICompressError) -> CGImage {
-        let colorSpace = rgbColorSpace(from: image) ?? CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue
         guard let context = CGContext(
             data: nil,
-            width: image.width,
-            height: image.height,
+            width: size.width,
+            height: size.height,
             bitsPerComponent: 8,
             bytesPerRow: 0,
             space: colorSpace,
             bitmapInfo: bitmapInfo
         ) else {
-            throw WICompressError.thumbnailCreationFailed
+            throw WICompressError.colorConversionFailed
         }
 
-        let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let rect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
         context.interpolationQuality = .high
+        context.setRenderingIntent(.relativeColorimetric)
 
+        if case .opaqueJPEG(let background?) = alphaMode {
+            context.setFillColor(try background.cgColor(in: colorSpace))
+            context.fill(rect)
+        }
+
+        context.draw(image, in: rect)
+
+        guard let renderedImage = context.makeImage() else {
+            throw WICompressError.colorConversionFailed
+        }
+
+        return renderedImage
+    }
+
+    private static func outputColorSpace(
+        for image: CGImage,
+        plan: WIWritePlan
+    ) throws(WICompressError) -> CGColorSpace {
+        if let target = plan.outputColorSpace.target {
+            return try target.makeCGColorSpace()
+        }
+
+        return rgbColorSpace(from: image) ?? CGColorSpaceCreateDeviceRGB()
+    }
+
+    private static func renderAlphaMode(for plan: WIWritePlan) throws(WICompressError) -> WIRenderAlphaMode {
+        guard plan.destinationFormat == .jpeg else {
+            return .preserveSourceAlpha
+        }
+
+        return .opaqueJPEG(background: try resolvedJPEGBackground(from: plan.jpegBackground))
+    }
+
+    private static func resolvedJPEGBackground(
+        from background: WIJPEGBackground?
+    ) throws(WICompressError) -> WIResolvedJPEGBackground? {
         switch background {
         case .white:
-            context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+            return WIResolvedJPEGBackground(color: WIColor(red: 1, green: 1, blue: 1))
         case .black:
-            context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
-        case .disallow:
-            break
+            return WIResolvedJPEGBackground(color: WIColor(red: 0, green: 0, blue: 0))
+        case .color(let color):
+            return WIResolvedJPEGBackground(color: color)
+        case .disallow, nil:
+            return nil
         }
-
-        context.fill(rect)
-        context.draw(image, in: rect)
-
-        guard let flattenedImage = context.makeImage() else {
-            throw WICompressError.thumbnailCreationFailed
-        }
-
-        return flattenedImage
     }
 
-    private static func resizedImage(
-        _ image: CGImage,
-        targetPixelSize: WIPixelSize
-    ) throws(WICompressError) -> CGImage {
-        guard image.width != targetPixelSize.width || image.height != targetPixelSize.height else {
-            return image
+    private static func bitmapInfo(for image: CGImage, alphaMode: WIRenderAlphaMode) -> UInt32 {
+        switch alphaMode {
+        case .preserveSourceAlpha:
+            return resizedBitmapInfo(for: image)
+        case .opaqueJPEG:
+            return CGImageAlphaInfo.noneSkipLast.rawValue
         }
-
-        let colorSpace = rgbColorSpace(from: image) ?? CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = resizedBitmapInfo(for: image)
-        guard let context = CGContext(
-            data: nil,
-            width: targetPixelSize.width,
-            height: targetPixelSize.height,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo
-        ) else {
-            throw WICompressError.thumbnailCreationFailed
-        }
-
-        let rect = CGRect(
-            x: 0,
-            y: 0,
-            width: targetPixelSize.width,
-            height: targetPixelSize.height
-        )
-        context.interpolationQuality = .high
-        context.draw(image, in: rect)
-
-        guard let resizedImage = context.makeImage() else {
-            throw WICompressError.thumbnailCreationFailed
-        }
-
-        return resizedImage
     }
 
     private static func resizedBitmapInfo(for image: CGImage) -> UInt32 {
@@ -264,4 +246,45 @@ enum WIImageEncoder {
             }
         }
     }
+}
+
+private struct WIResolvedJPEGBackground: Sendable, Equatable {
+    var color: WIColor
+
+    func cgColor(in destinationColorSpace: CGColorSpace) throws(WICompressError) -> CGColor {
+        let sourceColorSpace = try color.colorSpace.makeCGColorSpace()
+        guard sourceColorSpace.model == .rgb else {
+            throw WICompressError.unsupportedColorSpace
+        }
+
+        let components = [
+            clamped(color.red),
+            clamped(color.green),
+            clamped(color.blue),
+            clamped(color.alpha)
+        ]
+        guard let sourceColor = CGColor(colorSpace: sourceColorSpace, components: components),
+              let destinationColor = sourceColor.converted(
+                to: destinationColorSpace,
+                intent: .relativeColorimetric,
+                options: nil
+              ) else {
+            throw WICompressError.colorConversionFailed
+        }
+
+        return destinationColor
+    }
+
+    private func clamped(_ value: Double) -> CGFloat {
+        guard value.isFinite else {
+            return 0
+        }
+
+        return CGFloat(min(max(value, 0), 1))
+    }
+}
+
+private enum WIRenderAlphaMode: Sendable, Equatable {
+    case preserveSourceAlpha
+    case opaqueJPEG(background: WIResolvedJPEGBackground?)
 }

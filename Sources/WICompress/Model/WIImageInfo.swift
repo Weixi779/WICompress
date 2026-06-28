@@ -8,6 +8,10 @@
 
 import Foundation
 
+struct WISourceColorSpaceInfo: Sendable, Equatable {
+    let colorSpace: WIColorSpace?
+}
+
 struct WIImageInfo: Sendable, Equatable {
     let sourceFormat: WIImageFormat
     let typeIdentifier: String?

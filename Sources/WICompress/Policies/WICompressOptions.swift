@@ -8,7 +8,7 @@
 
 import Foundation
 
-/// Policies that control resize, format, metadata, and quality handling.
+/// Policies that control resize, format, metadata, quality, and color-space handling.
 public struct WICompressOptions: Sendable, Equatable {
     /// Resize policy applied before encoding.
     public var resize: WIResizePolicy
@@ -18,18 +18,22 @@ public struct WICompressOptions: Sendable, Equatable {
     public var metadata: WIMetadataPolicy
     /// Lossy quality policy.
     public var quality: WIQualityPolicy
+    /// Output color-space policy.
+    public var colorSpace: WIOutputColorSpace
 
     /// Creates compression options with upload-compression defaults unless overridden.
     public init(
         resize: WIResizePolicy = .luban,
         format: WIFormatPolicy = .preserve,
         metadata: WIMetadataPolicy = .strip,
-        quality: WIQualityPolicy = .compression(0.6)
+        quality: WIQualityPolicy = .compression(0.6),
+        colorSpace: WIOutputColorSpace = .preserve
     ) {
         self.resize = resize
         self.format = format
         self.metadata = metadata
         self.quality = quality
+        self.colorSpace = colorSpace
     }
 
     /// Default upload-compression options.

@@ -75,6 +75,12 @@ struct WICompressImageIOCoreTests {
         )
     }
 
+    private static func decodedColorSpaceName(_ data: Data) throws -> String? {
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+        let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        return image.colorSpace?.name as String?
+    }
+
     @available(iOS 14.1, macOS 11.0, *)
     private static func hasGainMap(_ data: Data) -> Bool {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
@@ -135,6 +141,35 @@ struct WICompressImageIOCoreTests {
         )
 
         CGImageDestinationAddImage(destination, image, properties)
+        try #require(CGImageDestinationFinalize(destination))
+
+        return data as Data
+    }
+
+    private static func cmykJPEG(width: Int, height: Int) throws -> Data {
+        let colorSpace = CGColorSpaceCreateDeviceCMYK()
+        let bitmapInfo = CGImageAlphaInfo.none.rawValue
+        let context = try #require(
+            CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: bitmapInfo
+            )
+        )
+        context.setFillColor([0, 1, 1, 0, 1])
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+        let image = try #require(context.makeImage())
+        let data = NSMutableData()
+        let destination = try #require(
+            CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil)
+        )
+
+        CGImageDestinationAddImage(destination, image, nil)
         try #require(CGImageDestinationFinalize(destination))
 
         return data as Data
@@ -470,6 +505,88 @@ struct WICompressImageIOCoreTests {
 
         #expect(writePlan.path == .redrawBitmap)
         #expect(outputInfo.profileName == inputInfo.profileName)
+    }
+
+    @Test("Color-space inspection is lazy for preserve and resolves Display P3 when requested")
+    func colorSpaceInspectionIsLazyForPreserve() throws {
+        let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+        let inputSource = try WIImageSource(data: inputData)
+
+        #expect(try inputSource.colorSpaceInfoIfNeeded(for: .preserve) == nil)
+
+        let colorSpaceInfo = try #require(
+            try inputSource.colorSpaceInfoIfNeeded(for: .convert(to: .sRGB))
+        )
+        #expect(colorSpaceInfo.colorSpace == .displayP3)
+    }
+
+    @Test("Display P3 can be converted to sRGB")
+    func displayP3ConvertsToSRGB() throws {
+        let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+        try #require(Self.decodedColorSpaceName(inputData) == CGColorSpace.displayP3 as String)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .none,
+                format: .preserve,
+                metadata: .strip,
+                quality: .compression(0.8),
+                colorSpace: .convert(to: .sRGB)
+            )
+        )
+        let outputColorSpaceName = try Self.decodedColorSpaceName(outputData)
+
+        #expect(WIImageFormat(data: outputData) == WIImageFormat(data: inputData))
+        #expect(outputColorSpaceName == CGColorSpace.sRGB as String)
+    }
+
+    @Test("Transparent PNG can be flattened to JPEG with a custom background")
+    func transparentPNGFlattensToJPEGWithCustomBackground() throws {
+        let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")
+        let inputData = try Data(contentsOf: url)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .none,
+                format: .jpeg(
+                    background: .color(
+                        WIColor(red: 0.9, green: 0.1, blue: 0.1, colorSpace: .displayP3)
+                    )
+                ),
+                metadata: .strip,
+                quality: .compression(0.8),
+                colorSpace: .convert(to: .sRGB)
+            )
+        )
+        let outputInfo = try Self.imageInfo(outputData)
+        let outputColorSpaceName = try Self.decodedColorSpaceName(outputData)
+
+        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(outputInfo.hasAlpha != true)
+        #expect(outputColorSpaceName == CGColorSpace.sRGB as String)
+    }
+
+    @Test("CMYK JPEG preserve still compresses without throwing")
+    func cmykJPEGWithPreserveStillCompresses() throws {
+        let inputData = try Self.cmykJPEG(width: 320, height: 240)
+
+        let outputData = try WICompress.compress(
+            inputData,
+            options: WICompressOptions(
+                resize: .maxPixel(160),
+                format: .preserve,
+                metadata: .strip,
+                quality: .compression(0.8),
+                colorSpace: .preserve
+            )
+        )
+
+        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(!outputData.isEmpty)
     }
 
     @Test("Size guard may return original when preserve policies are already satisfied")

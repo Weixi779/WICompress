@@ -16,6 +16,8 @@ public enum WIJPEGBackground: Sendable, Equatable {
     case white
     /// Flatten transparent pixels over black.
     case black
+    /// Flatten transparent pixels over a caller-supplied color.
+    case color(WIColor)
 }
 
 /// Destination container policy.

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CoreGraphics
 import ImageIO
 
 final class WIImageSource {
@@ -61,6 +62,23 @@ final class WIImageSource {
         )
     }
 
+    func colorSpaceInfoIfNeeded(
+        for policy: WIOutputColorSpace
+    ) throws(WICompressError) -> WISourceColorSpaceInfo? {
+        guard policy.requiresSourceColorSpaceInspection else {
+            return nil
+        }
+
+        guard let image = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
+            throw WICompressError.imageInfoUnavailable
+        }
+
+        let colorSpace = image.colorSpace
+        return WISourceColorSpaceInfo(
+            colorSpace: colorSpace.flatMap(Self.colorSpace(from:))
+        )
+    }
+
     private static func canWriteImageTypeIdentifier(_ typeIdentifier: String) -> Bool {
         WIImageFormat.canWrite(typeIdentifier: typeIdentifier)
     }
@@ -96,6 +114,24 @@ final class WIImageSource {
 
         return false
     }
+
+    private static func colorSpace(from colorSpace: CGColorSpace) -> WIColorSpace? {
+        if let name = colorSpace.name as String? {
+            if name == CGColorSpace.sRGB as String {
+                return .sRGB
+            }
+
+            if name == CGColorSpace.displayP3 as String {
+                return .displayP3
+            }
+        }
+
+        guard colorSpace.model == .rgb, let iccData = colorSpace.copyICCData() else {
+            return nil
+        }
+
+        return .iccProfile(iccData as Data)
+    }
 }
 
 private extension Dictionary where Key == CFString, Value == Any {
@@ -129,5 +165,16 @@ private extension Dictionary where Key == CFString, Value == Any {
         }
 
         return !dictionary.isEmpty
+    }
+}
+
+private extension WIOutputColorSpace {
+    var requiresSourceColorSpaceInspection: Bool {
+        switch self {
+        case .preserve:
+            return false
+        case .convert, .preserveIfSupported:
+            return true
+        }
     }
 }

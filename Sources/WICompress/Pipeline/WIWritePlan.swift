@@ -17,6 +17,7 @@ struct WIWritePlan: Sendable, Equatable {
     var metadataPolicy: WIMetadataPolicy
     var quality: Double?
     var jpegBackground: WIJPEGBackground?
+    var outputColorSpace: WIResolvedOutputColorSpace
 }
 
 struct WIPixelSize: Sendable, Equatable {
@@ -28,4 +29,12 @@ enum WIWritePath: Sendable, Equatable {
     case returnOriginal
     case copyFromSource
     case redrawBitmap
+}
+
+struct WIResolvedOutputColorSpace: Sendable, Equatable {
+    var target: WIColorSpace?
+
+    var requiresConversion: Bool {
+        target != nil
+    }
 }
