@@ -59,10 +59,10 @@ public struct WICompress: Sendable {
         _ data: Data,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WICompressionResult {
-        try WICompressionTargetResolver.validate(target)
+        try WICompressionTargetValidator.validate(target)
 
         let imageSource = try WIImageSource(data: data)
-        try WICompressionTargetResolver.validate(target, info: imageSource.info)
+        try WICompressionTargetValidator.validate(target, info: imageSource.info)
 
         let sourceColorSpace = try imageSource.colorSpaceInfoIfNeeded(for: target.output.colorSpace)
         if canReturnOriginal(data, target: target, imageSource: imageSource, sourceColorSpace: sourceColorSpace) {
@@ -86,7 +86,7 @@ public struct WICompress: Sendable {
         contentsOf url: URL,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WICompressionResult {
-        try WICompressionTargetResolver.validate(target)
+        try WICompressionTargetValidator.validate(target)
 
         let data: Data
         do {

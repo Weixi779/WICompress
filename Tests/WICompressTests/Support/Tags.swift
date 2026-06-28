@@ -15,4 +15,5 @@ extension Tag {
     @Tag static var edgeCase: Self
     @Tag static var publicAPI: Self
     @Tag static var imageIOCore: Self
+    @Tag static var algorithm: Self
 }

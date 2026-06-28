@@ -981,12 +981,12 @@ struct WICompressImageIOCoreTests {
         let referencePixelSize = WIPixelSize(width: 1_000, height: 1_000)
         let candidates = [largeLowQuality, smallerHighQuality]
 
-        let resolutionCandidate = WICompressionSolver.bestCandidate(
+        let resolutionCandidate = WICompressionRanking.bestCandidate(
             candidates,
             preference: .preserveResolution,
             referencePixelSize: referencePixelSize
         )
-        let fidelityCandidate = WICompressionSolver.bestCandidate(
+        let fidelityCandidate = WICompressionRanking.bestCandidate(
             candidates,
             preference: .preserveFidelity,
             referencePixelSize: referencePixelSize

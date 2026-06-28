@@ -170,6 +170,7 @@ Tests are organized by `@Suite` and filtered by `@Tag`:
 | `.imageIOCore` | ImageIO core: write-path resolution, encoder, real-image contracts |
 | `.publicAPI` | Public surface: options defaults, error mapping, entry points |
 | `.edgeCase` | Boundary values and edge inputs |
+| `.algorithm` | Pure target-search math (`WICompressionSizeEstimation`, `WICompressionRanking`) |
 
 Tag definitions live in `Tests/WICompressTests/Support/Tags.swift`.
 

@@ -90,6 +90,15 @@ struct WICompressPublicSurfaceTests {
             ),
             testDescription: "unrepresentable pixel width"
         ),
+        InvalidTargetCase(
+            target: WICompressionTarget(
+                maxBytes: 1024,
+                geometry: .fill(
+                    size: WISize(width: Double(Int.max), height: 100)
+                )
+            ),
+            testDescription: "pixel width at the Int.max rounding boundary"
+        ),
     ]
 
     private static func tinyPNGData() throws -> Data {

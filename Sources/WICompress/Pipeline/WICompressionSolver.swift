@@ -9,6 +9,17 @@
 import Foundation
 import CoreGraphics
 
+/// Target byte-budget search: a two-stage loop that drives an image under
+/// `maxBytes` while keeping visual quality as high as the constraints allow.
+///
+/// - Outer stage shrinks the longest side by an area-proportional estimate
+///   (`WICompressionSizeEstimation`) when quality alone cannot meet the budget.
+/// - Inner stage searches the highest feasible quality at a fixed size, reusing
+///   one rendered bitmap across encode attempts.
+/// - Surviving candidates are ranked by `WICompressionRanking` per preference.
+///
+/// Pure math (estimation, quality profiles, ranking) lives under `Algorithm/`;
+/// this type owns orchestration, rendering, encoding, and the attempt budget.
 enum WICompressionSolver {
     private static let defaultMaxEncodeAttempts = 40
     private static let maxSoftGeometryEncodeAttempts = 8
@@ -61,7 +72,7 @@ enum WICompressionSolver {
                 attemptCount: attemptCount,
                 maxEncodeAttempts: maxEncodeAttempts
             ) {
-                return bestCandidate(
+                return WICompressionRanking.bestCandidate(
                     candidates,
                     preference: target.preference,
                     referencePixelSize: referencePixelSize
@@ -96,7 +107,7 @@ enum WICompressionSolver {
                 )
             } catch WICompressError.resourceLimitExceeded {
                 if !candidates.isEmpty {
-                    return bestCandidate(
+                    return WICompressionRanking.bestCandidate(
                         candidates,
                         preference: target.preference,
                         referencePixelSize: referencePixelSize
@@ -109,7 +120,7 @@ enum WICompressionSolver {
                 candidates.append(candidate)
                 if !allowsDimensionSearch ||
                     candidate.quality >= highQuality {
-                    return bestCandidate(
+                    return WICompressionRanking.bestCandidate(
                         candidates,
                         preference: target.preference,
                         referencePixelSize: referencePixelSize
@@ -123,14 +134,14 @@ enum WICompressionSolver {
             }
 
             guard let estimateByteCount = outcome.dimensionSearchByteCount ?? outcome.smallestByteCount,
-                  let nextLongSide = nextLongSide(
+                  let nextLongSide = WICompressionSizeEstimation.nextLongSide(
                     current: currentLongSide,
                     encodedBytes: estimateByteCount,
                     maxBytes: target.maxBytes,
                     format: plan.destinationFormat
                   ) else {
                 if !candidates.isEmpty {
-                    return bestCandidate(
+                    return WICompressionRanking.bestCandidate(
                         candidates,
                         preference: target.preference,
                         referencePixelSize: referencePixelSize
@@ -184,7 +195,7 @@ enum WICompressionSolver {
                 throw WICompressError.targetUnsatisfiable(smallestByteCount: smallestByteCount)
             }
 
-            guard let nextLongSide = nextLongSide(
+            guard let nextLongSide = WICompressionSizeEstimation.nextLongSide(
                 current: currentLongSide,
                 encodedBytes: data.count,
                 maxBytes: target.maxBytes,
@@ -445,7 +456,7 @@ enum WICompressionSolver {
                 return targetPixelSize
             }
             if let maxPixelSize = initialPlan.maxPixelSize {
-                return scaledPixelSize(
+                return WICompressionSizeEstimation.scaledPixelSize(
                     source: WIPixelSize(width: info.displayWidth, height: info.displayHeight),
                     maxLongSide: maxPixelSize
                 )
@@ -473,78 +484,13 @@ enum WICompressionSolver {
         }
 
         if let maxPixelSize = plan.maxPixelSize {
-            return scaledPixelSize(
+            return WICompressionSizeEstimation.scaledPixelSize(
                 source: WIPixelSize(width: info.displayWidth, height: info.displayHeight),
                 maxLongSide: maxPixelSize
             )
         }
 
         return WIPixelSize(width: info.displayWidth, height: info.displayHeight)
-    }
-
-    private static func scaledPixelSize(source: WIPixelSize, maxLongSide: Int) -> WIPixelSize {
-        let sourceLongSide = max(source.width, source.height)
-        guard sourceLongSide > 0, maxLongSide < sourceLongSide else {
-            return source
-        }
-
-        let scale = Double(max(maxLongSide, 1)) / Double(sourceLongSide)
-        return WIPixelSize(
-            width: max(Int((Double(source.width) * scale).rounded(.toNearestOrAwayFromZero)), 1),
-            height: max(Int((Double(source.height) * scale).rounded(.toNearestOrAwayFromZero)), 1)
-        )
-    }
-
-    static func bestCandidate(
-        _ candidates: [WISolvedCompressionCandidate],
-        preference: WICompressionPreference,
-        referencePixelSize: WIPixelSize
-    ) -> WISolvedCompressionCandidate {
-        precondition(!candidates.isEmpty)
-
-        return candidates.min { lhs, rhs in
-            let lhsLoss = candidateLoss(lhs, preference: preference, referencePixelSize: referencePixelSize)
-            let rhsLoss = candidateLoss(rhs, preference: preference, referencePixelSize: referencePixelSize)
-            if abs(lhsLoss - rhsLoss) > 0.000_001 {
-                return lhsLoss < rhsLoss
-            }
-
-            if lhs.quality != rhs.quality {
-                return lhs.quality > rhs.quality
-            }
-
-            if lhs.pixelArea != rhs.pixelArea {
-                return lhs.pixelArea > rhs.pixelArea
-            }
-
-            return lhs.data.count < rhs.data.count
-        }!
-    }
-
-    private static func candidateLoss(
-        _ candidate: WISolvedCompressionCandidate,
-        preference: WICompressionPreference,
-        referencePixelSize: WIPixelSize
-    ) -> Double {
-        let weights = WICandidateScoreWeights(preference: preference)
-        let referenceArea = max(pixelArea(referencePixelSize), 1)
-        let candidateArea = max(candidate.pixelArea, 1)
-        let areaScore = log2(candidateArea / referenceArea)
-        let qualityPenalty = calibratedQualityPenalty(candidate.quality)
-        let qKnee = WILossyQualityProfile(format: candidate.format).qKnee
-        let kneePenalty = pow(max(0, qKnee - candidate.quality), 2)
-
-        return weights.area * abs(areaScore)
-            + weights.quality * qualityPenalty
-            + weights.knee * kneePenalty
-    }
-
-    private static func calibratedQualityPenalty(_ quality: Double) -> Double {
-        pow(max(0, 1 - quality), 2) * 4
-    }
-
-    private static func pixelArea(_ size: WIPixelSize) -> Double {
-        Double(size.width) * Double(size.height)
     }
 
     private static func shouldReturnBestCandidate(
@@ -570,29 +516,6 @@ enum WICompressionSolver {
         }
     }
 
-    private static func nextLongSide(
-        current: Int,
-        encodedBytes: Int,
-        maxBytes: Int,
-        format: WIImageFormat
-    ) -> Int? {
-        guard current > 1, encodedBytes > maxBytes else {
-            return nil
-        }
-
-        let overhead = 512.0
-        let adjustedTarget = max(Double(maxBytes) - overhead, 1)
-        let adjustedBytes = max(Double(encodedBytes) - overhead, 1)
-        let scale = sqrt(adjustedTarget / adjustedBytes) * 0.92
-        var next = min(current - 1, max(Int((Double(current) * scale).rounded(.down)), 1))
-
-        if format == .heif, next > 2, next % 2 != 0 {
-            next -= 1
-        }
-
-        return next < current ? next : nil
-    }
-
     private static func minByteCount(_ lhs: Int?, _ rhs: Int?) -> Int? {
         switch (lhs, rhs) {
         case (.some(let lhs), .some(let rhs)):
@@ -607,67 +530,8 @@ enum WICompressionSolver {
     }
 }
 
-private struct WILossyQualityProfile: Sendable, Equatable {
-    var qHigh: Double
-    var qAnchor: Double
-    var qKnee: Double
-    var qEmergency: Double
-
-    private init(qHigh: Double, qAnchor: Double, qKnee: Double, qEmergency: Double) {
-        self.qHigh = qHigh
-        self.qAnchor = qAnchor
-        self.qKnee = qKnee
-        self.qEmergency = qEmergency
-    }
-
-    init(format: WIImageFormat) {
-        switch format {
-        case .jpeg:
-            self.init(qHigh: 0.82, qAnchor: 0.72, qKnee: 0.45, qEmergency: 0.24)
-        case .heif:
-            self.init(qHigh: 0.78, qAnchor: 0.68, qKnee: 0.42, qEmergency: 0.22)
-        case .png, .unknown:
-            self.init(qHigh: 0, qAnchor: 0, qKnee: 0, qEmergency: 0)
-        }
-    }
-}
-
-struct WISolvedCompressionCandidate: Sendable, Equatable {
-    var data: Data
-    var pixelSize: WIPixelSize
-    var format: WIImageFormat
-    var quality: Double
-
-    var pixelArea: Double {
-        Double(pixelSize.width) * Double(pixelSize.height)
-    }
-}
-
 private struct WIFixedSizeSolveOutcome: Sendable, Equatable {
     var candidate: WISolvedCompressionCandidate?
     var smallestByteCount: Int?
     var dimensionSearchByteCount: Int?
-}
-
-private struct WICandidateScoreWeights: Sendable, Equatable {
-    var area: Double
-    var quality: Double
-    var knee: Double
-
-    init(preference: WICompressionPreference) {
-        switch preference {
-        case .balanced:
-            self.init(area: 1.0, quality: 1.0, knee: 2.0)
-        case .preserveResolution:
-            self.init(area: 1.3, quality: 0.8, knee: 1.5)
-        case .preserveFidelity:
-            self.init(area: 0.8, quality: 1.3, knee: 2.5)
-        }
-    }
-
-    private init(area: Double, quality: Double, knee: Double) {
-        self.area = area
-        self.quality = quality
-        self.knee = knee
-    }
 }
