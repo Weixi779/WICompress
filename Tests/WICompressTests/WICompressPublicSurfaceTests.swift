@@ -234,15 +234,17 @@ struct WICompressPublicSurfaceTests {
         }
     }
 
-    @Test("Hard geometry reports unsupported geometry until canvas rendering is implemented")
-    func hardGeometryReportsUnsupportedGeometry() throws {
+    @Test("Hard geometry target returns fixed pixel size")
+    func hardGeometryTargetReturnsFixedPixelSize() throws {
         let data = try Self.tinyPNGData()
-        let geometry = WICompressionGeometry.fill(size: WISize(width: 10, height: 10))
-        let target = WICompressionTarget(maxBytes: 1024, geometry: geometry)
+        let target = WICompressionTarget(
+            maxBytes: 100_000,
+            geometry: .fill(size: WISize(width: 10, height: 10))
+        )
+        let result = try WICompress.compress(data, to: target)
 
-        #expect(throws: WICompressError.unsupportedCompressionGeometry(geometry)) {
-            _ = try WICompress.compress(data, to: target)
-        }
+        #expect(result.pixelSize == WISize(width: 10, height: 10))
+        #expect(result.byteCount == result.data.count)
     }
 
     @Test("Target compression fails rather than returning bytes over the target")
@@ -253,8 +255,13 @@ struct WICompressPublicSurfaceTests {
             output: .preserve
         )
 
-        #expect(throws: WICompressError.targetUnsatisfiable(smallestByteCount: input.count)) {
+        do {
             _ = try WICompress.compress(input, to: target)
+            Issue.record("Expected targetUnsatisfiable")
+        } catch WICompressError.targetUnsatisfiable(let smallestByteCount) {
+            #expect((smallestByteCount ?? 0) > target.maxBytes)
+        } catch {
+            Issue.record("Unexpected error: \(error)")
         }
     }
 

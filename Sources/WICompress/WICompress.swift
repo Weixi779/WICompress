@@ -69,8 +69,12 @@ public struct WICompress: Sendable {
             return compressionResult(for: data, info: imageSource.info)
         }
 
-        let options = try WICompressionTargetResolver.options(for: target)
-        let outputData = try compress(data, options: options)
+        let writePlan = try WICompressionTargetResolver.writePlan(
+            for: target,
+            info: imageSource.info,
+            sourceColorSpace: sourceColorSpace
+        )
+        let outputData = try WIImageEncoder.encode(imageSource, plan: writePlan)
         guard outputData.count <= target.maxBytes else {
             throw WICompressError.targetUnsatisfiable(smallestByteCount: outputData.count)
         }

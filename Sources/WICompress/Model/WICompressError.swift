@@ -16,6 +16,8 @@ public enum WICompressError: Error, Sendable, Equatable {
     case invalidImageData
     /// ImageIO could not provide required image facts.
     case imageInfoUnavailable
+    /// ImageIO could not decode source pixels for rendering.
+    case imageDecodeFailed
     /// The source container is not supported.
     case unsupportedSourceFormat(String?)
     /// The current platform cannot write the requested destination format.
@@ -59,6 +61,8 @@ extension WICompressError: LocalizedError {
             return "The input data is not a decodable image."
         case .imageInfoUnavailable:
             return "Could not read basic image information (pixel size, format)."
+        case .imageDecodeFailed:
+            return "Could not decode source pixels for rendering."
         case .unsupportedSourceFormat(let identifier):
             return "Unsupported source image format: \(identifier ?? "unknown")."
         case .unsupportedDestinationFormat(let format):

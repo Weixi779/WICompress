@@ -181,7 +181,7 @@ enum WIWritePlanResolver {
         }
     }
 
-    private static func resolvedQuality(
+    static func resolvedQuality(
         for policy: WIQualityPolicy,
         destinationFormat: WIImageFormat
     ) -> Double? {
@@ -197,7 +197,7 @@ enum WIWritePlanResolver {
         }
     }
 
-    private static func resolvedColorSpace(
+    static func resolvedColorSpace(
         for policy: WIOutputColorSpace,
         sourceColorSpace: WISourceColorSpaceInfo?
     ) throws(WICompressError) -> WIResolvedOutputColorSpace {
@@ -266,7 +266,7 @@ enum WIWritePlanResolver {
         }
     }
 
-    private static func resolvedDestination(
+    static func resolvedDestination(
         for policy: WIFormatPolicy,
         info: WIImageInfo
     ) throws(WICompressError) -> (format: WIImageFormat, typeIdentifier: String, jpegBackground: WIJPEGBackground?) {
@@ -359,6 +359,7 @@ enum WIWritePlanResolver {
             destinationTypeIdentifier: destinationTypeIdentifier,
             maxPixelSize: resize.maxPixelSize,
             targetPixelSize: resize.targetPixelSize,
+            renderGeometry: nil,
             metadataPolicy: metadataPolicy,
             quality: quality,
             jpegBackground: jpegBackground,

@@ -14,6 +14,7 @@ struct WIWritePlan: Sendable, Equatable {
     var destinationTypeIdentifier: String
     var maxPixelSize: Int?
     var targetPixelSize: WIPixelSize?
+    var renderGeometry: WIRenderGeometry?
     var metadataPolicy: WIMetadataPolicy
     var quality: Double?
     var jpegBackground: WIJPEGBackground?
@@ -24,12 +25,38 @@ struct WIWritePlan: Sendable, Equatable {
 struct WIPixelSize: Sendable, Equatable {
     var width: Int
     var height: Int
+
+    init(width: Int, height: Int) {
+        self.width = width
+        self.height = height
+    }
+
+    init(_ size: WISize) {
+        self.init(
+            width: max(Int(size.width.rounded(.toNearestOrAwayFromZero)), 1),
+            height: max(Int(size.height.rounded(.toNearestOrAwayFromZero)), 1)
+        )
+    }
 }
 
 enum WIWritePath: Sendable, Equatable {
     case returnOriginal
     case copyFromSource
     case redrawBitmap
+    case redrawCanvas
+}
+
+struct WIRenderGeometry: Sendable, Equatable {
+    var canvasSize: WIPixelSize
+    var destinationRect: WIRect
+    var background: WIColor?
+}
+
+struct WIRect: Sendable, Equatable {
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
 }
 
 struct WIResolvedOutputColorSpace: Sendable, Equatable {

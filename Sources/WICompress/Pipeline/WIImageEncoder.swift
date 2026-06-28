@@ -19,6 +19,8 @@ enum WIImageEncoder {
             return try encodeFromSource(imageSource, plan: plan)
         case .redrawBitmap:
             return try encodeRedrawnBitmap(imageSource, plan: plan)
+        case .redrawCanvas:
+            return try encodeCanvasBitmap(imageSource, plan: plan)
         }
     }
 
@@ -75,27 +77,27 @@ enum WIImageEncoder {
 
         let image = try renderBitmap(thumbnail, plan: plan)
 
-        let outputData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            outputData,
-            plan.destinationTypeIdentifier as CFString,
-            1,
-            nil
+        return try encodeRenderedImage(image, imageSource: imageSource, plan: plan)
+    }
+
+    private static func encodeCanvasBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
+        guard let renderGeometry = plan.renderGeometry else {
+            throw WICompressError.writePlanUnavailable
+        }
+
+        guard let decodedImage = CGImageSourceCreateImageAtIndex(
+            imageSource.cgImageSource,
+            0,
+            [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
         ) else {
-            throw WICompressError.destinationCreationFailed(plan.destinationFormat)
+            throw WICompressError.imageDecodeFailed
         }
 
-        var properties = destinationProperties(for: plan, imageSource: imageSource)
-        // Reset the tag so readers do not rotate pixels that were already transformed.
-        properties[kCGImagePropertyOrientation] = 1
-
-        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
-
-        guard CGImageDestinationFinalize(destination) else {
-            throw WICompressError.encodeFailed(plan.destinationFormat)
-        }
-
-        return outputData as Data
+        let normalizedImage = imageSource.info.orientation == 1
+            ? decodedImage
+            : try renderOrientationNormalizedBitmap(decodedImage, info: imageSource.info)
+        let image = try renderBitmap(normalizedImage, plan: plan, renderGeometry: renderGeometry)
+        return try encodeRenderedImage(image, imageSource: imageSource, plan: plan)
     }
 
     private static func destinationProperties(
@@ -115,14 +117,64 @@ enum WIImageEncoder {
         return properties
     }
 
+    private static func encodeRenderedImage(
+        _ image: CGImage,
+        imageSource: WIImageSource,
+        plan: WIWritePlan
+    ) throws(WICompressError) -> Data {
+        let outputData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            outputData,
+            plan.destinationTypeIdentifier as CFString,
+            1,
+            nil
+        ) else {
+            throw WICompressError.destinationCreationFailed(plan.destinationFormat)
+        }
+
+        let properties = renderedDestinationProperties(for: plan, imageSource: imageSource)
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+
+        guard CGImageDestinationFinalize(destination) else {
+            throw WICompressError.encodeFailed(plan.destinationFormat)
+        }
+
+        return outputData as Data
+    }
+
+    private static func renderedDestinationProperties(
+        for plan: WIWritePlan,
+        imageSource: WIImageSource
+    ) -> [CFString: Any] {
+        var properties = destinationProperties(for: plan, imageSource: imageSource)
+        // Reset the tag so readers do not rotate pixels that were already transformed.
+        properties[kCGImagePropertyOrientation] = 1
+        return properties
+    }
+
     private static func renderBitmap(
         _ image: CGImage,
         plan: WIWritePlan
     ) throws(WICompressError) -> CGImage {
+        let size = plan.targetPixelSize ?? WIPixelSize(width: image.width, height: image.height)
+        let renderGeometry = WIRenderGeometry(
+            canvasSize: size,
+            destinationRect: WIRect(x: 0, y: 0, width: Double(size.width), height: Double(size.height)),
+            background: nil
+        )
+
+        return try renderBitmap(image, plan: plan, renderGeometry: renderGeometry)
+    }
+
+    private static func renderBitmap(
+        _ image: CGImage,
+        plan: WIWritePlan,
+        renderGeometry: WIRenderGeometry
+    ) throws(WICompressError) -> CGImage {
         let colorSpace = try outputColorSpace(for: image, plan: plan)
         let alphaMode = try renderAlphaMode(for: plan)
         let bitmapInfo = bitmapInfo(for: image, alphaMode: alphaMode)
-        let size = plan.targetPixelSize ?? WIPixelSize(width: image.width, height: image.height)
+        let size = renderGeometry.canvasSize
 
         guard let context = CGContext(
             data: nil,
@@ -140,18 +192,103 @@ enum WIImageEncoder {
         context.interpolationQuality = .high
         context.setRenderingIntent(.relativeColorimetric)
 
-        if case .opaqueJPEG(let background?) = alphaMode {
-            context.setFillColor(try background.cgColor(in: colorSpace))
+        if let background = renderGeometry.background {
+            context.setFillColor(try WIResolvedJPEGBackground(color: background).cgColor(in: colorSpace))
             context.fill(rect)
         }
 
-        context.draw(image, in: rect)
+        if case .opaqueJPEG(let background?) = alphaMode {
+            context.setFillColor(try background.cgColor(in: colorSpace))
+            let fillRect = renderGeometry.background == nil ? rect : renderGeometry.destinationRect.cgRect
+            context.fill(fillRect)
+        }
+
+        context.draw(image, in: renderGeometry.destinationRect.cgRect)
 
         guard let renderedImage = context.makeImage() else {
             throw WICompressError.colorConversionFailed
         }
 
         return renderedImage
+    }
+
+    private static func renderOrientationNormalizedBitmap(
+        _ image: CGImage,
+        info: WIImageInfo
+    ) throws(WICompressError) -> CGImage {
+        let colorSpace = rgbColorSpace(from: image) ?? CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = resizedBitmapInfo(for: image)
+
+        guard let context = CGContext(
+            data: nil,
+            width: info.displayWidth,
+            height: info.displayHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else {
+            throw WICompressError.colorConversionFailed
+        }
+
+        context.interpolationQuality = .high
+        context.setRenderingIntent(.relativeColorimetric)
+        applyOrientationTransform(
+            to: context,
+            orientation: info.orientation,
+            pixelWidth: image.width,
+            pixelHeight: image.height
+        )
+        context.draw(
+            image,
+            in: CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        )
+
+        guard let renderedImage = context.makeImage() else {
+            throw WICompressError.colorConversionFailed
+        }
+
+        return renderedImage
+    }
+
+    private static func applyOrientationTransform(
+        to context: CGContext,
+        orientation: Int,
+        pixelWidth: Int,
+        pixelHeight: Int
+    ) {
+        let width = CGFloat(pixelWidth)
+        let height = CGFloat(pixelHeight)
+
+        switch orientation {
+        case 2:
+            context.translateBy(x: width, y: 0)
+            context.scaleBy(x: -1, y: 1)
+        case 3:
+            context.translateBy(x: width, y: height)
+            context.rotate(by: .pi)
+        case 4:
+            context.translateBy(x: 0, y: height)
+            context.scaleBy(x: 1, y: -1)
+        case 5:
+            context.translateBy(x: height, y: 0)
+            context.scaleBy(x: -1, y: 1)
+            context.translateBy(x: 0, y: width)
+            context.rotate(by: -.pi / 2)
+        case 6:
+            context.translateBy(x: 0, y: width)
+            context.rotate(by: -.pi / 2)
+        case 7:
+            context.translateBy(x: height, y: 0)
+            context.scaleBy(x: -1, y: 1)
+            context.translateBy(x: height, y: 0)
+            context.rotate(by: .pi / 2)
+        case 8:
+            context.translateBy(x: height, y: 0)
+            context.rotate(by: .pi / 2)
+        default:
+            break
+        }
     }
 
     private static func outputColorSpace(
@@ -287,4 +424,10 @@ private struct WIResolvedJPEGBackground: Sendable, Equatable {
 private enum WIRenderAlphaMode: Sendable, Equatable {
     case preserveSourceAlpha
     case opaqueJPEG(background: WIResolvedJPEGBackground?)
+}
+
+private extension WIRect {
+    var cgRect: CGRect {
+        CGRect(x: x, y: y, width: width, height: height)
+    }
 }
