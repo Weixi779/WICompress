@@ -3,10 +3,7 @@
 This document captures future design discussion. It is not part of any release
 contract.
 
-## Target-Based Compression
-
-Shipped in 1.3.0 as `WICompress.compress(_:to:)` with `WICompressionTarget`; see
-the Target Compression section of the README for usage. Remaining follow-ups:
+## Target Compression Refinements
 
 - Whether to expose diagnostics for why a target result was returned: original
   passthrough, quality search, dimension reduction, metadata rewrite, format
