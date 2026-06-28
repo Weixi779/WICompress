@@ -30,6 +30,14 @@ public enum WICompressError: Error, Sendable, Equatable {
     case colorConversionFailed
     /// JPEG background colors must be fully opaque.
     case nonOpaqueJPEGBackground
+    /// The target compression request is not valid.
+    case invalidTarget
+    /// The target constraints cannot be satisfied by the supported encoder path.
+    case targetUnsatisfiable(smallestByteCount: Int?)
+    /// The target geometry is valid but is not supported by the current encoder path.
+    case unsupportedCompressionGeometry(WICompressionGeometry)
+    /// The target solver reached its internal resource budget.
+    case resourceLimitExceeded(attemptCount: Int)
     /// Multi-frame image data is not supported.
     case animatedSourceUnsupported(frameCount: Int)
     /// The options and image facts could not produce a valid write plan.
@@ -65,6 +73,18 @@ extension WICompressError: LocalizedError {
             return "Failed to render the image into the requested color space."
         case .nonOpaqueJPEGBackground:
             return "Encoding JPEG with a custom background requires an opaque color."
+        case .invalidTarget:
+            return "The compression target is invalid."
+        case .targetUnsatisfiable(let smallestByteCount):
+            if let smallestByteCount {
+                return "Could not satisfy the compression target; smallest encoded result was \(smallestByteCount) bytes."
+            }
+
+            return "Could not satisfy the compression target."
+        case .unsupportedCompressionGeometry:
+            return "The requested compression geometry is not supported by the current encoder path."
+        case .resourceLimitExceeded(let attemptCount):
+            return "Target compression exceeded its resource budget after \(attemptCount) attempts."
         case .animatedSourceUnsupported(let frameCount):
             return "Animated images are not supported (\(frameCount) frames)."
         case .writePlanUnavailable:

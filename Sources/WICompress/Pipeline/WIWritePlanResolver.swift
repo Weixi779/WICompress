@@ -124,10 +124,10 @@ enum WIWritePlanResolver {
         case .none:
             return true
         case .luban:
-            let displaySize = displayDimensions(for: info)
+            let displaySize = info.displayDimensions
             return WILuban.ratio(width: displaySize.width, height: displaySize.height) == 1
         case .maxPixel(let maxPixel):
-            let displaySize = displayDimensions(for: info)
+            let displaySize = info.displayDimensions
             let longSide = max(displaySize.width, displaySize.height)
             return max(maxPixel, 1) >= longSide
         case .fit(let minSize, let maxSize):
@@ -232,7 +232,7 @@ enum WIWritePlanResolver {
         case .none:
             return WIResolvedResize()
         case .luban:
-            let displaySize = displayDimensions(for: info)
+            let displaySize = info.displayDimensions
             let ratio = WILuban.ratio(width: displaySize.width, height: displaySize.height)
             guard ratio > 1 else {
                 return WIResolvedResize()
@@ -241,7 +241,7 @@ enum WIWritePlanResolver {
             let maxPixelSize = max(max(displaySize.width, displaySize.height) / ratio, 1)
             return WIResolvedResize(maxPixelSize: maxPixelSize == 1 ? 1 : WILuban.ensureEven(maxPixelSize))
         case .maxPixel(let maxPixel):
-            let displaySize = displayDimensions(for: info)
+            let displaySize = info.displayDimensions
             let longSide = max(displaySize.width, displaySize.height)
             let cappedMaxPixel = max(maxPixel, 1)
             guard cappedMaxPixel < longSide else {
@@ -254,7 +254,7 @@ enum WIWritePlanResolver {
                 return WIResolvedResize()
             }
 
-            let displaySize = displayDimensions(for: info)
+            let displaySize = info.displayDimensions
             let targetLongSide = max(targetPixelSize.width, targetPixelSize.height)
             let sourceLongSide = max(displaySize.width, displaySize.height)
 
@@ -312,21 +312,12 @@ enum WIWritePlanResolver {
         }
     }
 
-    private static func displayDimensions(for info: WIImageInfo) -> (width: Int, height: Int) {
-        switch info.orientation {
-        case 5, 6, 7, 8:
-            return (info.pixelHeight, info.pixelWidth)
-        default:
-            return (info.pixelWidth, info.pixelHeight)
-        }
-    }
-
     private static func fitTargetPixelSize(
         for info: WIImageInfo,
         minSize: WISize,
         maxSize: WISize
     ) -> WIPixelSize? {
-        let displaySize = displayDimensions(for: info)
+        let displaySize = info.displayDimensions
         let width = Double(max(displaySize.width, 1))
         let height = Double(max(displaySize.height, 1))
         let minWidth = positiveDimension(minSize.width)

@@ -53,4 +53,81 @@ public struct WICompress: Sendable {
 
         return try compress(data, options: options)
     }
+
+    /// Compresses image data to satisfy a target contract.
+    public static func compress(
+        _ data: Data,
+        to target: WICompressionTarget
+    ) throws(WICompressError) -> WICompressionResult {
+        try WICompressionTargetResolver.validate(target)
+
+        let imageSource = try WIImageSource(data: data)
+        try WICompressionTargetResolver.validate(target, info: imageSource.info)
+
+        let sourceColorSpace = try imageSource.colorSpaceInfoIfNeeded(for: target.output.colorSpace)
+        if canReturnOriginal(data, target: target, imageSource: imageSource, sourceColorSpace: sourceColorSpace) {
+            return compressionResult(for: data, info: imageSource.info)
+        }
+
+        let options = try WICompressionTargetResolver.options(for: target)
+        let outputData = try compress(data, options: options)
+        guard outputData.count <= target.maxBytes else {
+            throw WICompressError.targetUnsatisfiable(smallestByteCount: outputData.count)
+        }
+
+        return try compressionResult(for: outputData)
+    }
+
+    /// Reads image data from a file URL and compresses it to satisfy a target contract.
+    public static func compress(
+        contentsOf url: URL,
+        to target: WICompressionTarget
+    ) throws(WICompressError) -> WICompressionResult {
+        try WICompressionTargetResolver.validate(target)
+
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw WICompressError.fileReadFailed(url)
+        }
+
+        return try compress(data, to: target)
+    }
+
+    private static func canReturnOriginal(
+        _ data: Data,
+        target: WICompressionTarget,
+        imageSource: WIImageSource,
+        sourceColorSpace: WISourceColorSpaceInfo?
+    ) -> Bool {
+        guard data.count <= target.maxBytes,
+              let options = try? WICompressionTargetResolver.options(for: target) else {
+            return false
+        }
+
+        return WIWritePlanResolver.canReturnOriginalForSizeGuard(
+            options: options,
+            info: imageSource.info,
+            sourceColorSpace: sourceColorSpace
+        )
+    }
+
+    private static func compressionResult(for data: Data) throws(WICompressError) -> WICompressionResult {
+        let imageSource = try WIImageSource(data: data)
+        guard imageSource.info.sourceFormat != .unknown else {
+            throw WICompressError.unsupportedSourceFormat(imageSource.info.typeIdentifier)
+        }
+
+        return compressionResult(for: data, info: imageSource.info)
+    }
+
+    private static func compressionResult(for data: Data, info: WIImageInfo) -> WICompressionResult {
+        WICompressionResult(
+            data: data,
+            format: info.sourceFormat,
+            pixelSize: info.displaySize,
+            byteCount: data.count
+        )
+    }
 }

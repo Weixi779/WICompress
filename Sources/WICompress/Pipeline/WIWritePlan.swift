@@ -20,6 +20,7 @@ struct WIWritePlan: Sendable, Equatable {
     var outputColorSpace: WIResolvedOutputColorSpace
 }
 
+/// Integer pixel size used internally by rendering and encoding plans.
 struct WIPixelSize: Sendable, Equatable {
     var width: Int
     var height: Int

@@ -24,4 +24,29 @@ struct WIImageInfo: Sendable, Equatable {
     let hasGPS: Bool
     let hasGainMap: Bool
     let hasAlpha: Bool?
+
+    var displayWidth: Int {
+        swapsDisplayDimensions ? pixelHeight : pixelWidth
+    }
+
+    var displayHeight: Int {
+        swapsDisplayDimensions ? pixelWidth : pixelHeight
+    }
+
+    var displaySize: WISize {
+        WISize(width: Double(displayWidth), height: Double(displayHeight))
+    }
+
+    var displayDimensions: (width: Int, height: Int) {
+        (displayWidth, displayHeight)
+    }
+
+    private var swapsDisplayDimensions: Bool {
+        switch orientation {
+        case 5, 6, 7, 8:
+            return true
+        default:
+            return false
+        }
+    }
 }
