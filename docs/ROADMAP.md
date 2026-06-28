@@ -79,51 +79,6 @@ public enum WIMetadataRule: Sendable, Equatable {
 }
 ```
 
-## Output Color-Space Control
-
-Color-space handling should be designed together with custom JPEG background
-colors. The two concerns are separate in the public API, but they meet in the
-encoder: transparent pixels are composited into the resolved output color space.
-
-Likely direction:
-
-- Keep the default behavior conservative and preserve normal source color
-  semantics.
-- Provide explicit conversion targets for common output spaces such as sRGB and
-  Display P3.
-- Provide an upload/share compatibility policy that preserves supported spaces
-  such as sRGB and Display P3, otherwise converts unusual sources such as CMYK
-  to sRGB.
-- Let custom JPEG background colors carry their own color space.
-- Provide an ICC-profile extension point instead of trying to enumerate every
-  professional or display-specific color space.
-
-Open API sketch:
-
-```swift
-public enum WIColorSpace: Sendable, Hashable {
-    case sRGB
-    case displayP3
-    case iccProfile(Data)
-}
-
-public enum WIOutputColorSpace: Sendable, Equatable {
-    case preserve
-    case convert(to: WIColorSpace)
-    case preserveIfSupported(Set<WIColorSpace>, otherwise: WIColorSpace)
-}
-
-public struct WIColor: Sendable, Equatable {
-    public var red: Double
-    public var green: Double
-    public var blue: Double
-    public var colorSpace: WIColorSpace
-}
-```
-
-This area should ship as a dedicated feature version with CMYK and custom
-background fixtures, not as a v1.2.0 release tweak.
-
 ## Photos Adapter
 
 The core should stay UIKit/AppKit-free and keep accepting `Data` or file `URL`.
@@ -166,10 +121,9 @@ Possible directions:
 
 - Versioned presets for common workflows such as upload, social sharing,
   thumbnails, and archival preservation.
-- Strategy protocols for resize, target bytes, color conversion, metadata
-  handling, and encoding so each feature can evolve without making the resolver
-  monolithic.
-- More fixture-driven characterization tests for edge formats such as CMYK JPEG,
-  uncommon ICC profiles, wide-gamut sources, and server-oriented upload limits.
+- Strategy protocols for resize, target bytes, metadata handling, and encoding
+  so each feature can evolve without making the resolver monolithic.
+- More fixture-driven characterization tests for edge formats such as uncommon
+  ICC profiles, HDR sources, and server-oriented upload limits.
 - Better diagnostics for why a result was returned: original passthrough, quality
   search, dimension reduction, metadata rewrite, format conversion, or fallback.
