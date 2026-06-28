@@ -1,40 +1,12 @@
 # WICompress Roadmap Notes
 
-This document captures future design discussion. It is not part of the v1.2.0
-release contract.
+This document captures future design discussion. It is not part of any release
+contract.
 
 ## Target-Based Compression
 
-Some upload and sharing paths need a hard output-size ceiling, for example
-"the final thumbnail must be under 32 KB." This is a different contract from
-Luban. Luban is a fast, one-pass visual-size heuristic; target-based compression
-is an iterative search that trades CPU time for a stronger byte-size guarantee.
-
-Current direction:
-
-- Keep the target API separate from `WICompressOptions`.
-- Use `WICompressionTarget(maxBytes:geometry:output:preference:)` for hard byte
-  contracts.
-- Prefer quality search first for lossy destinations such as JPEG and HEIC.
-- Reduce dimensions when quality search cannot satisfy the target or when the
-  destination format has no lossy quality knob, such as PNG.
-- Keep upper bounds on attempts and quality floors so the API fails predictably
-  instead of looping forever or producing unusable output.
-- Keep Luban as the default upload heuristic; target compression is opt-in
-  because it is slower and less visually predictable.
-
-Implemented API shape:
-
-```swift
-public struct WICompressionTarget: Sendable, Equatable {
-    public var maxBytes: Int
-    public var geometry: WICompressionGeometry
-    public var output: WICompressionOutput
-    public var preference: WICompressionPreference
-}
-```
-
-Follow-up design questions:
+Shipped in 1.3.0 as `WICompress.compress(_:to:)` with `WICompressionTarget`; see
+the Target Compression section of the README for usage. Remaining follow-ups:
 
 - Whether to expose diagnostics for why a target result was returned: original
   passthrough, quality search, dimension reduction, metadata rewrite, format
