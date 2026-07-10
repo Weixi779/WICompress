@@ -7,7 +7,11 @@ let package = Package(
     name: "WICompress",
     platforms: [
         .iOS(.v14),
-        .macOS(.v11)
+        .macOS(.v11),
+        .macCatalyst(.v14),
+        .tvOS(.v14),
+        .watchOS(.v7),
+        .visionOS(.v1)
     ],
     products: [
         .library(

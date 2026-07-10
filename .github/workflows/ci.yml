@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  macos-tests:
+    name: Build and test (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Swift version
+        run: swift --version
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+
+  ios-simulator-tests:
+    name: Test (iOS Simulator)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Discover a simulator and run tests
+        run: |
+          UDID=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))][0].udid')
+          echo "Using simulator UDID: $UDID"
+          xcodebuild test \
+            -scheme WICompress-Package \
+            -destination "id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO
+
+  platform-builds:
+    name: Build (${{ matrix.platform }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [tvOS, watchOS, visionOS]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for ${{ matrix.platform }} Simulator
+        run: |
+          xcodebuild build \
+            -scheme WICompress \
+            -destination "generic/platform=${{ matrix.platform }} Simulator" \
+            CODE_SIGNING_ALLOWED=NO

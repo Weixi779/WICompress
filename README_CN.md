@@ -1,6 +1,7 @@
 # WICompress
 
-![Platform](https://img.shields.io/badge/platform-iOS%2014.0%2B%20%7C%20macOS%2011.0%2B-blue)
+[![CI](https://github.com/Weixi779/WICompress/actions/workflows/ci.yml/badge.svg)](https://github.com/Weixi779/WICompress/actions/workflows/ci.yml)
+![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-blue)
 ![Swift](https://img.shields.io/badge/Swift-6.0%2B-orange)
 ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen)
 ![License](https://img.shields.io/github/license/Weixi779/WICompress)
@@ -46,6 +47,19 @@ let uploadData = try WICompress.compress(
 - **方向安全**：基于 ImageIO 读取展示尺寸，redraw path 会把方向烘焙进像素。
 - **核心不依赖 UIKit / AppKit**：可在 iOS App、macOS 工具和 SwiftPM 测试中使用。
 - **强类型错误**：失败通过 `WICompressError` 表达，不再返回可空 `Data?`。
+
+## 系统要求与安装
+
+- iOS 14+ / macOS 11+ / Mac Catalyst 14+ / tvOS 14+ / watchOS 7+ / visionOS 1+
+- Swift 6.0+（Xcode 16+）
+
+通过 Swift Package Manager 集成：
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/Weixi779/WICompress.git", from: "1.4.0")
+]
+```
 
 ## 压缩效果预览
 

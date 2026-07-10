@@ -4,9 +4,9 @@
 /Packages
 xcuserdata/
 DerivedData/
-.swiftpm/configuration/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.swiftpm/
 .netrc
+/.build-*
 
 # Internal design/sync notes, kept locally and not tracked in the repo.
 docs/TARGET_COMPRESSION_DESIGN_CN.md

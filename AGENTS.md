@@ -9,7 +9,8 @@ duplicating the same instructions.
 WICompress is a lightweight ImageIO-based image compression library for JPEG,
 PNG, and HEIC/HEIF data. It uses the Luban resize strategy, preserves the source
 container format by default, supports explicit JPEG/PNG/HEIC output control, and
-exposes a UIKit/AppKit-free core API. The package targets iOS 14+ and macOS 11+.
+exposes a UIKit/AppKit-free core API. The package targets iOS 14+, macOS 11+,
+Mac Catalyst 14+, tvOS 14+, watchOS 7+, and visionOS 1+.
 
 ## Development Commands
 
@@ -27,6 +28,12 @@ swift test
 ```bash
 swift package resolve
 ```
+
+### Continuous Integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
+pull requests: `swift build` + `swift test` on macOS, the package test suite on
+an iOS Simulator, and build-only jobs for tvOS/watchOS/visionOS simulators.
 
 ## Repository Layout
 
@@ -213,16 +220,17 @@ simulator names or OS versions; discover devices first and use the UDID:
 ```bash
 xcrun simctl list devices available
 xcodebuild test \
-  -workspace .swiftpm/xcode/package.xcworkspace \
   -scheme WICompress-Package \
   -destination 'id=<UDID>' \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-If the scheme changes, inspect it instead of guessing:
+Run `xcodebuild` from the package root; it resolves SPM packages directly, so no
+`-workspace` argument is needed (`.swiftpm/` is untracked local state). If the
+scheme changes, inspect it instead of guessing:
 
 ```bash
-xcodebuild -list -workspace .swiftpm/xcode/package.xcworkspace
+xcodebuild -list
 ```
 
 `CODE_SIGNING_ALLOWED=NO` is required when testing SPM packages directly through

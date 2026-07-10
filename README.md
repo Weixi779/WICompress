@@ -1,6 +1,7 @@
 # WICompress
 
-![Platform](https://img.shields.io/badge/platform-iOS%2014.0%2B%20%7C%20macOS%2011.0%2B-blue)
+[![CI](https://github.com/Weixi779/WICompress/actions/workflows/ci.yml/badge.svg)](https://github.com/Weixi779/WICompress/actions/workflows/ci.yml)
+![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-blue)
 ![Swift](https://img.shields.io/badge/Swift-6.0%2B-orange)
 ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen)
 ![License](https://img.shields.io/github/license/Weixi779/WICompress)
@@ -54,6 +55,19 @@ let uploadData = try WICompress.compress(
   macOS tools, and SwiftPM tests without UI image types.
 - **Typed failures**: errors are surfaced as `WICompressError`, not optional
   `nil` results.
+
+## Requirements and Installation
+
+- iOS 14+ / macOS 11+ / Mac Catalyst 14+ / tvOS 14+ / watchOS 7+ / visionOS 1+
+- Swift 6.0+ (Xcode 16+)
+
+Add WICompress to your project with Swift Package Manager:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/Weixi779/WICompress.git", from: "1.4.0")
+]
+```
 
 ## Compression Preview
 
