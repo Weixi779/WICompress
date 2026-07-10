@@ -5,6 +5,26 @@ All notable changes to WICompress will be documented in this file.
 The format is based on Keep a Changelog, and this project follows Semantic
 Versioning.
 
+## [1.4.0] - 2026-07-10
+
+Broadens platform support and adds open-source infrastructure. No public API
+changes.
+
+### Added
+
+- Declared support for Mac Catalyst 14+, tvOS 14+, watchOS 7+, and visionOS 1+.
+  The core has always been pure ImageIO/CoreGraphics, so no code changes were
+  required.
+- GitHub Actions CI: build and test on macOS and an iOS Simulator, plus
+  build-only verification for tvOS, watchOS, and visionOS.
+- DocC documentation catalog and Swift Package Index configuration (`.spi.yml`).
+- Requirements and installation section in the README.
+
+### Changed
+
+- `compress(contentsOf:to:)` no longer validates the target twice; behavior is
+  unchanged.
+
 ## [1.3.0] - 2026-06-28
 
 Adds target-based compression: declare a hard byte ceiling plus output geometry,
