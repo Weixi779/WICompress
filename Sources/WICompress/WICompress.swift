@@ -86,8 +86,6 @@ public struct WICompress: Sendable {
         contentsOf url: URL,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WICompressionResult {
-        try WICompressionTargetValidator.validate(target)
-
         let data: Data
         do {
             data = try Data(contentsOf: url)
