@@ -93,10 +93,160 @@ struct WIImageSourceTests {
             frameCount: 2
         )
 
-        let descriptor = try WIImageSource(data: data).descriptor
+        let source = try WIImageSource(data: data)
+        let descriptor = source.descriptor
 
         #expect(descriptor.frameCount == 2)
         #expect(descriptor.format == .unknown)
+        #expect(throws: WIImageIOError.animatedSourceUnsupported(frameCount: 2)) {
+            try source.image()
+        }
+        #expect(throws: WIImageIOError.animatedSourceUnsupported(frameCount: 2)) {
+            try source.thumbnail(options: WIThumbnailOptions())
+        }
+        #expect(throws: WIImageIOError.animatedSourceUnsupported(frameCount: 2)) {
+            try source.copy(as: UTType.png.identifier)
+        }
+    }
+
+    @Test("Data and file sources have equivalent decode and copy semantics")
+    func dataAndFileSourceParity() throws {
+        let data = try Self.encodedImage(
+            width: 40,
+            height: 20,
+            typeIdentifier: UTType.jpeg.identifier,
+            orientation: 6,
+            hasGPS: true
+        )
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("jpg")
+        try data.write(to: url, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let dataSource = try WIImageSource(data: data)
+        let fileSource = try WIImageSource(contentsOf: url)
+        let dataImage = try dataSource.image()
+        let fileImage = try fileSource.image()
+        let dataThumbnail = try dataSource.thumbnail(
+            options: WIThumbnailOptions(maximumPixelSize: 10)
+        )
+        let fileThumbnail = try fileSource.thumbnail(
+            options: WIThumbnailOptions(maximumPixelSize: 10)
+        )
+        let dataCopy = try WIImageSource(
+            data: dataSource.copy(as: UTType.jpeg.identifier)
+        ).descriptor
+        let fileCopy = try WIImageSource(
+            data: fileSource.copy(as: UTType.jpeg.identifier)
+        ).descriptor
+
+        #expect(dataSource.descriptor == fileSource.descriptor)
+        #expect(dataImage.width == fileImage.width)
+        #expect(dataImage.height == fileImage.height)
+        #expect(dataThumbnail.width == fileThumbnail.width)
+        #expect(dataThumbnail.height == fileThumbnail.height)
+        #expect(dataCopy.format == fileCopy.format)
+        #expect(dataCopy.pixelSize == fileCopy.pixelSize)
+        #expect(dataCopy.orientedPixelSize == fileCopy.orientedPixelSize)
+        #expect(dataCopy.orientation == fileCopy.orientation)
+        #expect(dataCopy.hasGPS == fileCopy.hasGPS)
+    }
+
+    @Test("Image decode returns source pixel dimensions")
+    func imageDecode() throws {
+        let data = try Self.encodedImage(
+            width: 40,
+            height: 20,
+            typeIdentifier: UTType.jpeg.identifier
+        )
+
+        let image = try WIImageSource(data: data).image(
+            options: WIImageDecodeOptions(cacheImmediately: false)
+        )
+
+        #expect(image.width == 40)
+        #expect(image.height == 20)
+    }
+
+    @Test("Thumbnail applies orientation and respects the maximum pixel size")
+    func orientedThumbnail() throws {
+        let data = try Self.encodedImage(
+            width: 40,
+            height: 20,
+            typeIdentifier: UTType.jpeg.identifier,
+            orientation: 6
+        )
+
+        let thumbnail = try WIImageSource(data: data).thumbnail(
+            options: WIThumbnailOptions(maximumPixelSize: 10)
+        )
+
+        #expect(thumbnail.width == 5)
+        #expect(thumbnail.height == 10)
+    }
+
+    @Test("Source copy preserves metadata and orientation coupling")
+    func sourceCopy() throws {
+        let data = try Self.encodedImage(
+            width: 40,
+            height: 20,
+            typeIdentifier: UTType.jpeg.identifier,
+            orientation: 6,
+            hasGPS: true
+        )
+
+        let copiedData = try WIImageSource(data: data).copy(
+            as: UTType.jpeg.identifier
+        )
+        let properties = try Self.properties(in: copiedData)
+
+        #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
+        #expect(properties[kCGImagePropertyGPSDictionary] != nil)
+    }
+
+    @Test("Pixel encode strips metadata or preserves selected source metadata")
+    func pixelEncodeMetadata() throws {
+        let data = try Self.encodedImage(
+            width: 40,
+            height: 20,
+            typeIdentifier: UTType.jpeg.identifier,
+            orientation: 6,
+            hasGPS: true
+        )
+        let source = try WIImageSource(data: data)
+        let image = try source.thumbnail(options: WIThumbnailOptions())
+
+        let strippedData = try WIImageTranscoder.encode(
+            image,
+            as: UTType.jpeg.identifier
+        )
+        let preservedData = try WIImageTranscoder.encode(
+            image,
+            as: UTType.jpeg.identifier,
+            preservingMetadataFrom: source
+        )
+        let strippedProperties = try Self.properties(in: strippedData)
+        let preservedProperties = try Self.properties(in: preservedData)
+
+        #expect(strippedProperties[kCGImagePropertyGPSDictionary] == nil)
+        #expect(preservedProperties[kCGImagePropertyGPSDictionary] != nil)
+        #expect(preservedProperties.intValue(for: kCGImagePropertyOrientation) == 1)
+    }
+
+    @Test("Unsupported destinations fail before encoding")
+    func unsupportedDestination() throws {
+        let data = try Self.encodedImage(
+            width: 4,
+            height: 4,
+            typeIdentifier: UTType.png.identifier
+        )
+        let source = try WIImageSource(data: data)
+        let typeIdentifier = "com.wicompress.unsupported"
+
+        #expect(throws: WIImageIOError.destinationCreationFailed(typeIdentifier)) {
+            try source.copy(as: typeIdentifier)
+        }
     }
 
     @Test("Invalid encoded bytes fail explicitly")
@@ -166,6 +316,13 @@ struct WIImageSourceTests {
         return data as Data
     }
 
+    private static func properties(in data: Data) throws -> [CFString: Any] {
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+        return try #require(
+            CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        )
+    }
+
     private static func bitmap(width: Int, height: Int, alpha: UInt8) -> CGImage? {
         let bytesPerRow = width * 4
         var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
@@ -193,5 +350,15 @@ struct WIImageSourceTests {
             shouldInterpolate: true,
             intent: .defaultIntent
         )
+    }
+}
+
+private extension Dictionary where Key == CFString, Value == Any {
+    func intValue(for key: CFString) -> Int? {
+        if let value = self[key] as? Int {
+            return value
+        }
+
+        return (self[key] as? NSNumber)?.intValue
     }
 }

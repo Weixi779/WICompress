@@ -64,21 +64,6 @@ WICompress
 如果未来出现独立的真实消费者，可以重新评估是否发布 product；当前不为假设消费者冻结
 公共兼容合同。
 
-### 第一阶段实施状态
-
-第一阶段已经建立 package-only `WIImageIO` target，并迁移以下能力：
-
-- Data 与 file URL source creation。
-- typed descriptor、pixel count checked arithmetic 与 orientation-aware pixel size。
-- format detection、runtime decode/encode capability。
-- metadata、GPS、Alpha、gain map、frame count 与按需 color-space inspection。
-- 独立 Swift Testing 契约测试。
-
-现有 1.x Pipeline 通过 `WIImageSource` adapter 映射 descriptor 与基础设施错误，公开 API
-和压缩结果不变。旧 `WIImageEncoder` 尚未迁移，因此当前存在一个以下划线命名的
-package-only `CGImageSource` migration bridge。它不是模块正式合同；迁移
-`image()`、`thumbnail()` 和 source copy 时必须删除，不能扩展成长期 escape hatch。
-
 ## 模块职责
 
 `WIImageIO` 只拥有 ImageIO 固有能力：
@@ -107,7 +92,7 @@ package-only `CGImageSource` migration bridge。它不是模块正式合同；�
 `CGImageSource`，但不向调用方暴露该对象。
 
 ```swift
-package struct WIImageSource {
+package final class WIImageSource {
     package init(data: Data) throws
     package init(contentsOf url: URL) throws
 
@@ -202,7 +187,7 @@ package struct WIThumbnailOptions: Hashable, Sendable {
 }
 ```
 
-示例只表达 API 方向，字段名和默认值在实现阶段结合现有行为与测试冻结。
+这些 options 已按当前实现冻结为 package-only 值类型。
 
 `WIImageIO` 不提供：
 
@@ -313,7 +298,7 @@ ImageIO 层使用 typed throws 表达基础设施失败，至少能够区分：
 - destination finalization failed。
 - animated source unsupported。
 
-具体类型名和 case 在实现阶段冻结。`WICompress` 在产品边界统一映射为
+`WIImageIOError` 在基础设施边界表达这些失败，`WICompress` 在产品边界统一映射为
 `WICompressError`；ImageIO 层不以 `nil`、warning 或 silent fallback 隐藏失败。
 
 ## 迁移方向
@@ -373,9 +358,7 @@ ImageIO 层使用 typed throws 表达基础设施失败，至少能够区分：
 
 测试继续使用真实 fixture 验证 ImageIO 行为，纯尺寸计算不依赖 ImageIO fixture。
 
-## 已冻结与待实现确认
-
-已冻结：
+## 已冻结合同
 
 - 独立、非 product 的 `WIImageIO` target。
 - package-only typed API。
@@ -389,11 +372,3 @@ ImageIO 层使用 typed throws 表达基础设施失败，至少能够区分：
 - raw ImageIO dictionary 与 CF source/destination 不越过模块边界。
 - 静态图片首版；GIF 和其他动图不在当前规划。
 - ImageIO 只拥有 representation 基础设施，Raster 独立拥有像素绘制。
-
-实现前仍需结合最终 Execution Plan 确认：
-
-- descriptor 的 eager/lazy inspection 边界。
-- decode/thumbnail options 的最小字段和默认值。
-- encode 与 source-copy options 如何承载已经冻结的 Output Domain。
-- ImageIO error 到 `WICompressError` 的完整映射。
-- 现有 fixture 和测试如何迁移到独立 test target。

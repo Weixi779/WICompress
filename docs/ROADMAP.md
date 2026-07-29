@@ -29,10 +29,21 @@ The current 1.x inventory, combination matrix, external research, and historical
 evidence remain in [`V2_CAPABILITY_MAP_CN.md`](V2_CAPABILITY_MAP_CN.md). It is
 not an implementation contract.
 
-The 2.0 product and infrastructure boundaries are now conceptually complete.
-Implementation still requires a scoped change design for the SwiftPM dependency
-graph, concrete Swift spelling, migration batches, and test movement; those
-details must not reopen the frozen product domains without conflicting evidence.
+The 2.0 product and infrastructure boundaries are conceptually complete.
+Implementation status:
+
+- Completed: Swift 6.2 package baseline and package-only `WIImageIO` target.
+- Completed: typed source inspection, decode, thumbnail, source copy, pixel
+  encode, runtime capabilities, and ImageIO error mapping.
+- Completed: removal of the temporary `CGImageSource` migration bridge; the
+  `WICompress` target no longer owns raw ImageIO source/destination operations.
+- Next: move bitmap rendering, orientation normalization, crop, resize, alpha
+  flattening, and color conversion into `WIImageRaster`.
+- Later: replace the 1.x Process and Target policy surfaces with the frozen 2.0
+  domain contracts, then add synchronous and asynchronous terminals.
+
+Implementation details must not reopen the frozen product domains without
+conflicting evidence.
 
 ## Target Compression Refinements
 

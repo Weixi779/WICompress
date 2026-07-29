@@ -16,4 +16,8 @@ package enum WIImageIOError: Error, Sendable, Equatable {
     case fileReadFailed(URL)
     case fileSizeUnavailable(URL)
     case imageCreationFailed
+    case thumbnailCreationFailed
+    case animatedSourceUnsupported(frameCount: Int)
+    case destinationCreationFailed(String)
+    case destinationFinalizationFailed(String)
 }

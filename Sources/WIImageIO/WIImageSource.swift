@@ -64,9 +64,108 @@ package final class WIImageSource {
         return .iccProfile(iccData as Data)
     }
 
-    // Removed when image(), thumbnail(), and source-copy move into this target.
-    package var _migrationCGImageSource: CGImageSource {
-        cgImageSource
+    package func image(
+        options: WIImageDecodeOptions = .init()
+    ) throws(WIImageIOError) -> CGImage {
+        try validateStaticImage()
+
+        let properties: [CFString: Any] = [
+            kCGImageSourceShouldCacheImmediately: options.cacheImmediately
+        ]
+        guard let image = CGImageSourceCreateImageAtIndex(
+            cgImageSource,
+            0,
+            properties as CFDictionary
+        ) else {
+            throw .imageCreationFailed
+        }
+
+        return image
+    }
+
+    package func thumbnail(
+        options: WIThumbnailOptions
+    ) throws(WIImageIOError) -> CGImage {
+        try validateStaticImage()
+
+        var properties: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: options.appliesOrientationTransform,
+            kCGImageSourceShouldCacheImmediately: options.cacheImmediately
+        ]
+        if let maximumPixelSize = options.maximumPixelSize {
+            properties[kCGImageSourceThumbnailMaxPixelSize] = maximumPixelSize
+        }
+
+        guard let image = CGImageSourceCreateThumbnailAtIndex(
+            cgImageSource,
+            0,
+            properties as CFDictionary
+        ) else {
+            throw .thumbnailCreationFailed
+        }
+
+        return image
+    }
+
+    package func copy(
+        `as` typeIdentifier: String,
+        options: WIImageCopyOptions = .init()
+    ) throws(WIImageIOError) -> Data {
+        try validateStaticImage()
+
+        let outputData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            outputData,
+            typeIdentifier as CFString,
+            1,
+            nil
+        ) else {
+            throw .destinationCreationFailed(typeIdentifier)
+        }
+
+        var properties: [CFString: Any] = [:]
+        if let maximumPixelSize = options.maximumPixelSize {
+            properties[kCGImageDestinationImageMaxPixelSize] = maximumPixelSize
+        }
+        if let compressionQuality = options.compressionQuality {
+            properties[kCGImageDestinationLossyCompressionQuality] = compressionQuality
+        }
+
+        CGImageDestinationAddImageFromSource(
+            destination,
+            cgImageSource,
+            0,
+            properties as CFDictionary
+        )
+
+        guard CGImageDestinationFinalize(destination) else {
+            throw .destinationFinalizationFailed(typeIdentifier)
+        }
+
+        return outputData as Data
+    }
+
+    private func validateStaticImage() throws(WIImageIOError) {
+        guard descriptor.frameCount == 1 else {
+            throw .animatedSourceUnsupported(frameCount: descriptor.frameCount)
+        }
+    }
+
+    func preservedMetadataProperties() -> [CFString: Any] {
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(
+            cgImageSource,
+            0,
+            nil
+        ) as? [CFString: Any] else {
+            return [:]
+        }
+
+        return Self.metadataKeys.reduce(into: [:]) { result, key in
+            if let value = properties[key] {
+                result[key] = value
+            }
+        }
     }
 
     private static func fileByteCount(for url: URL) throws(WIImageIOError) -> Int {
@@ -143,7 +242,11 @@ package final class WIImageSource {
 
     private static func hasStrippableMetadata(in properties: [CFString: Any]) -> Bool {
         // Color profiles and pixel geometry are display semantics, not privacy metadata.
-        let metadataKeys: [CFString] = [
+        return metadataKeys.contains { properties.dictionaryExists(for: $0) }
+    }
+
+    private static var metadataKeys: [CFString] {
+        [
             kCGImagePropertyTIFFDictionary,
             kCGImagePropertyExifDictionary,
             kCGImagePropertyExifAuxDictionary,
@@ -157,8 +260,6 @@ package final class WIImageSource {
             kCGImagePropertyMakerOlympusDictionary,
             kCGImagePropertyMakerPentaxDictionary
         ]
-
-        return metadataKeys.contains { properties.dictionaryExists(for: $0) }
     }
 
     private static func hasGainMap(in source: CGImageSource) -> Bool {

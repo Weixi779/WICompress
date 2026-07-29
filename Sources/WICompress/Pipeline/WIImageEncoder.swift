@@ -8,7 +8,7 @@
 
 import Foundation
 import CoreGraphics
-import ImageIO
+import WIImageIO
 
 enum WIImageEncoder {
     static func encode(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
@@ -47,53 +47,28 @@ enum WIImageEncoder {
 
     private static func encodeFromSource(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
         // This path lets ImageIO keep metadata and orientation tags coupled to the source.
-        let outputData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            outputData,
-            plan.destinationTypeIdentifier as CFString,
-            1,
-            nil
-        ) else {
-            throw WICompressError.destinationCreationFailed(plan.destinationFormat)
+        do {
+            return try imageSource.imageIOSource.copy(
+                as: plan.destinationTypeIdentifier,
+                options: WIImageCopyOptions(
+                    maximumPixelSize: plan.maxPixelSize,
+                    compressionQuality: plan.quality
+                )
+            )
+        } catch {
+            throw map(error, destinationFormat: plan.destinationFormat)
         }
-
-        var properties = destinationProperties(for: plan)
-        if let maxPixelSize = plan.maxPixelSize {
-            properties[kCGImageDestinationImageMaxPixelSize] = maxPixelSize
-        }
-
-        CGImageDestinationAddImageFromSource(
-            destination,
-            imageSource.cgImageSource,
-            0,
-            properties as CFDictionary
-        )
-
-        guard CGImageDestinationFinalize(destination) else {
-            throw WICompressError.encodeFailed(plan.destinationFormat)
-        }
-
-        return outputData as Data
     }
 
     private static func renderRedrawnBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> CGImage {
         // Thumbnail creation bakes orientation into pixels, which matches the default strip path.
-        var thumbnailOptions: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true
-        ]
-
-        if let maxPixelSize = plan.maxPixelSize {
-            thumbnailOptions[kCGImageSourceThumbnailMaxPixelSize] = maxPixelSize
-        }
-
-        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
-            imageSource.cgImageSource,
-            0,
-            thumbnailOptions as CFDictionary
-        ) else {
-            throw WICompressError.thumbnailCreationFailed
+        let thumbnail: CGImage
+        do {
+            thumbnail = try imageSource.imageIOSource.thumbnail(
+                options: WIThumbnailOptions(maximumPixelSize: plan.maxPixelSize)
+            )
+        } catch {
+            throw map(error, destinationFormat: plan.destinationFormat)
         }
 
         return try renderBitmap(thumbnail, plan: plan)
@@ -104,12 +79,11 @@ enum WIImageEncoder {
             throw WICompressError.writePlanUnavailable
         }
 
-        guard let decodedImage = CGImageSourceCreateImageAtIndex(
-            imageSource.cgImageSource,
-            0,
-            [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
-        ) else {
-            throw WICompressError.imageDecodeFailed
+        let decodedImage: CGImage
+        do {
+            decodedImage = try imageSource.imageIOSource.image()
+        } catch {
+            throw map(error, destinationFormat: plan.destinationFormat)
         }
 
         let normalizedImage = imageSource.info.orientation == 1
@@ -118,56 +92,23 @@ enum WIImageEncoder {
         return try renderBitmap(normalizedImage, plan: plan, renderGeometry: renderGeometry)
     }
 
-    private static func destinationProperties(
-        for plan: WIWritePlan,
-        imageSource: WIImageSource? = nil
-    ) -> [CFString: Any] {
-        var properties: [CFString: Any] = [:]
-
-        if plan.metadataPolicy == .preserve, let imageSource {
-            properties.merge(preservedMetadataProperties(from: imageSource)) { _, new in new }
-        }
-
-        if let quality = plan.quality {
-            properties[kCGImageDestinationLossyCompressionQuality] = quality
-        }
-
-        return properties
-    }
-
     private static func encodeRenderedImage(
         _ image: CGImage,
         imageSource: WIImageSource,
         plan: WIWritePlan
     ) throws(WICompressError) -> Data {
-        let outputData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            outputData,
-            plan.destinationTypeIdentifier as CFString,
-            1,
-            nil
-        ) else {
-            throw WICompressError.destinationCreationFailed(plan.destinationFormat)
+        do {
+            return try WIImageTranscoder.encode(
+                image,
+                as: plan.destinationTypeIdentifier,
+                options: WIImageEncodeOptions(compressionQuality: plan.quality),
+                preservingMetadataFrom: plan.metadataPolicy == .preserve
+                    ? imageSource.imageIOSource
+                    : nil
+            )
+        } catch {
+            throw map(error, destinationFormat: plan.destinationFormat)
         }
-
-        let properties = renderedDestinationProperties(for: plan, imageSource: imageSource)
-        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
-
-        guard CGImageDestinationFinalize(destination) else {
-            throw WICompressError.encodeFailed(plan.destinationFormat)
-        }
-
-        return outputData as Data
-    }
-
-    private static func renderedDestinationProperties(
-        for plan: WIWritePlan,
-        imageSource: WIImageSource
-    ) -> [CFString: Any] {
-        var properties = destinationProperties(for: plan, imageSource: imageSource)
-        // Reset the tag so readers do not rotate pixels that were already transformed.
-        properties[kCGImagePropertyOrientation] = 1
-        return properties
     }
 
     private static func renderBitmap(
@@ -371,34 +312,30 @@ enum WIImageEncoder {
         return colorSpace
     }
 
-    private static func preservedMetadataProperties(from imageSource: WIImageSource) -> [CFString: Any] {
-        guard let properties = CGImageSourceCopyPropertiesAtIndex(
-            imageSource.cgImageSource,
-            0,
-            nil
-        ) as? [CFString: Any] else {
-            return [:]
-        }
-
-        let metadataKeys: [CFString] = [
-            kCGImagePropertyTIFFDictionary,
-            kCGImagePropertyExifDictionary,
-            kCGImagePropertyExifAuxDictionary,
-            kCGImagePropertyIPTCDictionary,
-            kCGImagePropertyGPSDictionary,
-            kCGImagePropertyMakerAppleDictionary,
-            kCGImagePropertyMakerCanonDictionary,
-            kCGImagePropertyMakerNikonDictionary,
-            kCGImagePropertyMakerMinoltaDictionary,
-            kCGImagePropertyMakerFujiDictionary,
-            kCGImagePropertyMakerOlympusDictionary,
-            kCGImagePropertyMakerPentaxDictionary
-        ]
-
-        return metadataKeys.reduce(into: [:]) { result, key in
-            if let value = properties[key] {
-                result[key] = value
-            }
+    private static func map(
+        _ error: WIImageIOError,
+        destinationFormat: WIImageFormat
+    ) -> WICompressError {
+        switch error {
+        case .invalidImageData:
+            return .invalidImageData
+        case .sourcePropertiesUnavailable,
+             .invalidPixelSize,
+             .pixelCountOverflow:
+            return .imageInfoUnavailable
+        case .fileReadFailed(let url),
+             .fileSizeUnavailable(let url):
+            return .fileReadFailed(url)
+        case .imageCreationFailed:
+            return .imageDecodeFailed
+        case .thumbnailCreationFailed:
+            return .thumbnailCreationFailed
+        case .animatedSourceUnsupported(let frameCount):
+            return .animatedSourceUnsupported(frameCount: frameCount)
+        case .destinationCreationFailed:
+            return .destinationCreationFailed(destinationFormat)
+        case .destinationFinalizationFailed:
+            return .encodeFailed(destinationFormat)
         }
     }
 }

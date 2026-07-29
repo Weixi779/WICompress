@@ -6,20 +6,14 @@
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
-import CoreGraphics
 import Foundation
-import ImageIO
 import WIImageIO
 
 final class WIImageSource {
     let data: Data
     let info: WIImageInfo
 
-    private let imageIOSource: WIImageIO.WIImageSource
-
-    var cgImageSource: CGImageSource {
-        imageIOSource._migrationCGImageSource
-    }
+    let imageIOSource: WIImageIO.WIImageSource
 
     init(data: Data) throws(WICompressError) {
         let imageIOSource: WIImageIO.WIImageSource
@@ -79,6 +73,14 @@ final class WIImageSource {
              .pixelCountOverflow,
              .imageCreationFailed:
             return .imageInfoUnavailable
+        case .thumbnailCreationFailed:
+            return .thumbnailCreationFailed
+        case .animatedSourceUnsupported(let frameCount):
+            return .animatedSourceUnsupported(frameCount: frameCount)
+        case .destinationCreationFailed(let typeIdentifier):
+            return .destinationCreationFailed(WIImageFormat(typeIdentifier: typeIdentifier))
+        case .destinationFinalizationFailed(let typeIdentifier):
+            return .encodeFailed(WIImageFormat(typeIdentifier: typeIdentifier))
         case .fileReadFailed(let url),
              .fileSizeUnavailable(let url):
             return .fileReadFailed(url)
