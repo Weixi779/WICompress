@@ -3,6 +3,37 @@
 This document captures future design discussion. It is not part of any release
 contract.
 
+## WICompress 2.0 Domain Redesign
+
+The shared 2.0 architecture boundary is frozen in
+[`V2_DOMAIN_MODEL_CN.md`](V2_DOMAIN_MODEL_CN.md).
+
+The two public product lines are tracked separately:
+
+- [`V2_IMAGE_PROCESS_CN.md`](V2_IMAGE_PROCESS_CN.md) owns the frozen
+  `WIImageProcess` behavior contract.
+- [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md) owns the frozen
+  target-compression contract.
+
+The internal ImageIO execution boundary is tracked in
+[`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md). It freezes the package-only target,
+typed source/options, synchronous primitive model, and static-image scope without
+exposing ImageIO implementation details to either public product line.
+
+The internal Core Graphics raster boundary is tracked in
+[`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md). It freezes the package-only
+target, resolved-geometry input, one-pass crop/resize rendering, hidden bitmap
+surface, pixel-only coordinates, and synchronous primitive model.
+
+The current 1.x inventory, combination matrix, external research, and historical
+evidence remain in [`V2_CAPABILITY_MAP_CN.md`](V2_CAPABILITY_MAP_CN.md). It is
+not an implementation contract.
+
+The 2.0 product and infrastructure boundaries are now conceptually complete.
+Implementation still requires a scoped change design for the SwiftPM dependency
+graph, concrete Swift spelling, migration batches, and test movement; those
+details must not reopen the frozen product domains without conflicting evidence.
+
 ## Target Compression Refinements
 
 - Whether to expose diagnostics for why a target result was returned: original
