@@ -71,6 +71,25 @@ struct WIImageFormatTests {
         #expect(WIImageFormat(data: data) == .unknown)
     }
 
+    @Test("Container detection does not require complete image properties")
+    func truncatedHEICIsDetectedFromContainer() throws {
+        let url = try #require(
+            Bundle.module.url(
+                forResource: "real_heic_4032x3024_o1_gps_hdr",
+                withExtension: "heic",
+                subdirectory: "Resources"
+            )
+        )
+        let data = try Data(contentsOf: url)
+        let truncatedData = Data(data.prefix(64))
+        let source = try #require(
+            CGImageSourceCreateWithData(truncatedData as CFData, nil)
+        )
+
+        #expect(CGImageSourceGetType(source) as String? == UTType.heic.identifier)
+        #expect(WIImageFormat(data: truncatedData) == .heif)
+    }
+
     // MARK: - isHEIF property
 
     @Test("isHEIF is true only for .heif")

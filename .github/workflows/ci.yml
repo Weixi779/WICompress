@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+
 jobs:
   macos-tests:
     name: Build and test (macOS)
@@ -12,8 +15,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - name: Show Swift version
-        run: swift --version
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
       - name: Build
         run: swift build
       # Parallel Swift Testing deadlocks on the virtualized runners

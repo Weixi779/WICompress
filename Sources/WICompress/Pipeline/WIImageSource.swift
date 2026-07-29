@@ -6,59 +6,48 @@
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
-import Foundation
 import CoreGraphics
+import Foundation
 import ImageIO
+import WIImageIO
 
 final class WIImageSource {
     let data: Data
-    let cgImageSource: CGImageSource
     let info: WIImageInfo
 
+    private let imageIOSource: WIImageIO.WIImageSource
+
+    var cgImageSource: CGImageSource {
+        imageIOSource._migrationCGImageSource
+    }
+
     init(data: Data) throws(WICompressError) {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            throw WICompressError.invalidImageData
+        let imageIOSource: WIImageIO.WIImageSource
+        do {
+            imageIOSource = try WIImageIO.WIImageSource(data: data)
+        } catch {
+            throw Self.map(error)
         }
 
-        let frameCount = CGImageSourceGetCount(source)
-        guard frameCount > 0 else {
-            throw WICompressError.invalidImageData
+        let descriptor = imageIOSource.descriptor
+        guard descriptor.frameCount == 1 else {
+            throw .animatedSourceUnsupported(frameCount: descriptor.frameCount)
         }
-
-        guard frameCount == 1 else {
-            throw WICompressError.animatedSourceUnsupported(frameCount: frameCount)
-        }
-
-        guard
-            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-            let pixelWidth = properties.intValue(for: kCGImagePropertyPixelWidth),
-            let pixelHeight = properties.intValue(for: kCGImagePropertyPixelHeight)
-        else {
-            throw WICompressError.imageInfoUnavailable
-        }
-
-        let typeIdentifier = CGImageSourceGetType(source) as String?
-        let format = WIImageFormat(typeIdentifier: typeIdentifier)
-        let orientation = properties.intValue(for: kCGImagePropertyOrientation) ?? 1
-        let hasGPS = properties.dictionaryExists(for: kCGImagePropertyGPSDictionary)
-        let hasMetadata = Self.hasStrippableMetadata(in: properties)
-        let hasAlpha = properties.boolValue(for: kCGImagePropertyHasAlpha)
-        let isWritable = typeIdentifier.map(Self.canWriteImageTypeIdentifier(_:)) ?? false
 
         self.data = data
-        self.cgImageSource = source
+        self.imageIOSource = imageIOSource
         self.info = WIImageInfo(
-            sourceFormat: format,
-            typeIdentifier: typeIdentifier,
-            pixelWidth: pixelWidth,
-            pixelHeight: pixelHeight,
-            orientation: orientation,
-            frameCount: frameCount,
-            isSourceFormatWritable: isWritable,
-            hasMetadata: hasMetadata,
-            hasGPS: hasGPS,
-            hasGainMap: Self.hasGainMap(in: source),
-            hasAlpha: hasAlpha
+            sourceFormat: WIImageFormat(descriptor.format),
+            typeIdentifier: descriptor.typeIdentifier,
+            pixelWidth: descriptor.pixelSize.width,
+            pixelHeight: descriptor.pixelSize.height,
+            orientation: descriptor.orientation,
+            frameCount: descriptor.frameCount,
+            isSourceFormatWritable: descriptor.isSourceFormatWritable,
+            hasMetadata: descriptor.hasMetadata,
+            hasGPS: descriptor.hasGPS,
+            hasGainMap: descriptor.hasGainMap,
+            hasAlpha: descriptor.hasAlpha
         )
     }
 
@@ -69,102 +58,59 @@ final class WIImageSource {
             return nil
         }
 
-        guard let image = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
-            throw WICompressError.imageInfoUnavailable
+        let colorSpace: WIImageIO.WIImageColorSpace?
+        do {
+            colorSpace = try imageIOSource.colorSpace()
+        } catch {
+            throw Self.map(error)
         }
 
-        let colorSpace = image.colorSpace
         return WISourceColorSpaceInfo(
-            colorSpace: colorSpace.flatMap(Self.colorSpace(from:))
+            colorSpace: colorSpace.map(WIColorSpace.init)
         )
     }
 
-    private static func canWriteImageTypeIdentifier(_ typeIdentifier: String) -> Bool {
-        WIImageFormat.canWrite(typeIdentifier: typeIdentifier)
-    }
-
-    private static func hasStrippableMetadata(in properties: [CFString: Any]) -> Bool {
-        // Color profiles and pixel geometry are display semantics, not privacy metadata.
-        let metadataKeys: [CFString] = [
-            kCGImagePropertyTIFFDictionary,
-            kCGImagePropertyExifDictionary,
-            kCGImagePropertyExifAuxDictionary,
-            kCGImagePropertyIPTCDictionary,
-            kCGImagePropertyGPSDictionary,
-            kCGImagePropertyMakerAppleDictionary,
-            kCGImagePropertyMakerCanonDictionary,
-            kCGImagePropertyMakerNikonDictionary,
-            kCGImagePropertyMakerMinoltaDictionary,
-            kCGImagePropertyMakerFujiDictionary,
-            kCGImagePropertyMakerOlympusDictionary,
-            kCGImagePropertyMakerPentaxDictionary
-        ]
-
-        return metadataKeys.contains { properties.dictionaryExists(for: $0) }
-    }
-
-    private static func hasGainMap(in source: CGImageSource) -> Bool {
-        if #available(iOS 14.1, macOS 11.0, *) {
-            return CGImageSourceCopyAuxiliaryDataInfoAtIndex(
-                source,
-                0,
-                kCGImageAuxiliaryDataTypeHDRGainMap
-            ) != nil
+    private static func map(_ error: WIImageIOError) -> WICompressError {
+        switch error {
+        case .invalidImageData:
+            return .invalidImageData
+        case .sourcePropertiesUnavailable,
+             .invalidPixelSize,
+             .pixelCountOverflow,
+             .imageCreationFailed:
+            return .imageInfoUnavailable
+        case .fileReadFailed(let url),
+             .fileSizeUnavailable(let url):
+            return .fileReadFailed(url)
         }
-
-        return false
-    }
-
-    private static func colorSpace(from colorSpace: CGColorSpace) -> WIColorSpace? {
-        if let name = colorSpace.name as String? {
-            if name == CGColorSpace.sRGB as String {
-                return .sRGB
-            }
-
-            if name == CGColorSpace.displayP3 as String {
-                return .displayP3
-            }
-        }
-
-        guard colorSpace.model == .rgb, let iccData = colorSpace.copyICCData() else {
-            return nil
-        }
-
-        return .iccProfile(iccData as Data)
     }
 }
 
-private extension Dictionary where Key == CFString, Value == Any {
-    func intValue(for key: CFString) -> Int? {
-        if let value = self[key] as? Int {
-            return value
+private extension WIImageFormat {
+    init(_ format: WIImageIO.WIImageFormat) {
+        switch format {
+        case .jpeg:
+            self = .jpeg
+        case .png:
+            self = .png
+        case .heif:
+            self = .heif
+        case .unknown:
+            self = .unknown
         }
-
-        if let value = self[key] as? NSNumber {
-            return value.intValue
-        }
-
-        return nil
     }
+}
 
-    func boolValue(for key: CFString) -> Bool? {
-        if let value = self[key] as? Bool {
-            return value
+private extension WIColorSpace {
+    init(_ colorSpace: WIImageIO.WIImageColorSpace) {
+        switch colorSpace {
+        case .sRGB:
+            self = .sRGB
+        case .displayP3:
+            self = .displayP3
+        case .iccProfile(let data):
+            self = .iccProfile(data)
         }
-
-        if let value = self[key] as? NSNumber {
-            return value.boolValue
-        }
-
-        return nil
-    }
-
-    func dictionaryExists(for key: CFString) -> Bool {
-        guard let dictionary = self[key] as? [AnyHashable: Any] else {
-            return false
-        }
-
-        return !dictionary.isEmpty
     }
 }
 

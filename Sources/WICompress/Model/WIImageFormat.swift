@@ -7,8 +7,7 @@
 //
 
 import Foundation
-import ImageIO
-import UniformTypeIdentifiers
+import WIImageIO
 
 /// Image container families supported by WICompress.
 public enum WIImageFormat: Sendable, Equatable {
@@ -27,23 +26,7 @@ public enum WIImageFormat: Sendable, Equatable {
     }
 
     init(typeIdentifier: String?) {
-        guard
-            let typeIdentifier,
-            let type = UTType(typeIdentifier)
-        else {
-            self = .unknown
-            return
-        }
-
-        if type.conforms(to: .jpeg) {
-            self = .jpeg
-        } else if type.conforms(to: .png) {
-            self = .png
-        } else if type.conforms(to: .heic) || type.conforms(to: .heif) {
-            self = .heif
-        } else {
-            self = .unknown
-        }
+        self.init(WIImageIO.WIImageFormat(typeIdentifier: typeIdentifier))
     }
 
     var supportsLossyQuality: Bool {
@@ -56,27 +39,24 @@ public enum WIImageFormat: Sendable, Equatable {
     }
 
     static func canWrite(typeIdentifier: String) -> Bool {
-        writableTypeIdentifiers.contains(typeIdentifier)
+        WIImageCapabilities.canEncode(typeIdentifier: typeIdentifier)
     }
 
     /// Detects the image format from container bytes.
     public init(data: Data) {
-        guard
-            let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
-            let uti = CGImageSourceGetType(imageSource)
-        else {
-            self = .unknown
-            return
-        }
-
-        self.init(typeIdentifier: uti as String)
+        self.init(WIImageIO.WIImageFormat(data: data))
     }
 
-    private static let writableTypeIdentifiers: Set<String> = {
-        guard let writableTypes = CGImageDestinationCopyTypeIdentifiers() as? [String] else {
-            return []
+    private init(_ format: WIImageIO.WIImageFormat) {
+        switch format {
+        case .jpeg:
+            self = .jpeg
+        case .png:
+            self = .png
+        case .heif:
+            self = .heif
+        case .unknown:
+            self = .unknown
         }
-
-        return Set(writableTypes)
-    }()
+    }
 }

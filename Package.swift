@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -22,15 +22,25 @@ let package = Package(
     dependencies: [],
     targets: [
         .target(
-            name: "WICompress",
+            name: "WIImageIO",
             dependencies: [],
+            path: "Sources/WIImageIO"
+        ),
+        .target(
+            name: "WICompress",
+            dependencies: ["WIImageIO"],
             path: "Sources/WICompress"
+        ),
+        .testTarget(
+            name: "WIImageIOTests",
+            dependencies: ["WIImageIO"],
+            path: "Tests/WIImageIOTests"
         ),
         .testTarget(
             name: "WICompressTests",
             dependencies: ["WICompress"],
-            path: "Tests",
-            resources: [.copy("WICompressTests/Resources")]
+            path: "Tests/WICompressTests",
+            resources: [.copy("Resources")]
         ),
         .executableTarget(
             name: "WICompressDocAssetGenerator",
@@ -38,5 +48,6 @@ let package = Package(
             path: "scripts",
             sources: ["generate-doc-assets.swift"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
