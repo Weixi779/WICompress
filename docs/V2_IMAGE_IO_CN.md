@@ -1,6 +1,7 @@
 # WICompress 2.0 ImageIO Core
 
-状态：模块职责、首版能力边界与并发模型已冻结；相邻 Process 与 Raster 合同已就绪。
+状态：Phase 2 ImageIO 与 Phase 3 Raster 集成已完成；公共 Process/Target Domain
+仍按后续阶段推进。
 
 本文记录 WICompress 2.0 对 Apple ImageIO 的内部二次封装方案。它只定义执行基础设施，
 不定义 `WIImageProcess` 或 `WICompressionTarget` 的公共产品语义。
@@ -316,8 +317,9 @@ ImageIO 层使用 typed throws 表达基础设施失败，至少能够区分：
 | `WIWritePlanResolver` 的 Domain 决策 | 由 2.0 Process / Target resolver 替换 |
 | `WICompressionSolver` 的 candidate search | Target Domain 保留 |
 
-迁移完成后，WICompress target 内不再直接拼接 ImageIO option dictionary。旧路径应被
-删除或迁移，不在其上增加长期兼容 wrapper。
+当前迁移后，WICompress target 已不再直接拼接 ImageIO source/destination option
+dictionary，也不再持有 bitmap render/orientation normalization helper。旧执行路径已经
+删除，不在其上增加长期兼容 wrapper。
 
 ## 首版非目标
 

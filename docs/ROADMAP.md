@@ -37,10 +37,15 @@ Implementation status:
   encode, runtime capabilities, and ImageIO error mapping.
 - Completed: removal of the temporary `CGImageSource` migration bridge; the
   `WICompress` target no longer owns raw ImageIO source/destination operations.
-- Next: move bitmap rendering, orientation normalization, crop, resize, alpha
-  flattening, and color conversion into `WIImageRaster`.
-- Later: replace the 1.x Process and Target policy surfaces with the frozen 2.0
-  domain contracts, then add synchronous and asynchronous terminals.
+- Completed: package-only `WIImageRaster` target with one resolved-plan entry;
+  bitmap rendering, orientation normalization, crop/resize, two-layer
+  backgrounds, alpha flattening, and color conversion no longer live in
+  `WIImageEncoder`.
+- Next: replace the 1.x Process surface with the frozen `WIImageProcess` /
+  resizing-slot contract while preserving the current public behavior until the
+  2.0 cut.
+- Later: replace the Target policy surface with the frozen target contract, then
+  add synchronous and asynchronous terminals over the same execution core.
 
 Implementation details must not reopen the frozen product domains without
 conflicting evidence.

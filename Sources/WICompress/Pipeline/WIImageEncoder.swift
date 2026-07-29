@@ -9,6 +9,7 @@
 import Foundation
 import CoreGraphics
 import WIImageIO
+import WIImageRaster
 
 enum WIImageEncoder {
     static func encode(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
@@ -71,7 +72,31 @@ enum WIImageEncoder {
             throw map(error, destinationFormat: plan.destinationFormat)
         }
 
-        return try renderBitmap(thumbnail, plan: plan)
+        let size = plan.targetPixelSize ?? WIPixelSize(
+            width: thumbnail.width,
+            height: thumbnail.height
+        )
+        return try rasterImage(
+            thumbnail,
+            plan: WIImageRaster.Plan(
+                canvasSize: rasterPixelSize(size),
+                sourceRect: WIImageRaster.Rect(
+                    x: 0,
+                    y: 0,
+                    width: Double(thumbnail.width),
+                    height: Double(thumbnail.height)
+                ),
+                destinationRect: WIImageRaster.Rect(
+                    x: 0,
+                    y: 0,
+                    width: Double(size.width),
+                    height: Double(size.height)
+                ),
+                alphaMode: rasterAlphaMode(for: plan),
+                imageBackground: rasterJPEGBackground(from: plan.jpegBackground),
+                colorSpace: rasterColorSpace(from: plan.outputColorSpace)
+            )
+        )
     }
 
     private static func renderCanvasBitmap(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> CGImage {
@@ -86,10 +111,37 @@ enum WIImageEncoder {
             throw map(error, destinationFormat: plan.destinationFormat)
         }
 
-        let normalizedImage = imageSource.info.orientation == 1
-            ? decodedImage
-            : try renderOrientationNormalizedBitmap(decodedImage, info: imageSource.info)
-        return try renderBitmap(normalizedImage, plan: plan, renderGeometry: renderGeometry)
+        guard let orientation = WIImageRaster.Orientation(
+            rawValue: imageSource.info.orientation
+        ) else {
+            throw WICompressError.imageInfoUnavailable
+        }
+
+        let canvasHeight = Double(renderGeometry.canvasSize.height)
+        let destinationRect = renderGeometry.destinationRect
+        return try rasterImage(
+            decodedImage,
+            plan: WIImageRaster.Plan(
+                canvasSize: rasterPixelSize(renderGeometry.canvasSize),
+                sourceRect: WIImageRaster.Rect(
+                    x: 0,
+                    y: 0,
+                    width: Double(imageSource.info.displayWidth),
+                    height: Double(imageSource.info.displayHeight)
+                ),
+                destinationRect: WIImageRaster.Rect(
+                    x: destinationRect.x,
+                    y: canvasHeight - destinationRect.y - destinationRect.height,
+                    width: destinationRect.width,
+                    height: destinationRect.height
+                ),
+                orientation: orientation,
+                alphaMode: rasterAlphaMode(for: plan),
+                canvasBackground: renderGeometry.background.map(rasterColor),
+                imageBackground: rasterJPEGBackground(from: plan.jpegBackground),
+                colorSpace: rasterColorSpace(from: plan.outputColorSpace)
+            )
+        )
     }
 
     private static func encodeRenderedImage(
@@ -111,205 +163,75 @@ enum WIImageEncoder {
         }
     }
 
-    private static func renderBitmap(
+    private static func rasterImage(
         _ image: CGImage,
-        plan: WIWritePlan
+        plan: WIImageRaster.Plan
     ) throws(WICompressError) -> CGImage {
-        let size = plan.targetPixelSize ?? WIPixelSize(width: image.width, height: image.height)
-        let renderGeometry = WIRenderGeometry(
-            canvasSize: size,
-            destinationRect: WIRect(x: 0, y: 0, width: Double(size.width), height: Double(size.height)),
-            background: nil
-        )
-
-        return try renderBitmap(image, plan: plan, renderGeometry: renderGeometry)
-    }
-
-    private static func renderBitmap(
-        _ image: CGImage,
-        plan: WIWritePlan,
-        renderGeometry: WIRenderGeometry
-    ) throws(WICompressError) -> CGImage {
-        let colorSpace = try outputColorSpace(for: image, plan: plan)
-        let alphaMode = try renderAlphaMode(for: plan)
-        let bitmapInfo = bitmapInfo(for: image, alphaMode: alphaMode)
-        let size = renderGeometry.canvasSize
-
-        guard let context = CGContext(
-            data: nil,
-            width: size.width,
-            height: size.height,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo
-        ) else {
-            throw WICompressError.colorConversionFailed
-        }
-
-        let rect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
-        context.interpolationQuality = .high
-        context.setRenderingIntent(.relativeColorimetric)
-
-        if let background = renderGeometry.background {
-            context.setFillColor(try WIResolvedJPEGBackground(color: background).cgColor(in: colorSpace))
-            context.fill(rect)
-        }
-
-        if case .opaqueJPEG(let background?) = alphaMode {
-            context.setFillColor(try background.cgColor(in: colorSpace))
-            let fillRect = renderGeometry.background == nil ? rect : renderGeometry.destinationRect.cgRect
-            context.fill(fillRect)
-        }
-
-        context.draw(image, in: renderGeometry.destinationRect.cgRect)
-
-        guard let renderedImage = context.makeImage() else {
-            throw WICompressError.colorConversionFailed
-        }
-
-        return renderedImage
-    }
-
-    private static func renderOrientationNormalizedBitmap(
-        _ image: CGImage,
-        info: WIImageInfo
-    ) throws(WICompressError) -> CGImage {
-        let colorSpace = rgbColorSpace(from: image) ?? CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = resizedBitmapInfo(for: image)
-
-        guard let context = CGContext(
-            data: nil,
-            width: info.displayWidth,
-            height: info.displayHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo
-        ) else {
-            throw WICompressError.colorConversionFailed
-        }
-
-        context.interpolationQuality = .high
-        context.setRenderingIntent(.relativeColorimetric)
-        applyOrientationTransform(
-            to: context,
-            orientation: info.orientation,
-            pixelWidth: image.width,
-            pixelHeight: image.height
-        )
-        context.draw(
-            image,
-            in: CGRect(x: 0, y: 0, width: image.width, height: image.height)
-        )
-
-        guard let renderedImage = context.makeImage() else {
-            throw WICompressError.colorConversionFailed
-        }
-
-        return renderedImage
-    }
-
-    private static func applyOrientationTransform(
-        to context: CGContext,
-        orientation: Int,
-        pixelWidth: Int,
-        pixelHeight: Int
-    ) {
-        let width = CGFloat(pixelWidth)
-        let height = CGFloat(pixelHeight)
-
-        switch orientation {
-        case 2:
-            context.translateBy(x: width, y: 0)
-            context.scaleBy(x: -1, y: 1)
-        case 3:
-            context.translateBy(x: width, y: height)
-            context.rotate(by: .pi)
-        case 4:
-            context.translateBy(x: 0, y: height)
-            context.scaleBy(x: 1, y: -1)
-        case 5:
-            context.translateBy(x: height, y: 0)
-            context.scaleBy(x: -1, y: 1)
-            context.translateBy(x: 0, y: width)
-            context.rotate(by: -.pi / 2)
-        case 6:
-            context.translateBy(x: 0, y: width)
-            context.rotate(by: -.pi / 2)
-        case 7:
-            context.translateBy(x: height, y: 0)
-            context.scaleBy(x: -1, y: 1)
-            context.translateBy(x: height, y: 0)
-            context.rotate(by: .pi / 2)
-        case 8:
-            context.translateBy(x: height, y: 0)
-            context.rotate(by: .pi / 2)
-        default:
-            break
+        do {
+            return try WIImageRaster.image(image, plan: plan)
+        } catch {
+            throw map(error)
         }
     }
 
-    private static func outputColorSpace(
-        for image: CGImage,
-        plan: WIWritePlan
-    ) throws(WICompressError) -> CGColorSpace {
-        if let target = plan.outputColorSpace.target {
-            return try target.makeCGColorSpace()
-        }
-
-        return rgbColorSpace(from: image) ?? CGColorSpaceCreateDeviceRGB()
+    private static func rasterPixelSize(
+        _ size: WIPixelSize
+    ) -> WIImageRaster.PixelSize {
+        WIImageRaster.PixelSize(width: size.width, height: size.height)
     }
 
-    private static func renderAlphaMode(for plan: WIWritePlan) throws(WICompressError) -> WIRenderAlphaMode {
-        guard plan.destinationFormat == .jpeg else {
-            return .preserveSourceAlpha
-        }
-
-        return .opaqueJPEG(background: try resolvedJPEGBackground(from: plan.jpegBackground))
+    private static func rasterAlphaMode(
+        for plan: WIWritePlan
+    ) -> WIImageRaster.AlphaMode {
+        plan.destinationFormat == .jpeg ? .opaque : .preserve
     }
 
-    private static func resolvedJPEGBackground(
+    private static func rasterJPEGBackground(
         from background: WIJPEGBackground?
-    ) throws(WICompressError) -> WIResolvedJPEGBackground? {
+    ) -> WIImageRaster.Color? {
         switch background {
         case .white:
-            return WIResolvedJPEGBackground(color: WIColor(red: 1, green: 1, blue: 1))
+            return rasterColor(WIColor(red: 1, green: 1, blue: 1))
         case .black:
-            return WIResolvedJPEGBackground(color: WIColor(red: 0, green: 0, blue: 0))
+            return rasterColor(WIColor(red: 0, green: 0, blue: 0))
         case .color(let color):
-            return WIResolvedJPEGBackground(color: color)
+            return rasterColor(color)
         case .disallow, nil:
             return nil
         }
     }
 
-    private static func bitmapInfo(for image: CGImage, alphaMode: WIRenderAlphaMode) -> UInt32 {
-        switch alphaMode {
-        case .preserveSourceAlpha:
-            return resizedBitmapInfo(for: image)
-        case .opaqueJPEG:
-            return CGImageAlphaInfo.noneSkipLast.rawValue
-        }
+    private static func rasterColor(_ color: WIColor) -> WIImageRaster.Color {
+        WIImageRaster.Color(
+            red: color.red,
+            green: color.green,
+            blue: color.blue,
+            alpha: color.alpha,
+            colorSpace: rasterColorSpace(from: color.colorSpace)
+        )
     }
 
-    private static func resizedBitmapInfo(for image: CGImage) -> UInt32 {
-        switch image.alphaInfo {
-        case .first, .last, .premultipliedFirst, .premultipliedLast, .alphaOnly:
-            return CGImageAlphaInfo.premultipliedLast.rawValue
-        case .none, .noneSkipFirst, .noneSkipLast:
-            return CGImageAlphaInfo.noneSkipLast.rawValue
-        @unknown default:
-            return CGImageAlphaInfo.premultipliedLast.rawValue
+    private static func rasterColorSpace(
+        from colorSpace: WIResolvedOutputColorSpace
+    ) -> WIImageRaster.ColorSpace {
+        guard let target = colorSpace.target else {
+            return .source
         }
+
+        return rasterColorSpace(from: target)
     }
 
-    private static func rgbColorSpace(from image: CGImage) -> CGColorSpace? {
-        guard let colorSpace = image.colorSpace, colorSpace.model == .rgb else {
-            return nil
+    private static func rasterColorSpace(
+        from colorSpace: WIColorSpace
+    ) -> WIImageRaster.ColorSpace {
+        switch colorSpace {
+        case .sRGB:
+            return .sRGB
+        case .displayP3:
+            return .displayP3
+        case .iccProfile(let data):
+            return .iccProfile(data)
         }
-
-        return colorSpace
     }
 
     private static func map(
@@ -338,51 +260,28 @@ enum WIImageEncoder {
             return .encodeFailed(destinationFormat)
         }
     }
-}
 
-private struct WIResolvedJPEGBackground: Sendable, Equatable {
-    var color: WIColor
-
-    func cgColor(in destinationColorSpace: CGColorSpace) throws(WICompressError) -> CGColor {
-        let sourceColorSpace = try color.colorSpace.makeCGColorSpace()
-        guard sourceColorSpace.model == .rgb else {
-            throw WICompressError.unsupportedColorSpace
+    private static func map(
+        _ error: WIImageRasterError
+    ) -> WICompressError {
+        switch error {
+        case .invalidPixelSize,
+             .invalidSourceRect,
+             .invalidDestinationRect,
+             .sourceRectOutOfBounds:
+            return .writePlanUnavailable
+        case .unsupportedColorSpace:
+            return .unsupportedColorSpace
+        case .invalidICCProfile:
+            return .invalidICCProfile
+        case .nonOpaqueBackground:
+            return .nonOpaqueJPEGBackground
+        case .rowByteOverflow,
+             .bitmapByteCountOverflow,
+             .colorConversionFailed,
+             .contextCreationFailed,
+             .imageCreationFailed:
+            return .colorConversionFailed
         }
-
-        let components = [
-            clamped(color.red),
-            clamped(color.green),
-            clamped(color.blue),
-            clamped(color.alpha)
-        ]
-        guard let sourceColor = CGColor(colorSpace: sourceColorSpace, components: components),
-              let destinationColor = sourceColor.converted(
-                to: destinationColorSpace,
-                intent: .relativeColorimetric,
-                options: nil
-              ) else {
-            throw WICompressError.colorConversionFailed
-        }
-
-        return destinationColor
-    }
-
-    private func clamped(_ value: Double) -> CGFloat {
-        guard value.isFinite else {
-            return 0
-        }
-
-        return CGFloat(min(max(value, 0), 1))
-    }
-}
-
-private enum WIRenderAlphaMode: Sendable, Equatable {
-    case preserveSourceAlpha
-    case opaqueJPEG(background: WIResolvedJPEGBackground?)
-}
-
-private extension WIRect {
-    var cgRect: CGRect {
-        CGRect(x: x, y: y, width: width, height: height)
     }
 }

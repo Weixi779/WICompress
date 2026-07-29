@@ -27,14 +27,24 @@ let package = Package(
             path: "Sources/WIImageIO"
         ),
         .target(
+            name: "WIImageRaster",
+            dependencies: [],
+            path: "Sources/WIImageRaster"
+        ),
+        .target(
             name: "WICompress",
-            dependencies: ["WIImageIO"],
+            dependencies: ["WIImageIO", "WIImageRaster"],
             path: "Sources/WICompress"
         ),
         .testTarget(
             name: "WIImageIOTests",
             dependencies: ["WIImageIO"],
             path: "Tests/WIImageIOTests"
+        ),
+        .testTarget(
+            name: "WIImageRasterTests",
+            dependencies: ["WIImageRaster"],
+            path: "Tests/WIImageRasterTests"
         ),
         .testTarget(
             name: "WICompressTests",

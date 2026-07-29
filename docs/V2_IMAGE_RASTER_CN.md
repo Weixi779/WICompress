@@ -1,6 +1,7 @@
 # WICompress 2.0 Image Raster Core
 
-状态：模块职责、单次绘制合同和首版非目标已冻结；具体实现等待 Execution Plan 定型。
+状态：Phase 3 已实现。独立 `WIImageRaster` target、单次绘制入口与现有 Encoder
+集成已经完成；公共 2.0 Process/Target Domain 仍按后续阶段推进。
 
 本文记录 WICompress 2.0 对 Core Graphics 像素绘制能力的内部二次封装。它位于 ImageIO
 decode 与 encode 之间，只执行已经解析完成的几何和输出决定，不定义
@@ -55,30 +56,38 @@ WIImageIO ── encode ◀── CGImage
 - 跨 target 只暴露一个 package-level 图片绘制入口。
 - 不依赖 Process、Target、solver、Luban、UIKit 或 AppKit。
 - primitive 保持同步，不拥有 queue、actor、Task 或 cancellation。
-- target 名称和共享 pixel value 的最终归属在 SwiftPM 实施设计中确认，但职责边界不再
-  重新讨论。
+- target 与 raster value 最终命名已确认为 `WIImageRaster` 及其嵌套 package 类型。
 
 ## 唯一模块入口
 
 调用层只看见一个 terminal pixel operation，概念 API 为：
 
 ```swift
-let image = try ImageRaster.image(
+let image = try WIImageRaster.image(
     decodedImage,
-    sourceRect: resolvedCropRect,
-    pixelSize: resolvedOutputSize,
-    background: resolvedBackground,
-    colorSpace: resolvedColorSpace
+    plan: WIImageRaster.Plan(
+        canvasSize: resolvedCanvasSize,
+        sourceRect: resolvedCropRect,
+        destinationRect: resolvedDestinationRect,
+        orientation: sourceOrientation,
+        alphaMode: resolvedAlphaMode,
+        canvasBackground: resolvedCanvasBackground,
+        imageBackground: resolvedImageBackground,
+        colorSpace: resolvedColorSpace
+    )
 )
 ```
 
-最终参数可以收敛到 immutable raster plan，但该 plan 只能包含已经解析完成的事实：
+`Plan` 是 immutable execution value，只包含已经解析完成的事实：
 
 ```text
-oriented source image
-source pixel rect
-destination pixel size
-resolved background
+raw source image + orientation
+oriented source pixel rect
+final canvas pixel size
+destination pixel rect
+resolved alpha mode
+resolved canvas background
+resolved image-area background
 resolved output color space
 ```
 
@@ -94,7 +103,9 @@ plan，Raster 只执行。
 
 ## Bitmap Surface 是隐藏实现
 
-内部可以有一个管理 bitmap surface 的低层 primitive，概念名称为 `BitmapSurface`：
+首版没有为了一个消费者再建立第二个 package API。`WIImageRaster.image` 内部直接管理
+bitmap surface；如果未来出现第二个真实绘制 primitive，再提取 target-private
+`BitmapSurface`：
 
 ```swift
 private enum BitmapSurface {
@@ -107,18 +118,18 @@ private enum BitmapSurface {
 }
 ```
 
-它拥有：
+当前入口已经拥有：
 
 - checked row-byte 与 total-byte 计算。
-- canonical standard-range bitmap format。
-- row alignment 和 buffer allocation。
-- top-left user-space CTM。
-- transparent clear 或 opaque background fill。
+- standard-range bitmap format。
+- 由 Core Graphics 管理的 row alignment 和 buffer allocation。
+- top-left plan 到 Core Graphics 坐标的单点转换。
+- transparent clear、canvas fill 与 image-area fill。
 - scoped `CGContext` 生命周期。
 - 一次性 snapshot/finalize。
 
-`BitmapSurface` 首版保持 target-private。它只有 `ImageRaster` 一个真实消费者，不升级为
-第二套 package API，也不向外暴露 raw pointer、bitmap info 或任意 CGContext builder。
+实现不向外暴露 raw pointer、bitmap info、`CGContext` builder 或可复用 mutable
+surface。
 
 ## 坐标与 Orientation
 
@@ -164,16 +175,21 @@ Target 都会继续 resize 或 encode，不需要公开 subimage/materialized-cr
 
 Raster 接收的是 Output resolver 已经完成的结果，不拥有第二套公开 Policy。
 
-内部 background 只有两个互斥状态：
+Alpha mode 只有两个互斥状态：
 
 ```text
-transparent
-solid(opaque color)
+preserve
+opaque
 ```
 
-- transparent 使用带 premultiplied Alpha 的 surface，并保证初始像素清零。
-- solid 使用 opaque surface，先完整填充画布，再绘制 source。
-- JPEG Alpha flatten 只有在 Output 已显式选择 opaque background 时进入 solid。
+- preserve 使用带 premultiplied Alpha 的 surface，并保证初始像素清零。
+- opaque 使用无 Alpha surface。
+- `canvasBackground` 填充整个最终画布，例如 exact-canvas 的留白。
+- `imageBackground` 只填充 source 的 destination rect，例如透明 PNG 转 JPEG 时的
+  Alpha flatten。
+- 两层 background 可以同时存在，不能合并成一个值；现有 exact-canvas JPEG 行为依赖
+  这一差异。
+- JPEG Alpha flatten 只有在 Output 已显式选择 opaque background 时进入 opaque。
 
 首版 surface 使用 standard-range、8-bit canonical RGB layout。sRGB 是压缩输出的稳定
 基线；preserve、Display P3 或 custom ICC 是否可兑现由 Output resolver 和 ImageIO
@@ -267,27 +283,29 @@ Raster 的美感来自把有状态的 Core Graphics machinery 压缩成一次准
 - 不提供 HDR/EDR、tone mapping 或任意 pixel format builder。
 - 不提供独立 crop view 或长期 bitmap cache。
 
-## 验证合同
+## Phase 3 验证结果
 
-独立模块至少覆盖：
+独立模块与现有集成当前覆盖：
 
-- 八种 EXIF orientation 输入都输出 `.up` 且视觉尺寸正确。
+- 八种 EXIF orientation 与 ImageIO display transform 一致。
 - normalized top-left crop rect 映射到正确像素区域。
-- crop + resize 只产生最终大小的 destination surface。
-- transparent 与 solid background 的 Alpha 结果。
-- JPEG flatten 所需 opaque background 可以完整覆盖画布。
-- sRGB standard-range surface 的 pixel format 和编码兼容性。
-- 非正尺寸、越界 rect、row-byte/total-byte overflow 和 context creation failure。
-- `bytesPerRow × height` 成本估算使用实际 row padding。
-- sync 与 async terminal 对同一 plan 得到一致 raster 结果。
+- crop、resize、orientation、background 与 color 在最终 destination surface 中完成。
+- canvas background 与 JPEG image-area background 保持独立。
+- transparent PNG、JPEG flatten、sRGB/P3 conversion、CMYK fallback 与 metadata
+  路径通过原有真实图片回归测试。
+- 非正 canvas、无效 rect、越界 rect 与整数溢出在创建 context 前失败。
+- Solver 仍然只 render 一次，并在 quality search 中复用同一个 `CGImage`。
+
+async terminal 尚未进入公共 API，因此 sync/async parity 留给 execution phase；实际
+row padding 的观测与固定内存预算留给后续 benchmark，不扩大当前 Raster 返回值。
 
 ## 已冻结与延后
 
 已冻结：
 
 - 独立、非 product 的 Raster target。
-- package 调用层只有 `ImageRaster.image` 一个入口。
-- `BitmapSurface` target-private。
+- package 调用层只有 `WIImageRaster.image` 一个入口。
+- bitmap surface machinery 不越过该入口。
 - Raster 只消费 resolved geometry/output，不解释 Domain。
 - top-left oriented pixel coordinates，输出 orientation 恒为 `.up`。
 - crop + resize + orientation + background + color 单次绘制。
@@ -295,7 +313,7 @@ Raster 的美感来自把有状态的 Core Graphics machinery 压缩成一次准
 
 延后：
 
-- target 和类型的最终 Swift 拼写。
-- shared pixel value 在 target graph 中的具体归属。
+- shared cross-module pixel value 是否值得独立归属；当前 Raster value 保持嵌套。
 - 内部 interpolation 的 benchmark 结果。
+- async terminal 建立后的 sync/async parity gate。
 - raw mutable bytes、materialized crop、wide-gamut/HDR backend。
