@@ -1,6 +1,6 @@
 # WICompress 2.0 Target Compression
 
-状态：Target Domain 及相邻执行边界已冻结；共享 Output 已实施，Sizing 与执行计划迁移待继续。
+状态：Target Domain、Sizing、共享 Output 与执行计划边界已实施。
 
 本文记录 `WICompressionTarget` 在 2.0 中已经接受的职责、输入组合、结果保证与非目标。
 后续实现可以依赖这些结论，不需要重新打开 1.x `geometry`、`preference` 或平台 preset
@@ -62,8 +62,7 @@ WICompressionSizing(
 )
 ```
 
-Swift 类型名、初始化器拼写和 aspect-ratio 的数值表示可以在实现阶段调整；以下可观察
-语义已经冻结。
+以下可观察语义已经冻结并实现。
 
 #### maximumPixelSize
 
@@ -106,11 +105,13 @@ metadata 或 color-space 合同。
   `WICompressionOutput`。
 - Target 默认 Output 已按冻结合同实现：Alpha 源输出 PNG，否则输出 JPEG；strip
   metadata；转换到 sRGB。
-- 现有 byte solver、1.x geometry 与 candidate preference 暂时保留，因此当前实现通过
-  internal adapter 把共享 Output 映射到旧 `WIWritePlan`。该 adapter 是迁移边界，不是
-  新 Domain。
-- 下一步是实现 `WICompressionSizing`，删除 public geometry/preference，再让 Target
-  直接产出共享 `WIExecutionPlan`；solver 的 byte-search 算法不在这一步改写。
+- `WICompressionSizing` 的四种输入组合、normalized anchor 和一次性 crop/base-size
+  解析已实现。
+- Public `geometry`、candidate `preference`、canvas placement 及其旧 resolver 已删除。
+- Target resolver 与 solver 直接产出共享 `WIExecutionPlan`，不再经过旧
+  `WIWritePlan` adapter。
+- Data 与 file URL 使用同一 file-backed pipeline；原始字节只在 passthrough 时按需读取。
+- Byte-search 算法保持原有平衡选择行为，本次只收紧 Domain 与执行边界。
 
 ## Sizing 组合真值表
 
@@ -258,5 +259,5 @@ Target、Process、Output、ImageIO 与 Raster 的职责现在都已经冻结。
    geometry resolver、preference ranking 和对应兼容分支
 ```
 
-具体文件、target dependency graph、错误类型和迁移批次属于后续实施设计，不在本文提前
-冻结。
+以上四步已完成。后续工作是补齐异步 terminal、迁移文档与删除 2.0 不再保留的旧
+Process compatibility surface，不重新引入旧 Target Domain。

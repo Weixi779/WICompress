@@ -139,22 +139,21 @@ Key types:
    (format, pixel size, orientation, frame count, alpha, gain map, writability).
 6. **WIExecutionPlan** - resolved Process execution facts; it contains no
    resizing algorithm, crop intent, or public Policy.
-7. **WIWritePlanResolver** / **WIWritePlan** - the legacy/Target decision core. Picks one of
-   `returnOriginal` / `copyFromSource` / `redrawBitmap` / `redrawCanvas`
-   (the last bakes fit/fill/exact-canvas geometry for the target API).
+7. **WIWritePlanResolver** / **WIWritePlan** - the legacy Process decision core.
+   Picks one of `returnOriginal` / `copyFromSource` / `redrawBitmap`.
 8. **WIImageEncoder** - executes resolved plans through WIImageIO and WIImageRaster.
 9. **WIImageFormat** - `UTType`-based container detection (JPEG/PNG/HEIF/unknown).
 10. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
 11. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
 12. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
-   (`geometry` / shared `WIImageOutput` / `preference`) returning
+   (`maxBytes` / `WICompressionSizing` / shared `WIImageOutput`) returning
    `WICompressionResult`.
    `WICompressionTargetValidator` checks legality, `WICompressionTargetResolver`
-   temporarily adapts the shared output to `WIWritePlan`, and
-   `WICompressionSolver` runs the byte-budget search.
-   Pure math lives in `Algorithm/`: `WICompressionSizeEstimation` (shrink +
-   quality profile), `WICompressionLayout` (canvas placement), and
-   `WICompressionRanking` (preference-weighted candidate selection).
+   produces shared `WIExecutionPlan` values, and `WICompressionSolver` runs the
+   byte-budget search.
+   Pure math lives in `Algorithm/`: `WICompressionSizingResolver` (fixed crop +
+   base candidate), `WICompressionSizeEstimation` (shrink + quality profile),
+   and `WICompressionRanking` (internal deterministic candidate selection).
 
 ## Key Implementation Details
 

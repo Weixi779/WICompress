@@ -94,25 +94,7 @@ public struct WICompress: Sendable {
         try WICompressionTargetValidator.validate(target)
 
         let imageSource = try WIImageSource(data: data)
-        try WICompressionTargetValidator.validate(target, info: imageSource.info)
-
-        let sourceColorSpace = try imageSource.processColorSpaceInfoIfNeeded(
-            for: target.output.colorSpace
-        )
-        if canReturnOriginal(data, target: target, imageSource: imageSource, sourceColorSpace: sourceColorSpace) {
-            return compressionResult(for: data, info: imageSource.info)
-        }
-
-        let outputData = try WICompressionSolver.compress(
-            imageSource,
-            to: target,
-            sourceColorSpace: sourceColorSpace
-        )
-        guard outputData.count <= target.maxBytes else {
-            throw WICompressError.targetUnsatisfiable(smallestByteCount: outputData.count)
-        }
-
-        return try compressionResult(for: outputData)
+        return try compress(imageSource, to: target)
     }
 
     /// Reads image data from a file URL and compresses it to satisfy a target contract.
@@ -120,32 +102,50 @@ public struct WICompress: Sendable {
         contentsOf url: URL,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WICompressionResult {
-        let data: Data
-        do {
-            data = try Data(contentsOf: url)
-        } catch {
-            throw WICompressError.fileReadFailed(url)
-        }
+        try WICompressionTargetValidator.validate(target)
 
-        return try compress(data, to: target)
+        let imageSource = try WIImageSource(contentsOf: url)
+        return try compress(imageSource, to: target)
     }
 
-    private static func canReturnOriginal(
-        _ data: Data,
-        target: WICompressionTarget,
-        imageSource: WIImageSource,
-        sourceColorSpace: WISourceColorSpaceInfo?
-    ) -> Bool {
-        guard data.count <= target.maxBytes,
-              let options = try? WICompressionTargetResolver.options(for: target) else {
-            return false
+    private static func compress(
+        _ imageSource: WIImageSource,
+        to target: WICompressionTarget
+    ) throws(WICompressError) -> WICompressionResult {
+        let sizing = try WICompressionTargetResolver.sizing(
+            for: target,
+            imageSource: imageSource
+        )
+        let output = try WICompressionTargetResolver.output(
+            for: target,
+            imageSource: imageSource
+        )
+        if WICompressionTargetResolver.canReturnOriginal(
+            target: target,
+            sizing: sizing,
+            output: output,
+            imageSource: imageSource
+        ) {
+            let data = try imageSource.originalData()
+            return compressionResult(
+                for: data,
+                info: imageSource.info
+            )
         }
 
-        return WIWritePlanResolver.canReturnOriginalForSizeGuard(
-            options: options,
-            info: imageSource.info,
-            sourceColorSpace: sourceColorSpace
+        let outputData = try WICompressionSolver.compress(
+            imageSource,
+            to: target,
+            sizing: sizing,
+            output: output
         )
+        guard outputData.count <= target.maxBytes else {
+            throw WICompressError.targetUnsatisfiable(
+                smallestByteCount: outputData.count
+            )
+        }
+
+        return try compressionResult(for: outputData)
     }
 
     private static func compressionResult(for data: Data) throws(WICompressError) -> WICompressionResult {

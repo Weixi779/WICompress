@@ -156,7 +156,10 @@ let thumbnail = try WICompress.compress(
     originalData,
     to: WICompressionTarget(
         maxBytes: 32 * 1024,
-        geometry: .fill(size: WISize(width: 200, height: 200)),
+        sizing: WICompressionSizing(
+            maximumPixelSize: 200,
+            aspectRatio: WIAspectRatio(width: 1, height: 1)
+        ),
         output: WIImageOutput(
             representation: .jpeg(background: .white),
             metadata: .strip,
@@ -349,10 +352,15 @@ attempt count internally.
 
 ```swift
 public struct WICompressionTarget {
-    public var maxBytes: Int
-    public var geometry: WICompressionGeometry
-    public var output: WIImageOutput
-    public var preference: WICompressionPreference
+    public let maxBytes: Int
+    public let sizing: WICompressionSizing
+    public let output: WIImageOutput
+}
+
+public struct WICompressionSizing {
+    public let maximumPixelSize: Int?
+    public let aspectRatio: WIAspectRatio?
+    public let anchor: WICropAnchor
 }
 ```
 
@@ -360,27 +368,18 @@ The Target default output writes PNG for Alpha sources and JPEG otherwise,
 strips metadata, and converts pixels to sRGB. Passing an explicit
 `WIImageOutput` replaces that product default with the stated requirements.
 
-Geometry expresses visual intent:
+Sizing defines the base candidate before byte search begins:
 
-- `.original`: start from the source display dimensions and reduce only when
-  needed to satisfy `maxBytes`.
-- `.fit(maxLongSide:)`: preserve aspect ratio and cap the longest side.
-- `.fitInside(box:)`: preserve aspect ratio and fit inside a box.
-- `.fill(size:crop:)`: output the exact size by scaling and cropping.
-- `.exactCanvas(size:placement:background:)`: output the exact canvas size,
-  optionally adding background padding.
+- With neither value, search starts from the oriented source pixel size.
+- `maximumPixelSize` proportionally caps the longest side and never upscales.
+- `aspectRatio` takes the largest crop at that ratio, positioned by `anchor`.
+- With both values, WICompress crops first and then applies the pixel bound.
 
-`preference` only breaks ties between candidates that already satisfy `maxBytes`,
-`geometry`, and `output`; it never relaxes those constraints:
-
-- `.balanced`: weigh pixel area and visual fidelity evenly (the default).
-- `.preserveResolution`: prefer larger dimensions when candidates are close.
-- `.preserveFidelity`: prefer higher quality, accepting a smaller image.
-
-JPEG and HEIC targets search quality first, then reduce dimensions when geometry
-allows it. PNG targets stay lossless and reduce dimensions when geometry allows
-it. Hard geometry such as `.fill` and `.exactCanvas` does not silently change
-pixel size; if the byte target cannot be met, WICompress throws
+`anchor` uses normalized `0...1` top-left-origin coordinates and defaults to the
+center. The ratio and crop are resolved once; the solver only searches a uniform
+scale and lossy quality. JPEG and HEIC search quality before reducing dimensions.
+PNG stays lossless and reduces dimensions. If no result can satisfy both the
+output contract and byte ceiling, WICompress throws
 `WICompressError.targetUnsatisfiable`.
 
 Target compression returns `WICompressionResult`, including the encoded `Data`,

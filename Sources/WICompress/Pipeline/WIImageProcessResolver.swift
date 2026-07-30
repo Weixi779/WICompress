@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import UniformTypeIdentifiers
 
 enum WIImageProcessResolver {
     static func resolve(
@@ -28,51 +27,40 @@ enum WIImageProcessResolver {
                 height: info.displayHeight
             )
         )
-        let destination = try resolvedDestination(
-            for: process.output.representation,
-            info: info
+        let resolvedOutput = try WIImageOutputResolver.resolve(
+            process.output,
+            imageSource: imageSource
         )
-        let quality = destination.format.supportsLossyQuality
+        let quality = resolvedOutput.destinationFormat.supportsLossyQuality
             ? process.quality
             : nil
-        let sourceColorSpace = try imageSource.processColorSpaceInfoIfNeeded(
-            for: process.output.colorSpace
-        )
-        let outputColorSpace = try resolvedColorSpace(
-            process.output.colorSpace,
-            sourceColorSpace: sourceColorSpace
-        )
 
         if canReturnOriginal(
             process: process,
             geometry: geometry,
             quality: quality,
             info: info,
-            outputColorSpace: outputColorSpace
+            outputColorSpace: resolvedOutput.colorSpace
         ) {
             return plan(
                 operation: .returnOriginal,
-                destination: destination,
+                resolvedOutput: resolvedOutput,
                 process: process,
-                quality: quality,
-                outputColorSpace: outputColorSpace
+                quality: quality
             )
         }
 
-        let canWriteDestination = process.output.representation == .preserve
-            ? info.isSourceFormatWritable
-            : WIImageFormat.canWrite(
-                typeIdentifier: destination.typeIdentifier
+        guard resolvedOutput.isWritable else {
+            throw .unsupportedDestinationFormat(
+                resolvedOutput.destinationFormat
             )
-        guard canWriteDestination else {
-            throw .unsupportedDestinationFormat(destination.format)
         }
 
         let operation: WIExecutionPlan.Operation
         if canCopyFromSource(
             process: process,
             geometry: geometry,
-            outputColorSpace: outputColorSpace
+            outputColorSpace: resolvedOutput.colorSpace
         ) {
             operation = .copyFromSource
         } else {
@@ -94,10 +82,9 @@ enum WIImageProcessResolver {
 
         return plan(
             operation: operation,
-            destination: destination,
+            resolvedOutput: resolvedOutput,
             process: process,
-            quality: quality,
-            outputColorSpace: outputColorSpace
+            quality: quality
         )
     }
 
@@ -109,72 +96,6 @@ enum WIImageProcessResolver {
         }
         guard quality.isFinite, (0...1).contains(quality) else {
             throw .invalidProcessQuality
-        }
-    }
-
-    private static func resolvedDestination(
-        for representation: WIImageRepresentation,
-        info: WIImageInfo
-    ) throws(WICompressError) -> (
-        format: WIImageFormat,
-        typeIdentifier: String,
-        jpegBackground: WIJPEGBackground?
-    ) {
-        switch representation {
-        case .preserve:
-            guard let typeIdentifier = info.typeIdentifier else {
-                throw .unsupportedSourceFormat(nil)
-            }
-
-            return (info.sourceFormat, typeIdentifier, nil)
-        case .jpeg(let background):
-            try validateJPEGBackground(background)
-            if background == .disallow, info.hasAlpha == true {
-                throw .transparentSourceRequiresBackground(info.sourceFormat)
-            }
-
-            return (.jpeg, UTType.jpeg.identifier, background)
-        case .pngIfAlphaOtherwiseJPEG:
-            if info.hasAlpha == true {
-                return (.png, UTType.png.identifier, nil)
-            }
-
-            return (.jpeg, UTType.jpeg.identifier, .disallow)
-        case .png:
-            return (.png, UTType.png.identifier, nil)
-        case .heic:
-            return (.heif, UTType.heic.identifier, nil)
-        }
-    }
-
-    private static func validateJPEGBackground(
-        _ background: WIJPEGBackground
-    ) throws(WICompressError) {
-        guard case .color(let color) = background else {
-            return
-        }
-        guard color.alpha.isFinite, color.alpha >= 1 else {
-            throw .nonOpaqueJPEGBackground
-        }
-
-        let colorSpace = try color.colorSpace.makeCGColorSpace()
-        guard colorSpace.model == .rgb else {
-            throw .unsupportedColorSpace
-        }
-    }
-
-    private static func resolvedColorSpace(
-        _ decision: WIImageColorSpace,
-        sourceColorSpace: WISourceColorSpaceInfo?
-    ) throws(WICompressError) -> WIResolvedOutputColorSpace {
-        switch decision {
-        case .preserve:
-            return WIResolvedOutputColorSpace(target: nil)
-        case .convert(let target):
-            _ = try target.makeCGColorSpace()
-            return WIResolvedOutputColorSpace(
-                target: sourceColorSpace?.colorSpace == target ? nil : target
-            )
         }
     }
 
@@ -217,23 +138,18 @@ enum WIImageProcessResolver {
 
     private static func plan(
         operation: WIExecutionPlan.Operation,
-        destination: (
-            format: WIImageFormat,
-            typeIdentifier: String,
-            jpegBackground: WIJPEGBackground?
-        ),
+        resolvedOutput: WIResolvedImageOutput,
         process: WIImageProcess,
-        quality: Double?,
-        outputColorSpace: WIResolvedOutputColorSpace
+        quality: Double?
     ) -> WIExecutionPlan {
         WIExecutionPlan(
             operation: operation,
-            destinationFormat: destination.format,
-            destinationTypeIdentifier: destination.typeIdentifier,
+            destinationFormat: resolvedOutput.destinationFormat,
+            destinationTypeIdentifier: resolvedOutput.destinationTypeIdentifier,
             metadata: process.output.metadata,
             quality: quality,
-            jpegBackground: destination.jpegBackground,
-            outputColorSpace: outputColorSpace
+            jpegBackground: resolvedOutput.jpegBackground,
+            outputColorSpace: resolvedOutput.colorSpace
         )
     }
 }

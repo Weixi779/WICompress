@@ -50,13 +50,14 @@ Implementation status:
 - Completed: Target now uses the shared `WIImageOutput`; its frozen default is
   Alpha-aware PNG/JPEG, stripped metadata, and conversion to sRGB. The duplicate
   public `WICompressionOutput` has been removed.
+- Completed: Target now exposes the frozen `WICompressionSizing` contract,
+  resolves crop and base size once, and drives the shared `WIExecutionPlan`
+  directly. The old public geometry/preference/canvas domain and transitional
+  `WIWritePlan` adapter have been removed.
 - In migration: the 1.x Process surface remains available as a compatibility
   guard while the new Process path is reviewed; it will be removed before the
   2.0 cut rather than maintained as a second architecture.
-- Next: replace Target geometry/preference with the frozen
-  `WICompressionSizing` contract and move the solver directly onto the shared
-  execution-plan boundary. Its current `WIWritePlan` adapter is transitional.
-- Later: add the Swift 6.2 asynchronous terminals over the same synchronous
+- Next: add the Swift 6.2 asynchronous terminals over the same synchronous
   execution core.
 
 Implementation details must not reopen the frozen product domains without

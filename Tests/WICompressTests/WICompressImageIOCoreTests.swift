@@ -19,13 +19,6 @@ struct WICompressImageIOCoreTests {
         let testDescription: String
     }
 
-    struct OrientationTransformCase: CustomTestStringConvertible, Sendable {
-        let orientation: Int
-        let displayWidth: Int
-        let displayHeight: Int
-        let testDescription: String
-    }
-
     private struct PixelColor {
         let red: UInt8
         let green: UInt8
@@ -44,57 +37,6 @@ struct WICompressImageIOCoreTests {
     private static let jpegBackgroundCases: [JPEGBackgroundCase] = [
         JPEGBackgroundCase(background: .white, testDescription: "white background"),
         JPEGBackgroundCase(background: .black, testDescription: "black background"),
-    ]
-
-    private static let orientationTransformCases: [OrientationTransformCase] = [
-        OrientationTransformCase(
-            orientation: 1,
-            displayWidth: 8,
-            displayHeight: 4,
-            testDescription: "orientation 1"
-        ),
-        OrientationTransformCase(
-            orientation: 2,
-            displayWidth: 8,
-            displayHeight: 4,
-            testDescription: "orientation 2"
-        ),
-        OrientationTransformCase(
-            orientation: 3,
-            displayWidth: 8,
-            displayHeight: 4,
-            testDescription: "orientation 3"
-        ),
-        OrientationTransformCase(
-            orientation: 4,
-            displayWidth: 8,
-            displayHeight: 4,
-            testDescription: "orientation 4"
-        ),
-        OrientationTransformCase(
-            orientation: 5,
-            displayWidth: 4,
-            displayHeight: 8,
-            testDescription: "orientation 5"
-        ),
-        OrientationTransformCase(
-            orientation: 6,
-            displayWidth: 4,
-            displayHeight: 8,
-            testDescription: "orientation 6"
-        ),
-        OrientationTransformCase(
-            orientation: 7,
-            displayWidth: 4,
-            displayHeight: 8,
-            testDescription: "orientation 7"
-        ),
-        OrientationTransformCase(
-            orientation: 8,
-            displayWidth: 4,
-            displayHeight: 8,
-            testDescription: "orientation 8"
-        ),
     ]
 
     private struct ImageInfo {
@@ -386,34 +328,6 @@ struct WICompressImageIOCoreTests {
         try #require(CGImageDestinationFinalize(destination))
 
         return data as Data
-    }
-
-    private static func orientationTransformedPNG(_ data: Data, maxPixelSize: Int) throws -> Data {
-        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
-        let thumbnail = try #require(
-            CGImageSourceCreateThumbnailAtIndex(
-                source,
-                0,
-                [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
-                ] as CFDictionary
-            )
-        )
-        let output = NSMutableData()
-        let destination = try #require(
-            CGImageDestinationCreateWithData(output, "public.png" as CFString, 1, nil)
-        )
-
-        CGImageDestinationAddImage(
-            destination,
-            thumbnail,
-            [kCGImagePropertyOrientation: 1] as CFDictionary
-        )
-        try #require(CGImageDestinationFinalize(destination))
-
-        return output as Data
     }
 
     private static func cmykJPEG(width: Int, height: Int) throws -> Data {
@@ -843,77 +757,15 @@ struct WICompressImageIOCoreTests {
         #expect(outputInfo.hasAlpha == true)
     }
 
-    @Test("Target fill geometry renders a fixed canvas")
-    func targetFillGeometryRendersFixedCanvas() throws {
-        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
-        let inputData = try Data(contentsOf: url)
-        let result = try WICompress.compress(
-            inputData,
-            to: WICompressionTarget(
-                maxBytes: 1_000_000,
-                geometry: .fill(size: WISize(width: 320, height: 320)),
-                output: WIImageOutput(representation: .jpeg(background: .disallow))
-            )
-        )
-        let outputInfo = try Self.imageInfo(result.data)
-
-        #expect(result.format == .jpeg)
-        #expect(result.pixelSize == WISize(width: 320, height: 320))
-        #expect(outputInfo.orientation == 1)
-        #expect(outputInfo.displayWidth == 320)
-        #expect(outputInfo.displayHeight == 320)
-    }
-
-    @Test("Lossy target searches quality for fixed canvas geometry")
-    func lossyTargetSearchesQualityForFixedCanvasGeometry() throws {
-        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
-        let inputData = try Data(contentsOf: url)
-        let result = try WICompress.compress(
-            inputData,
-            to: WICompressionTarget(
-                maxBytes: 12_000,
-                geometry: .fill(size: WISize(width: 320, height: 320)),
-                output: WIImageOutput(representation: .jpeg(background: .disallow))
-            )
-        )
-        let outputInfo = try Self.imageInfo(result.data)
-
-        #expect(result.format == .jpeg)
-        #expect(result.byteCount <= 12_000)
-        #expect(result.pixelSize == WISize(width: 320, height: 320))
-        #expect(outputInfo.displayWidth == 320)
-        #expect(outputInfo.displayHeight == 320)
-    }
-
-    @Test("Lossy target fails when fixed geometry cannot meet byte limit")
-    func lossyTargetFailsWhenFixedGeometryCannotMeetByteLimit() throws {
-        let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
-        let inputData = try Data(contentsOf: url)
-        let target = WICompressionTarget(
-            maxBytes: 1,
-            geometry: .fill(size: WISize(width: 320, height: 320)),
-            output: WIImageOutput(representation: .jpeg(background: .disallow))
-        )
-
-        do {
-            _ = try WICompress.compress(inputData, to: target)
-            Issue.record("Expected targetUnsatisfiable")
-        } catch WICompressError.targetUnsatisfiable(let smallestByteCount) {
-            #expect((smallestByteCount ?? 0) > target.maxBytes)
-        } catch {
-            Issue.record("Unexpected error: \(error)")
-        }
-    }
-
-    @Test("Lossy target lowers soft geometry dimensions when quality is not enough")
-    func lossyTargetLowersSoftGeometryDimensions() throws {
+    @Test("Lossy target lowers dimensions when quality is not enough")
+    func lossyTargetLowersDimensions() throws {
         let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
         let inputData = try Data(contentsOf: url)
         let result = try WICompress.compress(
             inputData,
             to: WICompressionTarget(
                 maxBytes: 10_000,
-                geometry: .fit(maxLongSide: 1200),
+                sizing: WICompressionSizing(maximumPixelSize: 1200),
                 output: WIImageOutput(representation: .jpeg(background: .disallow))
             )
         )
@@ -928,6 +780,33 @@ struct WICompressImageIOCoreTests {
         ))
     }
 
+    @Test("Target solver keeps the fixed aspect ratio while shrinking")
+    func targetSolverKeepsFixedAspectRatio() throws {
+        let url = try Self.resource(
+            "real_jpeg_2098x1350_landscape",
+            extension: "jpg"
+        )
+        let inputData = try Data(contentsOf: url)
+        let result = try WICompress.compress(
+            inputData,
+            to: WICompressionTarget(
+                maxBytes: 10_000,
+                sizing: WICompressionSizing(
+                    maximumPixelSize: 1200,
+                    aspectRatio: WIAspectRatio(width: 1, height: 1)
+                ),
+                output: WIImageOutput(
+                    representation: .jpeg(background: .disallow)
+                )
+            )
+        )
+        let outputInfo = try Self.imageInfo(result.data)
+
+        #expect(result.byteCount <= 10_000)
+        #expect(outputInfo.displayWidth == outputInfo.displayHeight)
+        #expect(outputInfo.displayWidth < 1200)
+    }
+
     @Test("Lossy target returns existing candidate when attempt budget cannot cover another size")
     func lossyTargetReturnsExistingCandidateWhenAttemptBudgetCannotCoverAnotherSize() throws {
         let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
@@ -935,14 +814,13 @@ struct WICompressImageIOCoreTests {
         let imageSource = try WIImageSource(data: inputData)
         let target = WICompressionTarget(
             maxBytes: 60_000,
-            geometry: .fit(maxLongSide: 1200),
+            sizing: WICompressionSizing(maximumPixelSize: 1200),
             output: WIImageOutput(representation: .jpeg(background: .disallow))
         )
 
         let outputData = try WICompressionSolver.compress(
             imageSource,
             to: target,
-            sourceColorSpace: nil,
             maxEncodeAttempts: 12
         )
         let outputInfo = try Self.imageInfo(outputData)
@@ -951,15 +829,15 @@ struct WICompressImageIOCoreTests {
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) == 1200)
     }
 
-    @Test("PNG target lowers soft geometry dimensions")
-    func pngTargetLowersSoftGeometryDimensions() throws {
+    @Test("PNG target lowers dimensions")
+    func pngTargetLowersDimensions() throws {
         let url = try Self.resource("real_png_1928x464_pano", extension: "png")
         let inputData = try Data(contentsOf: url)
         let result = try WICompress.compress(
             inputData,
             to: WICompressionTarget(
                 maxBytes: 100_000,
-                geometry: .fit(maxLongSide: 1200),
+                sizing: WICompressionSizing(maximumPixelSize: 1200),
                 output: WIImageOutput(representation: .png)
             )
         )
@@ -974,13 +852,12 @@ struct WICompressImageIOCoreTests {
         ))
     }
 
-    @Test("PNG target fails when hard geometry cannot meet byte limit")
-    func pngTargetFailsWhenHardGeometryCannotMeetByteLimit() throws {
+    @Test("PNG target fails when even one pixel cannot meet the byte limit")
+    func pngTargetFailsAtMinimumPixelSize() throws {
         let url = try Self.resource("real_png_814x386_wide", extension: "png")
         let inputData = try Data(contentsOf: url)
         let target = WICompressionTarget(
             maxBytes: 1,
-            geometry: .fill(size: WISize(width: 320, height: 320)),
             output: WIImageOutput(representation: .png)
         )
 
@@ -994,8 +871,8 @@ struct WICompressImageIOCoreTests {
         }
     }
 
-    @Test("Target candidate ranking applies compression preference")
-    func targetCandidateRankingAppliesCompressionPreference() {
+    @Test("Target candidate ranking uses one deterministic balance")
+    func targetCandidateRankingIsDeterministic() {
         let largeLowQuality = WISolvedCompressionCandidate(
             data: Data(count: 80),
             pixelSize: WIPixelSize(width: 1_000, height: 1_000),
@@ -1011,29 +888,25 @@ struct WICompressImageIOCoreTests {
         let referencePixelSize = WIPixelSize(width: 1_000, height: 1_000)
         let candidates = [largeLowQuality, smallerHighQuality]
 
-        let resolutionCandidate = WICompressionRanking.bestCandidate(
+        let candidate = WICompressionRanking.bestCandidate(
             candidates,
-            preference: .preserveResolution,
-            referencePixelSize: referencePixelSize
-        )
-        let fidelityCandidate = WICompressionRanking.bestCandidate(
-            candidates,
-            preference: .preserveFidelity,
             referencePixelSize: referencePixelSize
         )
 
-        #expect(resolutionCandidate == largeLowQuality)
-        #expect(fidelityCandidate == smallerHighQuality)
+        #expect(candidate == smallerHighQuality)
     }
 
-    @Test("Target fill left crop keeps left source content")
-    func targetFillLeftCropKeepsLeftSourceContent() throws {
+    @Test("Target aspect-ratio crop honors its normalized anchor")
+    func targetAspectRatioCropHonorsAnchor() throws {
         let inputData = try Self.quadrantJPEG(width: 8, height: 4, orientation: 1)
         let result = try WICompress.compress(
             inputData,
             to: WICompressionTarget(
                 maxBytes: 100_000,
-                geometry: .fill(size: WISize(width: 4, height: 4), crop: .left),
+                sizing: WICompressionSizing(
+                    aspectRatio: WIAspectRatio(width: 1, height: 1),
+                    anchor: WICropAnchor(x: 0, y: 0.5)
+                ),
                 output: WIImageOutput(representation: .png)
             )
         )
@@ -1063,17 +936,16 @@ struct WICompressImageIOCoreTests {
         )
     }
 
-    @Test("Target exactCanvas fill top crop keeps top source content")
-    func targetExactCanvasFillTopCropKeepsTopSourceContent() throws {
+    @Test("Target top anchor keeps the top of a tall source")
+    func targetTopAnchorKeepsTopSourceContent() throws {
         let inputData = try Self.quadrantJPEG(width: 4, height: 8, orientation: 1)
         let result = try WICompress.compress(
             inputData,
             to: WICompressionTarget(
                 maxBytes: 100_000,
-                geometry: .exactCanvas(
-                    size: WISize(width: 4, height: 4),
-                    placement: .fill(.top),
-                    background: WIColor(red: 0, green: 0, blue: 0)
+                sizing: WICompressionSizing(
+                    aspectRatio: WIAspectRatio(width: 1, height: 1),
+                    anchor: WICropAnchor(x: 0.5, y: 0)
                 ),
                 output: WIImageOutput(representation: .png)
             )
@@ -1104,17 +976,15 @@ struct WICompressImageIOCoreTests {
         )
     }
 
-    @Test("Target exactCanvas fill center crop drops horizontal edges")
-    func targetExactCanvasFillCenterCropDropsHorizontalEdges() throws {
+    @Test("Target centered aspect-ratio crop drops both horizontal edges")
+    func targetCenteredAspectRatioCropDropsHorizontalEdges() throws {
         let inputData = try Self.verticalBandsPNG(width: 8, height: 4)
         let result = try WICompress.compress(
             inputData,
             to: WICompressionTarget(
                 maxBytes: 100_000,
-                geometry: .exactCanvas(
-                    size: WISize(width: 4, height: 4),
-                    placement: .fill(.center),
-                    background: WIColor(red: 0, green: 0, blue: 0)
+                sizing: WICompressionSizing(
+                    aspectRatio: WIAspectRatio(width: 1, height: 1)
                 ),
                 output: WIImageOutput(representation: .png)
             )
@@ -1151,62 +1021,8 @@ struct WICompressImageIOCoreTests {
         )
     }
 
-    @Test("Target exactCanvas fit renders background padding")
-    func targetExactCanvasFitRendersBackgroundPadding() throws {
-        let inputData = try Self.solidPNG(width: 20, height: 10)
-        let result = try WICompress.compress(
-            inputData,
-            to: WICompressionTarget(
-                maxBytes: 100_000,
-                geometry: .exactCanvas(
-                    size: WISize(width: 20, height: 20),
-                    placement: .fit(.center),
-                    background: WIColor(red: 0, green: 1, blue: 0)
-                ),
-                output: WIImageOutput(representation: .png)
-            )
-        )
-        let outputInfo = try Self.imageInfo(result.data)
-        let corner = try Self.pixelColor(result.data, x: 0, y: 0)
-
-        #expect(result.format == .png)
-        #expect(outputInfo.displayWidth == 20)
-        #expect(outputInfo.displayHeight == 20)
-        #expect(corner.red < 40)
-        #expect(corner.green > 200)
-        #expect(corner.blue < 40)
-        #expect(corner.alpha > 240)
-    }
-
-    @Test("Target exactCanvas uses JPEG background only inside source alpha")
-    func targetExactCanvasUsesJPEGBackgroundInsideSourceAlpha() throws {
-        let inputData = try Self.transparentPNG(width: 20, height: 10)
-        let result = try WICompress.compress(
-            inputData,
-            to: WICompressionTarget(
-                maxBytes: 100_000,
-                geometry: .exactCanvas(
-                    size: WISize(width: 20, height: 20),
-                    placement: .fit(.center),
-                    background: WIColor(red: 0, green: 1, blue: 0)
-                ),
-                output: WIImageOutput(representation: .jpeg(background: .white))
-            )
-        )
-        let padding = try Self.pixelColor(result.data, x: 0, y: 0)
-        let sourceArea = try Self.pixelColor(result.data, x: 10, y: 10)
-
-        #expect(result.format == .jpeg)
-        #expect(padding.red < 80)
-        #expect(padding.green > 160)
-        #expect(padding.blue < 80)
-        #expect(sourceArea.red > 180)
-        #expect(sourceArea.green > 180)
-        #expect(sourceArea.blue > 180)
-    }
-
-    @Test("Target canvas preserve metadata still resets baked orientation")
-    func targetCanvasPreserveMetadataResetsOrientation() throws {
+    @Test("Target crop preserves metadata while baking orientation")
+    func targetCropPreservesMetadataAndBakesOrientation() throws {
         let url = try Self.resource("real_heic_4032x3024_o6_gps_hdr", extension: "heic")
         let inputData = try Data(contentsOf: url)
         let inputInfo = try Self.imageInfo(inputData)
@@ -1217,7 +1033,10 @@ struct WICompressImageIOCoreTests {
             inputData,
             to: WICompressionTarget(
                 maxBytes: 1_000_000,
-                geometry: .fill(size: WISize(width: 200, height: 200)),
+                sizing: WICompressionSizing(
+                    maximumPixelSize: 200,
+                    aspectRatio: WIAspectRatio(width: 1, height: 1)
+                ),
                 output: WIImageOutput(
                     representation: .preserve,
                     metadata: .preserve,
@@ -1233,48 +1052,6 @@ struct WICompressImageIOCoreTests {
         #expect(outputInfo.orientation == 1)
         #expect(outputInfo.displayWidth == 200)
         #expect(outputInfo.displayHeight == 200)
-    }
-
-    @Test("Target canvas orientation transform matches ImageIO display transform", arguments: orientationTransformCases)
-    func targetCanvasOrientationTransformMatchesImageIO(_ orientationCase: OrientationTransformCase) throws {
-        let inputData = try Self.quadrantJPEG(width: 8, height: 4, orientation: orientationCase.orientation)
-        let result = try WICompress.compress(
-            inputData,
-            to: WICompressionTarget(
-                maxBytes: 100_000,
-                geometry: .exactCanvas(
-                    size: WISize(
-                        width: Double(orientationCase.displayWidth),
-                        height: Double(orientationCase.displayHeight)
-                    ),
-                    placement: .stretch,
-                    background: WIColor(red: 0, green: 0, blue: 0)
-                ),
-                output: WIImageOutput(representation: .png)
-            )
-        )
-        let oracle = try Self.orientationTransformedPNG(
-            inputData,
-            maxPixelSize: max(orientationCase.displayWidth, orientationCase.displayHeight)
-        )
-        let samplePoints = [
-            (x: 0, y: 0),
-            (x: orientationCase.displayWidth - 1, y: 0),
-            (x: 0, y: orientationCase.displayHeight - 1),
-            (x: orientationCase.displayWidth - 1, y: orientationCase.displayHeight - 1),
-        ]
-
-        for point in samplePoints {
-            let actual = try Self.pixelColor(result.data, x: point.x, y: point.y)
-            let expected = try Self.pixelColor(oracle, x: point.x, y: point.y)
-            let message = """
-            point: \(point), actual: \(actual.red),\(actual.green),\(actual.blue), \
-            expected: \(expected.red),\(expected.green),\(expected.blue)
-            """
-            #expect(abs(Int(actual.red) - Int(expected.red)) < 48, Comment(rawValue: message))
-            #expect(abs(Int(actual.green) - Int(expected.green)) < 48, Comment(rawValue: message))
-            #expect(abs(Int(actual.blue) - Int(expected.blue)) < 48, Comment(rawValue: message))
-        }
     }
 
     @Test("Transparent PNG can be flattened to JPEG with a custom background")

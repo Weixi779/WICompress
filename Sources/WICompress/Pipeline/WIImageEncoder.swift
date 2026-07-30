@@ -30,28 +30,51 @@ enum WIImageEncoder {
             } catch {
                 throw map(error, destinationFormat: plan.destinationFormat)
             }
-        case .render(let geometry):
-            let image = try render(
-                imageSource,
-                geometry: geometry,
-                destinationFormat: plan.destinationFormat,
-                jpegBackground: plan.jpegBackground,
-                outputColorSpace: plan.outputColorSpace
+        case .render:
+            let image = try render(imageSource, plan: plan)
+            return try encodeRendered(
+                image,
+                imageSource: imageSource,
+                plan: plan
             )
-            do {
-                return try WIImageTranscoder.encode(
-                    image,
-                    as: plan.destinationTypeIdentifier,
-                    options: WIImageEncodeOptions(
-                        compressionQuality: plan.quality
-                    ),
-                    preservingMetadataFrom: plan.metadata == .preserve
-                        ? imageSource.imageIOSource
-                        : nil
-                )
-            } catch {
-                throw map(error, destinationFormat: plan.destinationFormat)
-            }
+        }
+    }
+
+    static func render(
+        _ imageSource: WIImageSource,
+        plan: WIExecutionPlan
+    ) throws(WICompressError) -> CGImage {
+        guard case .render(let geometry) = plan.operation else {
+            throw .writePlanUnavailable
+        }
+
+        return try render(
+            imageSource,
+            geometry: geometry,
+            destinationFormat: plan.destinationFormat,
+            jpegBackground: plan.jpegBackground,
+            outputColorSpace: plan.outputColorSpace
+        )
+    }
+
+    static func encodeRendered(
+        _ image: CGImage,
+        imageSource: WIImageSource,
+        plan: WIExecutionPlan
+    ) throws(WICompressError) -> Data {
+        do {
+            return try WIImageTranscoder.encode(
+                image,
+                as: plan.destinationTypeIdentifier,
+                options: WIImageEncodeOptions(
+                    compressionQuality: plan.quality
+                ),
+                preservingMetadataFrom: plan.metadata == .preserve
+                    ? imageSource.imageIOSource
+                    : nil
+            )
+        } catch {
+            throw map(error, destinationFormat: plan.destinationFormat)
         }
     }
 

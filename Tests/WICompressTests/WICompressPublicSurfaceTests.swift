@@ -54,50 +54,65 @@ struct WICompressPublicSurfaceTests {
             testDescription: "zero byte target"
         ),
         InvalidTargetCase(
-            target: WICompressionTarget(maxBytes: 1024, geometry: .fit(maxLongSide: 0)),
-            testDescription: "zero max long side"
-        ),
-        InvalidTargetCase(
             target: WICompressionTarget(
                 maxBytes: 1024,
-                geometry: .fitInside(box: WISize(width: .nan, height: 100))
+                sizing: WICompressionSizing(maximumPixelSize: 0)
             ),
-            testDescription: "non-finite fit box"
+            testDescription: "zero maximum pixel size"
         ),
         InvalidTargetCase(
             target: WICompressionTarget(
                 maxBytes: 1024,
-                geometry: .fill(size: WISize(width: 0, height: 100))
+                sizing: WICompressionSizing(maximumPixelSize: -1)
             ),
-            testDescription: "zero fill width"
+            testDescription: "negative maximum pixel size"
         ),
         InvalidTargetCase(
             target: WICompressionTarget(
                 maxBytes: 1024,
-                geometry: .exactCanvas(
-                    size: WISize(width: 100, height: -1),
-                    background: WIColor(red: 1, green: 1, blue: 1)
+                sizing: WICompressionSizing(
+                    aspectRatio: WIAspectRatio(width: 0, height: 1)
                 )
             ),
-            testDescription: "negative canvas height"
+            testDescription: "zero aspect-ratio width"
         ),
         InvalidTargetCase(
             target: WICompressionTarget(
                 maxBytes: 1024,
-                geometry: .fill(
-                    size: WISize(width: Double(Int.max) * 2, height: 100)
+                sizing: WICompressionSizing(
+                    aspectRatio: WIAspectRatio(width: 1, height: .nan)
                 )
             ),
-            testDescription: "unrepresentable pixel width"
+            testDescription: "non-finite aspect-ratio height"
         ),
         InvalidTargetCase(
             target: WICompressionTarget(
                 maxBytes: 1024,
-                geometry: .fill(
-                    size: WISize(width: Double(Int.max), height: 100)
+                sizing: WICompressionSizing(
+                    aspectRatio: WIAspectRatio(width: 1, height: 1),
+                    anchor: WICropAnchor(x: -0.1, y: 0.5)
                 )
             ),
-            testDescription: "pixel width at the Int.max rounding boundary"
+            testDescription: "anchor before the left edge"
+        ),
+        InvalidTargetCase(
+            target: WICompressionTarget(
+                maxBytes: 1024,
+                sizing: WICompressionSizing(
+                    aspectRatio: WIAspectRatio(width: 1, height: 1),
+                    anchor: WICropAnchor(x: 0.5, y: 1.1)
+                )
+            ),
+            testDescription: "anchor after the bottom edge"
+        ),
+        InvalidTargetCase(
+            target: WICompressionTarget(
+                maxBytes: 1024,
+                sizing: WICompressionSizing(
+                    anchor: WICropAnchor(x: 0, y: 0)
+                )
+            ),
+            testDescription: "anchor without an aspect ratio"
         ),
     ]
 
@@ -106,14 +121,17 @@ struct WICompressPublicSurfaceTests {
     }
 
     private static func resourceData(_ name: String, extension ext: String) throws -> Data {
-        let url = try #require(
+        try Data(contentsOf: resourceURL(name, extension: ext))
+    }
+
+    private static func resourceURL(_ name: String, extension ext: String) throws -> URL {
+        try #require(
             Bundle.module.url(
                 forResource: name,
                 withExtension: ext,
                 subdirectory: "Resources"
             )
         )
-        return try Data(contentsOf: url)
     }
 
     @Test("Default options match the documented upload-compression defaults")
@@ -131,7 +149,7 @@ struct WICompressPublicSurfaceTests {
         let target = WICompressionTarget(maxBytes: 1024)
 
         #expect(target.maxBytes == 1024)
-        #expect(target.geometry == .original)
+        #expect(target.sizing == WICompressionSizing())
         #expect(
             target.output == WIImageOutput(
                 representation: .pngIfAlphaOtherwiseJPEG,
@@ -139,7 +157,6 @@ struct WICompressPublicSurfaceTests {
                 colorSpace: .convert(to: .sRGB)
             )
         )
-        #expect(target.preference == .balanced)
     }
 
     @Test("No-op policy returns the original data")
@@ -200,6 +217,27 @@ struct WICompressPublicSurfaceTests {
         #expect(result.byteCount == input.count)
     }
 
+    @Test("Data and file Target terminals have equivalent behavior")
+    func dataAndFileTargetTerminalsAreEquivalent() throws {
+        let url = try Self.resourceURL("real_jpeg_2098x1350_landscape", extension: "jpg")
+        let data = try Data(contentsOf: url)
+        let target = WICompressionTarget(
+            maxBytes: 64 * 1024,
+            sizing: WICompressionSizing(
+                maximumPixelSize: 320,
+                aspectRatio: WIAspectRatio(width: 1, height: 1)
+            )
+        )
+
+        let dataResult = try WICompress.compress(data, to: target)
+        let fileResult = try WICompress.compress(contentsOf: url, to: target)
+
+        #expect(fileResult.data == dataResult.data)
+        #expect(fileResult.format == dataResult.format)
+        #expect(fileResult.pixelSize == dataResult.pixelSize)
+        #expect(fileResult.byteCount == dataResult.byteCount)
+    }
+
     @Test("Invalid input data throws explicit WICompressError", arguments: invalidInputCases)
     func invalidInputDataThrowsExplicitError(_ invalidInputCase: InvalidInputCase) throws {
         let data = try Self.data(for: invalidInputCase)
@@ -218,50 +256,28 @@ struct WICompressPublicSurfaceTests {
         }
     }
 
-    @Test("Hard HEIF geometry rejects odd dimensions")
-    func hardHEIFGeometryRejectsOddDimensions() throws {
+    @Test("Target JPEG requires an opaque custom background")
+    func targetJPEGRequiresOpaqueCustomBackground() throws {
         let data = try Self.tinyPNGData()
         let target = WICompressionTarget(
             maxBytes: 1024,
-            geometry: .fill(size: WISize(width: 601, height: 420)),
-            output: WIImageOutput(representation: .heic)
-        )
-
-        #expect(throws: WICompressError.invalidTarget) {
-            _ = try WICompress.compress(data, to: target)
-        }
-    }
-
-    @Test("JPEG exact canvas requires an opaque background")
-    func jpegExactCanvasRequiresOpaqueBackground() throws {
-        let data = try Self.tinyPNGData()
-        let target = WICompressionTarget(
-            maxBytes: 1024,
-            geometry: .exactCanvas(
-                size: WISize(width: 10, height: 10),
-                background: WIColor(red: 1, green: 1, blue: 1, alpha: 0.5)
-            ),
             output: WIImageOutput(
-                representation: .jpeg(background: .white)
+                representation: .jpeg(
+                    background: .color(
+                        WIColor(
+                            red: 1,
+                            green: 1,
+                            blue: 1,
+                            alpha: 0.5
+                        )
+                    )
+                )
             )
         )
 
         #expect(throws: WICompressError.nonOpaqueJPEGBackground) {
             _ = try WICompress.compress(data, to: target)
         }
-    }
-
-    @Test("Hard geometry target returns fixed pixel size")
-    func hardGeometryTargetReturnsFixedPixelSize() throws {
-        let data = try Self.tinyPNGData()
-        let target = WICompressionTarget(
-            maxBytes: 100_000,
-            geometry: .fill(size: WISize(width: 10, height: 10))
-        )
-        let result = try WICompress.compress(data, to: target)
-
-        #expect(result.pixelSize == WISize(width: 10, height: 10))
-        #expect(result.byteCount == result.data.count)
     }
 
     @Test("Target compression fails rather than returning bytes over the target")

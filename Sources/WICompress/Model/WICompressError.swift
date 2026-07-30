@@ -42,8 +42,6 @@ public enum WICompressError: Error, Sendable, Equatable {
     case invalidTarget
     /// The target constraints cannot be satisfied by the supported encoder path.
     case targetUnsatisfiable(smallestByteCount: Int?)
-    /// The target geometry is valid but is not supported by the current encoder path.
-    case unsupportedCompressionGeometry(WICompressionGeometry)
     /// The target solver reached its internal resource budget.
     case resourceLimitExceeded(attemptCount: Int)
     /// Multi-frame image data is not supported.
@@ -97,8 +95,6 @@ extension WICompressError: LocalizedError {
             }
 
             return "Could not satisfy the compression target."
-        case .unsupportedCompressionGeometry:
-            return "The requested compression geometry is not supported by the current encoder path."
         case .resourceLimitExceeded(let attemptCount):
             return "Target compression exceeded its resource budget after \(attemptCount) attempts."
         case .animatedSourceUnsupported(let frameCount):

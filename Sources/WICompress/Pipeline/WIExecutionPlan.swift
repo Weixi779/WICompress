@@ -19,7 +19,7 @@ struct WIExecutionPlan: Sendable, Equatable {
     let destinationFormat: WIImageFormat
     let destinationTypeIdentifier: String
     let metadata: WIImageMetadata
-    let quality: Double?
+    var quality: Double?
     let jpegBackground: WIJPEGBackground?
     let outputColorSpace: WIResolvedOutputColorSpace
 }

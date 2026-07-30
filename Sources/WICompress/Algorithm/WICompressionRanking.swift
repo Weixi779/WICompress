@@ -21,19 +21,23 @@ struct WISolvedCompressionCandidate: Sendable, Equatable {
 }
 
 /// Deterministic candidate ranking. Hard constraints are filtered by the solver
-/// before ranking; this only orders the survivors by a preference-weighted loss
-/// that balances pixel area against visual fidelity.
+/// before ranking; this only balances pixel area against visual fidelity.
 enum WICompressionRanking {
     static func bestCandidate(
         _ candidates: [WISolvedCompressionCandidate],
-        preference: WICompressionPreference,
         referencePixelSize: WIPixelSize
     ) -> WISolvedCompressionCandidate {
         precondition(!candidates.isEmpty)
 
         return candidates.min { lhs, rhs in
-            let lhsLoss = candidateLoss(lhs, preference: preference, referencePixelSize: referencePixelSize)
-            let rhsLoss = candidateLoss(rhs, preference: preference, referencePixelSize: referencePixelSize)
+            let lhsLoss = candidateLoss(
+                lhs,
+                referencePixelSize: referencePixelSize
+            )
+            let rhsLoss = candidateLoss(
+                rhs,
+                referencePixelSize: referencePixelSize
+            )
             if abs(lhsLoss - rhsLoss) > 0.000_001 {
                 return lhsLoss < rhsLoss
             }
@@ -52,10 +56,8 @@ enum WICompressionRanking {
 
     private static func candidateLoss(
         _ candidate: WISolvedCompressionCandidate,
-        preference: WICompressionPreference,
         referencePixelSize: WIPixelSize
     ) -> Double {
-        let weights = WICandidateScoreWeights(preference: preference)
         let referenceArea = max(pixelArea(referencePixelSize), 1)
         let candidateArea = max(candidate.pixelArea, 1)
         let areaScore = log2(candidateArea / referenceArea)
@@ -63,9 +65,9 @@ enum WICompressionRanking {
         let qKnee = WILossyQualityProfile(format: candidate.format).qKnee
         let kneePenalty = pow(max(0, qKnee - candidate.quality), 2)
 
-        return weights.area * abs(areaScore)
-            + weights.quality * qualityPenalty
-            + weights.knee * kneePenalty
+        return abs(areaScore)
+            + qualityPenalty
+            + 2 * kneePenalty
     }
 
     private static func calibratedQualityPenalty(_ quality: Double) -> Double {
@@ -74,28 +76,5 @@ enum WICompressionRanking {
 
     private static func pixelArea(_ size: WIPixelSize) -> Double {
         Double(size.width) * Double(size.height)
-    }
-}
-
-private struct WICandidateScoreWeights: Sendable, Equatable {
-    var area: Double
-    var quality: Double
-    var knee: Double
-
-    init(preference: WICompressionPreference) {
-        switch preference {
-        case .balanced:
-            self.init(area: 1.0, quality: 1.0, knee: 2.0)
-        case .preserveResolution:
-            self.init(area: 1.3, quality: 0.8, knee: 1.5)
-        case .preserveFidelity:
-            self.init(area: 0.8, quality: 1.3, knee: 2.5)
-        }
-    }
-
-    private init(area: Double, quality: Double, knee: Double) {
-        self.area = area
-        self.quality = quality
-        self.knee = knee
     }
 }

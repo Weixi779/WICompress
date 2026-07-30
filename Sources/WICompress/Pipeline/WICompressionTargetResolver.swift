@@ -8,131 +8,120 @@
 
 import Foundation
 
-/// Builds the encoder inputs (`WICompressOptions` / `WIWritePlan`) for a target.
-///
-/// Legality is checked separately by `WICompressionTargetValidator`; placement
-/// math comes from `WICompressionLayout`. This type only wires those into the
-/// existing `WIWritePlanResolver` and chooses the canvas vs. soft-resize path.
 enum WICompressionTargetResolver {
-    private static let defaultTargetQuality = WIQualityPolicy.compression(0.6)
-
-    static func options(for target: WICompressionTarget) throws(WICompressError) -> WICompressOptions {
-        guard let resize = resizePolicy(for: target.geometry) else {
-            throw WICompressError.unsupportedCompressionGeometry(target.geometry)
-        }
-
-        return WICompressOptions(
-            resize: resize,
-            format: target.output.representation,
-            metadata: target.output.metadata,
-            quality: defaultTargetQuality,
-            colorSpace: target.output.colorSpace.legacyPolicy
-        )
-    }
-
-    static func writePlan(
+    static func sizing(
         for target: WICompressionTarget,
-        info: WIImageInfo,
-        sourceColorSpace: WISourceColorSpaceInfo?
-    ) throws(WICompressError) -> WIWritePlan {
-        guard let renderGeometry = renderGeometry(for: target.geometry, info: info) else {
-            let options = try options(for: target)
-            return try WIWritePlanResolver.resolve(
-                options: options,
-                info: info,
-                sourceColorSpace: sourceColorSpace
+        imageSource: WIImageSource
+    ) throws(WICompressError) -> WIResolvedCompressionSizing {
+        guard imageSource.info.sourceFormat != .unknown else {
+            throw .unsupportedSourceFormat(
+                imageSource.info.typeIdentifier
             )
         }
 
-        let destination = try WIWritePlanResolver.resolvedDestination(
-            for: target.output.representation,
-            info: info
-        )
-        let canWriteDestination = target.output.representation == .preserve
-            ? info.isSourceFormatWritable
-            : WIImageFormat.canWrite(typeIdentifier: destination.typeIdentifier)
-        guard canWriteDestination else {
-            throw WICompressError.unsupportedDestinationFormat(destination.format)
-        }
-
-        let quality = WIWritePlanResolver.resolvedQuality(
-            for: defaultTargetQuality,
-            destinationFormat: destination.format
-        )
-        let colorSpace = try WIWritePlanResolver.resolvedColorSpace(
-            for: target.output.colorSpace.legacyPolicy,
-            sourceColorSpace: sourceColorSpace
-        )
-
-        return WIWritePlan(
-            path: .redrawCanvas,
-            destinationFormat: destination.format,
-            destinationTypeIdentifier: destination.typeIdentifier,
-            maxPixelSize: nil,
-            targetPixelSize: renderGeometry.canvasSize,
-            renderGeometry: renderGeometry,
-            metadataPolicy: target.output.metadata,
-            quality: quality,
-            jpegBackground: destination.jpegBackground,
-            outputColorSpace: colorSpace
-        )
-    }
-
-    private static func resizePolicy(for geometry: WICompressionGeometry) -> WIResizePolicy? {
-        switch geometry {
-        case .original:
-            return WIResizePolicy.none
-        case .fit(let maxLongSide):
-            return .maxPixel(maxLongSide)
-        case .fitInside(let box):
-            return .fit(minSize: WISize(width: 1, height: 1), maxSize: box)
-        case .fill, .exactCanvas:
-            return nil
-        }
-    }
-
-    private static func renderGeometry(
-        for geometry: WICompressionGeometry,
-        info: WIImageInfo
-    ) -> WIRenderGeometry? {
-        let sourceSize = WIPixelSize(width: info.displayWidth, height: info.displayHeight)
-
-        switch geometry {
-        case .fill(let size, let crop):
-            let canvasSize = WIPixelSize(size)
-            return WIRenderGeometry(
-                canvasSize: canvasSize,
-                destinationRect: WICompressionLayout.destinationRect(
-                    sourceSize: sourceSize,
-                    canvasSize: canvasSize,
-                    placement: .fill(crop)
-                ),
-                background: nil
+        return try WICompressionSizingResolver.resolve(
+            target.sizing,
+            sourcePixelSize: WIPixelSize(
+                width: imageSource.info.displayWidth,
+                height: imageSource.info.displayHeight
             )
-        case .exactCanvas(let size, let placement, let background):
-            let canvasSize = WIPixelSize(size)
-            return WIRenderGeometry(
-                canvasSize: canvasSize,
-                destinationRect: WICompressionLayout.destinationRect(
-                    sourceSize: sourceSize,
-                    canvasSize: canvasSize,
-                    placement: placement
-                ),
-                background: background
-            )
-        case .original, .fit, .fitInside:
-            return nil
-        }
+        )
     }
-}
 
-private extension WIImageColorSpace {
-    var legacyPolicy: WIOutputColorSpace {
-        switch self {
+    static func output(
+        for target: WICompressionTarget,
+        imageSource: WIImageSource
+    ) throws(WICompressError) -> WIResolvedImageOutput {
+        try WIImageOutputResolver.resolve(
+            target.output,
+            imageSource: imageSource
+        )
+    }
+
+    static func canReturnOriginal(
+        target: WICompressionTarget,
+        sizing: WIResolvedCompressionSizing,
+        output: WIResolvedImageOutput,
+        imageSource: WIImageSource
+    ) -> Bool {
+        guard
+            imageSource.byteCount <= target.maxBytes,
+            !sizing.hasCrop,
+            sizing.basePixelSize == sizing.sourcePixelSize,
+            target.output.representation == .preserve,
+            !output.colorSpace.requiresConversion
+        else {
+            return false
+        }
+
+        switch target.output.metadata {
         case .preserve:
-            return .preserve
-        case .convert(let colorSpace):
-            return .convert(to: colorSpace)
+            return true
+        case .strip:
+            return !imageSource.info.hasMetadata
+                && imageSource.info.orientation == 1
         }
+    }
+
+    static func executionPlan(
+        for target: WICompressionTarget,
+        sizing: WIResolvedCompressionSizing,
+        output: WIResolvedImageOutput,
+        pixelSize: WIPixelSize,
+        quality: Double?
+    ) throws(WICompressError) -> WIExecutionPlan {
+        guard output.isWritable else {
+            throw .unsupportedDestinationFormat(output.destinationFormat)
+        }
+
+        let resolvedQuality = output.destinationFormat.supportsLossyQuality
+            ? quality
+            : nil
+        let operation: WIExecutionPlan.Operation
+        if canCopyFromSource(
+            target: target,
+            sizing: sizing,
+            output: output,
+            pixelSize: pixelSize
+        ) {
+            operation = .copyFromSource
+        } else {
+            operation = .render(
+                WIResolvedRender(
+                    sourceRect: sizing.sourceRect,
+                    canvasSize: pixelSize,
+                    destinationRect: WIRect(
+                        x: 0,
+                        y: 0,
+                        width: Double(pixelSize.width),
+                        height: Double(pixelSize.height)
+                    ),
+                    canvasBackground: nil
+                )
+            )
+        }
+
+        return WIExecutionPlan(
+            operation: operation,
+            destinationFormat: output.destinationFormat,
+            destinationTypeIdentifier: output.destinationTypeIdentifier,
+            metadata: target.output.metadata,
+            quality: resolvedQuality,
+            jpegBackground: output.jpegBackground,
+            outputColorSpace: output.colorSpace
+        )
+    }
+
+    private static func canCopyFromSource(
+        target: WICompressionTarget,
+        sizing: WIResolvedCompressionSizing,
+        output: WIResolvedImageOutput,
+        pixelSize: WIPixelSize
+    ) -> Bool {
+        !sizing.hasCrop
+            && pixelSize == sizing.sourcePixelSize
+            && target.output.representation == .preserve
+            && target.output.metadata == .preserve
+            && !output.colorSpace.requiresConversion
     }
 }

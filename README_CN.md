@@ -145,7 +145,10 @@ let thumbnail = try WICompress.compress(
     originalData,
     to: WICompressionTarget(
         maxBytes: 32 * 1024,
-        geometry: .fill(size: WISize(width: 200, height: 200)),
+        sizing: WICompressionSizing(
+            maximumPixelSize: 200,
+            aspectRatio: WIAspectRatio(width: 1, height: 1)
+        ),
         output: WIImageOutput(
             representation: .jpeg(background: .white),
             metadata: .strip,
@@ -322,35 +325,32 @@ PNG 是无损格式，quality 对 PNG 不会被理解为有损压缩。
 
 ```swift
 public struct WICompressionTarget {
-    public var maxBytes: Int
-    public var geometry: WICompressionGeometry
-    public var output: WIImageOutput
-    public var preference: WICompressionPreference
+    public let maxBytes: Int
+    public let sizing: WICompressionSizing
+    public let output: WIImageOutput
+}
+
+public struct WICompressionSizing {
+    public let maximumPixelSize: Int?
+    public let aspectRatio: WIAspectRatio?
+    public let anchor: WICropAnchor
 }
 ```
 
 Target 默认输出会在源图含 Alpha 时写 PNG，否则写 JPEG；同时移除 metadata 并将像素
 转换到 sRGB。显式传入 `WIImageOutput` 时，以调用方声明的要求为准。
 
-geometry 表达视觉意图：
+Sizing 只定义 byte search 开始前的 base candidate：
 
-- `.original`：从源图展示尺寸开始，只在需要满足 `maxBytes` 时缩小。
-- `.fit(maxLongSide:)`：保持比例，限制最长边。
-- `.fitInside(box:)`：保持比例，放进指定 box。
-- `.fill(size:crop:)`：输出精确尺寸，允许缩放裁剪。
-- `.exactCanvas(size:placement:background:)`：输出精确画布尺寸，可以留白铺底。
+- 不传参数：从源图的 oriented display pixel size 开始。
+- 只传 `maximumPixelSize`：保持源比例并限制最长边；不会放大。
+- 只传 `aspectRatio`：按 `anchor` 取得该比例的最大内接裁剪。
+- 两者都传：先裁剪，再限制最长边。
 
-`preference` 只在已经满足 `maxBytes`、`geometry`、`output` 的候选之间做排序，
-不会放松这些硬约束：
-
-- `.balanced`：像素面积与画质并重（默认）。
-- `.preserveResolution`：候选接近时优先更大尺寸。
-- `.preserveFidelity`：优先更高画质，可以接受更小的图。
-
-JPEG 和 HEIC target 会先搜索 quality，必要时再在允许的 geometry 下缩尺寸。
-PNG target 保持无损，只在允许的 geometry 下缩尺寸。`.fill` 和 `.exactCanvas`
-这类硬 geometry 不会偷偷改变像素尺寸；如果无法满足字节目标，会抛
-`WICompressError.targetUnsatisfiable`。
+`anchor` 使用左上原点的 `0...1` 归一化坐标，默认居中。比例和裁剪区域解析一次后
+保持不变；solver 只搜索统一缩放比例与有损 quality。JPEG 和 HEIC 会先搜索 quality，
+必要时再缩小尺寸；PNG 保持无损并通过缩小尺寸满足限制。若不存在满足 output 合同和
+字节上限的结果，会抛 `WICompressError.targetUnsatisfiable`。
 
 Target compression 返回 `WICompressionResult`，包含输出 `Data`、容器格式、
 整数像素尺寸和字节数。

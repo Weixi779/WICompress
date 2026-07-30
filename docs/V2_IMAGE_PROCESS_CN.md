@@ -262,9 +262,9 @@ resolver 或改变执行语义。
   crop/resize/color/background 融合成一次绘制。
 - file terminal 保持 file-backed source；只有 return-original passthrough 才按需
   读取完整原始 `Data`。
-- 1.x `compress(_:options:)`、旧 Policy 名称与 Target path 暂时保留为迁移护栏。
-- `WICompressionTarget` 已共享 `WIImageOutput`；Target 仍通过迁移 adapter 使用旧
-  `WIWritePlan`，尚未汇合到 `WIExecutionPlan`。
+- 1.x `compress(_:options:)` 与旧 Policy 名称暂时保留为迁移护栏。
+- `WICompressionTarget` 已共享 `WIImageOutput` 和 `WIExecutionPlan`；两条产品线
+  在 resolved execution boundary 汇合，但仍保留各自 resolver。
 - 尚未实现 async terminal。
 
 ## 已接受

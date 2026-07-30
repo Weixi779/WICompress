@@ -8,41 +8,27 @@
 
 import Foundation
 
-/// Candidate ranking preference for target-based compression.
-public enum WICompressionPreference: Sendable, Equatable {
-    /// Balance output dimensions and fidelity.
-    case balanced
-    /// Prefer larger dimensions when candidates are close.
-    case preserveResolution
-    /// Prefer higher visual fidelity when candidates are close.
-    case preserveFidelity
-}
-
 /// Result constraints for target-based compression.
 public struct WICompressionTarget: Sendable, Equatable {
     /// Maximum allowed encoded byte count.
-    public var maxBytes: Int
-    /// Output geometry intent.
-    public var geometry: WICompressionGeometry
+    public let maxBytes: Int
+    /// Base pixel constraints resolved before byte search.
+    public let sizing: WICompressionSizing
     /// Immutable representation, metadata, and color-space requirements.
-    public var output: WIImageOutput
-    /// Candidate ranking preference.
-    public var preference: WICompressionPreference
+    public let output: WIImageOutput
 
     /// Creates a target compression request.
     public init(
         maxBytes: Int,
-        geometry: WICompressionGeometry = .original,
+        sizing: WICompressionSizing = WICompressionSizing(),
         output: WIImageOutput = WIImageOutput(
             representation: .pngIfAlphaOtherwiseJPEG,
             metadata: .strip,
             colorSpace: .convert(to: .sRGB)
-        ),
-        preference: WICompressionPreference = .balanced
+        )
     ) {
         self.maxBytes = maxBytes
-        self.geometry = geometry
+        self.sizing = sizing
         self.output = output
-        self.preference = preference
     }
 }

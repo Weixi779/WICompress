@@ -23,14 +23,17 @@ let uploadData = try WICompress.compress(
 ```
 
 The target-based entry point declares an output contract — a hard byte ceiling
-plus geometry — and searches quality and dimensions to satisfy it:
+plus optional base sizing — and searches quality and dimensions to satisfy it:
 
 ```swift
 let thumbnail = try WICompress.compress(
     originalData,
     to: WICompressionTarget(
         maxBytes: 32 * 1024,
-        geometry: .fill(size: WISize(width: 200, height: 200))
+        sizing: WICompressionSizing(
+            maximumPixelSize: 200,
+            aspectRatio: WIAspectRatio(width: 1, height: 1)
+        )
     )
 )
 ```
@@ -62,11 +65,10 @@ All failures are thrown as ``WICompressError``; the core never imports UIKit or 
 ### Target-Based Compression
 
 - ``WICompressionTarget``
+- ``WICompressionSizing``
 - ``WIImageOutput``
-- ``WICompressionGeometry``
-- ``WICropMode``
-- ``WIImagePlacement``
-- ``WICompressionPreference``
+- ``WIAspectRatio``
+- ``WICropAnchor``
 - ``WICompressionResult``
 
 ### Values

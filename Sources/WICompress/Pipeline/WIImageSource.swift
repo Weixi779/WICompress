@@ -20,6 +20,10 @@ final class WIImageSource {
 
     let imageIOSource: WIImageIO.WIImageSource
 
+    var byteCount: Int {
+        imageIOSource.byteCount
+    }
+
     convenience init(data: Data) throws(WICompressError) {
         let imageIOSource: WIImageIO.WIImageSource
         do {

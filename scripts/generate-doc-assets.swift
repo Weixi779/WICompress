@@ -90,7 +90,10 @@ enum GenerateDocAssets {
                 compression: .target(
                     WICompressionTarget(
                         maxBytes: 32 * 1024,
-                        geometry: .fill(size: WISize(width: 200, height: 200)),
+                        sizing: WICompressionSizing(
+                            maximumPixelSize: 200,
+                            aspectRatio: WIAspectRatio(width: 1, height: 1)
+                        ),
                         output: WIImageOutput(
                             representation: .jpeg(background: .white),
                             metadata: .strip,
