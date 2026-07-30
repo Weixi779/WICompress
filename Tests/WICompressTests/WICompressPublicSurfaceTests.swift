@@ -134,16 +134,6 @@ struct WICompressPublicSurfaceTests {
         )
     }
 
-    @Test("Default options match the documented upload-compression defaults")
-    func defaultOptions() {
-        #expect(WICompressOptions.default == WICompressOptions())
-        #expect(WICompressOptions.default.resize == .luban)
-        #expect(WICompressOptions.default.format == .preserve)
-        #expect(WICompressOptions.default.metadata == .strip)
-        #expect(WICompressOptions.default.quality == .compression(0.6))
-        #expect(WICompressOptions.default.colorSpace == .preserve)
-    }
-
     @Test("Default target values match target-compression defaults")
     func defaultTarget() {
         let target = WICompressionTarget(maxBytes: 1024)
@@ -159,16 +149,19 @@ struct WICompressPublicSurfaceTests {
         )
     }
 
-    @Test("No-op policy returns the original data")
-    func noOpPolicyReturnsOriginalData() throws {
+    @Test("No-op Process returns the original data")
+    func noOpProcessReturnsOriginalData() throws {
         let input = try Self.tinyPNGData()
-        let output = try WICompress.compress(
+        let output = try WICompress.process(
             input,
-            options: WICompressOptions(
-                resize: .none,
-                format: .preserve,
-                metadata: .preserve,
-                quality: .none
+            using: WIImageProcess(
+                sizing: .original,
+                quality: nil,
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .preserve,
+                    colorSpace: .preserve
+                )
             )
         )
 
@@ -243,7 +236,7 @@ struct WICompressPublicSurfaceTests {
         let data = try Self.data(for: invalidInputCase)
 
         #expect(throws: invalidInputCase.expectedError) {
-            _ = try WICompress.compress(data)
+            _ = try WICompress.process(data)
         }
     }
 
@@ -308,7 +301,7 @@ struct WICompressPublicSurfaceTests {
             .appendingPathComponent("wi-compress-missing-\(UUID().uuidString)")
 
         #expect(throws: WICompressError.fileReadFailed(url)) {
-            _ = try WICompress.compress(contentsOf: url)
+            _ = try WICompress.process(contentsOf: url)
         }
     }
 

@@ -1,5 +1,5 @@
 //
-//  WIMetadataPolicy.swift
+//  WIImageMetadata.swift
 //  WICompress
 //
 //  Created by weixi on 2026/6/22.
@@ -15,6 +15,3 @@ public enum WIImageMetadata: Sendable, Equatable {
     /// Preserve source metadata where ImageIO supports it.
     case preserve
 }
-
-/// Legacy name retained while the 1.x Process surface is being removed.
-public typealias WIMetadataPolicy = WIImageMetadata

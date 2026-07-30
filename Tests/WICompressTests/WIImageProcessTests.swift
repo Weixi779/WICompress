@@ -466,8 +466,8 @@ struct WIImageProcessTests {
         )
         let outputSource = try WIImageSource(data: output)
         let colorSpace = try #require(
-            try outputSource.colorSpaceInfoIfNeeded(
-                for: WIOutputColorSpace.convert(to: .sRGB)
+            try outputSource.processColorSpaceInfoIfNeeded(
+                for: .convert(to: .sRGB)
             )
         )
 

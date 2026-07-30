@@ -154,15 +154,6 @@ struct WICompressImageIOCoreTests {
         )
     }
 
-    private static func solidPNG(width: Int, height: Int) throws -> Data {
-        try solidImageData(
-            typeIdentifier: "public.png",
-            width: width,
-            height: height,
-            properties: nil
-        )
-    }
-
     private static func transparentPNG(width: Int, height: Int) throws -> Data {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
@@ -359,13 +350,13 @@ struct WICompressImageIOCoreTests {
         return data as Data
     }
 
-    @Test("Default compression strips GPS, bakes orientation, and preserves display size contract")
-    func defaultCompressionUsesRedrawBehavior() throws {
+    @Test("Default Process strips GPS, bakes orientation, and preserves display size contract")
+    func defaultProcessUsesRenderBehavior() throws {
         let url = try Self.resource("real_heic_4032x3024_o6_gps_hdr", extension: "heic")
         let inputData = try Data(contentsOf: url)
         let inputInfo = try Self.imageInfo(inputData)
 
-        let outputData = try WICompress.compress(inputData)
+        let outputData = try WICompress.process(inputData)
         let outputInfo = try Self.imageInfo(outputData)
 
         let ratio = WILuban.ratio(
@@ -387,27 +378,25 @@ struct WICompressImageIOCoreTests {
         let inputData = try Data(contentsOf: url)
         let inputInfo = try Self.imageInfo(inputData)
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .luban,
-                format: .preserve,
-                metadata: .preserve,
-                quality: .compression(0.6)
+            using: WIImageProcess(
+                sizing: .original,
+                quality: 0.6,
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .preserve,
+                    colorSpace: .preserve
+                )
             )
         )
         let outputInfo = try Self.imageInfo(outputData)
 
-        let ratio = WILuban.ratio(
-            width: inputInfo.displayWidth,
-            height: inputInfo.displayHeight
-        )
-
         #expect(WIImageFormat(data: outputData) == WIImageFormat(data: inputData))
         #expect(outputInfo.hasGPS == true)
         #expect(outputInfo.orientation == inputInfo.orientation)
-        #expect(outputInfo.displayWidth == max(inputInfo.displayWidth / ratio, 1))
-        #expect(outputInfo.displayHeight == max(inputInfo.displayHeight / ratio, 1))
+        #expect(outputInfo.displayWidth == inputInfo.displayWidth)
+        #expect(outputInfo.displayHeight == inputInfo.displayHeight)
     }
 
     @Test("PNG alpha survives redraw compression")
@@ -415,7 +404,7 @@ struct WICompressImageIOCoreTests {
         let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")
         let inputData = try Data(contentsOf: url)
 
-        let outputData = try WICompress.compress(inputData)
+        let outputData = try WICompress.process(inputData)
         let outputInfo = try Self.imageInfo(outputData)
 
         #expect(WIImageFormat(data: outputData) == .png)
@@ -429,13 +418,18 @@ struct WICompressImageIOCoreTests {
         let inputInfo = try Self.imageInfo(inputData)
         try #require(inputInfo.hasAlpha == true, "Fixture should contain alpha")
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .none,
-                format: .jpeg(background: jpegBackgroundCase.background),
-                metadata: .strip,
-                quality: .compression(0.8)
+            using: WIImageProcess(
+                sizing: .original,
+                quality: 0.8,
+                output: WIImageOutput(
+                    representation: .jpeg(
+                        background: jpegBackgroundCase.background
+                    ),
+                    metadata: .strip,
+                    colorSpace: .preserve
+                )
             )
         )
         let outputInfo = try Self.imageInfo(outputData)
@@ -453,13 +447,16 @@ struct WICompressImageIOCoreTests {
         let inputData = try Data(contentsOf: url)
 
         #expect(throws: WICompressError.transparentSourceRequiresBackground(.png)) {
-            _ = try WICompress.compress(
+            _ = try WICompress.process(
                 inputData,
-                options: WICompressOptions(
-                    resize: .none,
-                    format: .jpeg(background: .disallow),
-                    metadata: .strip,
-                    quality: .compression(0.8)
+                using: WIImageProcess(
+                    sizing: .original,
+                    quality: 0.8,
+                    output: WIImageOutput(
+                        representation: .jpeg(),
+                        metadata: .strip,
+                        colorSpace: .preserve
+                    )
                 )
             )
         }
@@ -472,13 +469,16 @@ struct WICompressImageIOCoreTests {
         let inputInfo = try Self.imageInfo(inputData)
         try #require(inputInfo.hasAlpha == true, "Fixture should contain alpha")
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .none,
-                format: .pngIfAlphaOtherwiseJPEG,
-                metadata: .strip,
-                quality: .compression(0.8)
+            using: WIImageProcess(
+                sizing: .original,
+                quality: 0.8,
+                output: WIImageOutput(
+                    representation: .pngIfAlphaOtherwiseJPEG,
+                    metadata: .strip,
+                    colorSpace: .preserve
+                )
             )
         )
         let outputInfo = try Self.imageInfo(outputData)
@@ -496,13 +496,16 @@ struct WICompressImageIOCoreTests {
         let inputInfo = try Self.imageInfo(inputData)
         try #require(inputInfo.hasAlpha != true, "Fixture should be opaque")
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .none,
-                format: .pngIfAlphaOtherwiseJPEG,
-                metadata: .strip,
-                quality: .compression(0.8)
+            using: WIImageProcess(
+                sizing: .original,
+                quality: 0.8,
+                output: WIImageOutput(
+                    representation: .pngIfAlphaOtherwiseJPEG,
+                    metadata: .strip,
+                    colorSpace: .preserve
+                )
             )
         )
         let outputInfo = try Self.imageInfo(outputData)
@@ -518,13 +521,18 @@ struct WICompressImageIOCoreTests {
         let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
         let inputData = try Data(contentsOf: url)
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .maxPixel(600),
-                format: .png,
-                metadata: .strip,
-                quality: .compression(0.1)
+            using: WIImageProcess(
+                sizing: .resize(
+                    using: WIImageResize.maximumPixelSize(600)
+                ),
+                quality: 0.1,
+                output: WIImageOutput(
+                    representation: .png,
+                    metadata: .strip,
+                    colorSpace: .preserve
+                )
             )
         )
         let outputInfo = try Self.imageInfo(outputData)
@@ -533,87 +541,21 @@ struct WICompressImageIOCoreTests {
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) <= 600)
     }
 
-    @Test(".fit resize upscales small assets")
-    func fitResizeUpscalesSmallAssets() throws {
-        let inputData = try Self.solidPNG(width: 20, height: 20)
-
-        let outputData = try WICompress.compress(
-            inputData,
-            options: WICompressOptions(
-                resize: .fit(
-                    minSize: WISize(width: 40, height: 50),
-                    maxSize: WISize(width: 400, height: 467)
-                ),
-                format: .preserve,
-                metadata: .strip,
-                quality: .none
-            )
-        )
-        let outputInfo = try Self.imageInfo(outputData)
-
-        #expect(WIImageFormat(data: outputData) == .png)
-        #expect(outputInfo.displayWidth == 40)
-        #expect(outputInfo.displayHeight == 40)
-    }
-
-    @Test(".fit resize downscales large assets")
-    func fitResizeDownscalesLargeAssets() throws {
-        let inputData = try Self.solidPNG(width: 720, height: 1080)
-
-        let outputData = try WICompress.compress(
-            inputData,
-            options: WICompressOptions(
-                resize: .fit(
-                    minSize: WISize(width: 40, height: 50),
-                    maxSize: WISize(width: 400, height: 467)
-                ),
-                format: .preserve,
-                metadata: .strip,
-                quality: .none
-            )
-        )
-        let outputInfo = try Self.imageInfo(outputData)
-
-        #expect(WIImageFormat(data: outputData) == .png)
-        #expect(outputInfo.displayWidth == 311)
-        #expect(outputInfo.displayHeight == 467)
-    }
-
-    @Test(".fit resize downscales assets with only one oversized side")
-    func fitResizeDownscalesSingleOversizedSide() throws {
-        let inputData = try Self.solidPNG(width: 1200, height: 100)
-
-        let outputData = try WICompress.compress(
-            inputData,
-            options: WICompressOptions(
-                resize: .fit(
-                    minSize: WISize(width: 40, height: 50),
-                    maxSize: WISize(width: 400, height: 467)
-                ),
-                format: .preserve,
-                metadata: .strip,
-                quality: .none
-            )
-        )
-        let outputInfo = try Self.imageInfo(outputData)
-
-        #expect(WIImageFormat(data: outputData) == .png)
-        #expect(outputInfo.displayWidth == 400)
-        #expect(outputInfo.displayHeight == 33)
-    }
-
     @Test("Explicit same-format JPEG still rewrites instead of returning original")
     func explicitSameFormatJPEGDoesNotReturnOriginal() throws {
         let url = try Self.resource("real_jpeg_738x1302_recompressed", extension: "jpg")
         let inputData = try Data(contentsOf: url)
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .none,
-                format: .jpeg(background: .disallow),
-                metadata: .preserve,
-                quality: .compression(0.6)
+            using: WIImageProcess(
+                sizing: .original,
+                quality: 0.6,
+                output: WIImageOutput(
+                    representation: .jpeg(),
+                    metadata: .preserve,
+                    colorSpace: .preserve
+                )
             )
         )
 
@@ -628,13 +570,18 @@ struct WICompressImageIOCoreTests {
         let inputInfo = try Self.imageInfo(inputData)
         try #require(inputInfo.hasGPS == true, "Fixture should contain GPS metadata")
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .maxPixel(1200),
-                format: .jpeg(background: .disallow),
-                metadata: .preserve,
-                quality: .compression(0.7)
+            using: WIImageProcess(
+                sizing: .resize(
+                    using: WIImageResize.maximumPixelSize(1200)
+                ),
+                quality: 0.7,
+                output: WIImageOutput(
+                    representation: .jpeg(),
+                    metadata: .preserve,
+                    colorSpace: .preserve
+                )
             )
         )
         let outputInfo = try Self.imageInfo(outputData)
@@ -652,19 +599,25 @@ struct WICompressImageIOCoreTests {
         let inputInfo = try Self.imageInfo(inputData)
         try #require(inputInfo.profileName == "Display P3", "Fixture should be Display P3")
 
-        let options = WICompressOptions(
-            resize: .luban,
-            format: .preserve,
-            metadata: .preserve,
-            quality: .compression(0.6)
+        let process = WIImageProcess(
+            sizing: .original,
+            quality: 0.6,
+            output: WIImageOutput(
+                representation: .preserve,
+                metadata: .preserve,
+                colorSpace: .preserve
+            )
         )
         let inputSource = try WIImageSource(data: inputData)
-        let writePlan = try WIWritePlanResolver.resolve(options: options, info: inputSource.info)
+        let executionPlan = try WIImageProcessResolver.resolve(
+            process,
+            imageSource: inputSource
+        )
 
-        let outputData = try WICompress.compress(inputData, options: options)
+        let outputData = try WICompress.process(inputData, using: process)
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(writePlan.path == .copyFromSource)
+        #expect(executionPlan.operation == .copyFromSource)
         #expect(outputInfo.profileName == inputInfo.profileName)
     }
 
@@ -675,19 +628,28 @@ struct WICompressImageIOCoreTests {
         let inputInfo = try Self.imageInfo(inputData)
         try #require(inputInfo.profileName == "Display P3", "Fixture should be Display P3")
 
-        let options = WICompressOptions(
-            resize: .luban,
-            format: .preserve,
-            metadata: .strip,
-            quality: .compression(0.6)
+        let process = WIImageProcess(
+            sizing: .resize(using: WIImageResize.luban),
+            quality: 0.6,
+            output: WIImageOutput(
+                representation: .preserve,
+                metadata: .strip,
+                colorSpace: .preserve
+            )
         )
         let inputSource = try WIImageSource(data: inputData)
-        let writePlan = try WIWritePlanResolver.resolve(options: options, info: inputSource.info)
+        let executionPlan = try WIImageProcessResolver.resolve(
+            process,
+            imageSource: inputSource
+        )
 
-        let outputData = try WICompress.compress(inputData, options: options)
+        let outputData = try WICompress.process(inputData, using: process)
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(writePlan.path == .redrawBitmap)
+        guard case .render = executionPlan.operation else {
+            Issue.record("Expected render execution")
+            return
+        }
         #expect(outputInfo.profileName == inputInfo.profileName)
     }
 
@@ -697,10 +659,16 @@ struct WICompressImageIOCoreTests {
         let inputData = try Data(contentsOf: url)
         let inputSource = try WIImageSource(data: inputData)
 
-        #expect(try inputSource.colorSpaceInfoIfNeeded(for: .preserve) == nil)
+        #expect(
+            try inputSource.processColorSpaceInfoIfNeeded(
+                for: .preserve
+            ) == nil
+        )
 
         let colorSpaceInfo = try #require(
-            try inputSource.colorSpaceInfoIfNeeded(for: .convert(to: .sRGB))
+            try inputSource.processColorSpaceInfoIfNeeded(
+                for: .convert(to: .sRGB)
+            )
         )
         #expect(colorSpaceInfo.colorSpace == .displayP3)
     }
@@ -711,14 +679,16 @@ struct WICompressImageIOCoreTests {
         let inputData = try Data(contentsOf: url)
         try #require(Self.decodedColorSpaceName(inputData) == CGColorSpace.displayP3 as String)
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .none,
-                format: .preserve,
-                metadata: .strip,
-                quality: .compression(0.8),
-                colorSpace: .convert(to: .sRGB)
+            using: WIImageProcess(
+                sizing: .original,
+                quality: 0.8,
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .strip,
+                    colorSpace: .convert(to: .sRGB)
+                )
             )
         )
         let outputColorSpaceName = try Self.decodedColorSpaceName(outputData)
@@ -1059,18 +1029,20 @@ struct WICompressImageIOCoreTests {
         let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")
         let inputData = try Data(contentsOf: url)
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .none,
-                format: .jpeg(
-                    background: .color(
+            using: WIImageProcess(
+                sizing: .original,
+                quality: 0.8,
+                output: WIImageOutput(
+                    representation: .jpeg(
+                        background: .color(
                         WIColor(red: 0.9, green: 0.1, blue: 0.1, colorSpace: .displayP3)
-                    )
-                ),
-                metadata: .strip,
-                quality: .compression(0.8),
-                colorSpace: .convert(to: .sRGB)
+                        )
+                    ),
+                    metadata: .strip,
+                    colorSpace: .convert(to: .sRGB)
+                )
             )
         )
         let outputInfo = try Self.imageInfo(outputData)
@@ -1081,18 +1053,22 @@ struct WICompressImageIOCoreTests {
         #expect(outputColorSpaceName == CGColorSpace.sRGB as String)
     }
 
-    @Test("CMYK JPEG preserve still compresses without throwing")
-    func cmykJPEGWithPreserveStillCompresses() throws {
+    @Test("CMYK JPEG preserve still processes without throwing")
+    func cmykJPEGWithPreserveStillProcesses() throws {
         let inputData = try Self.cmykJPEG(width: 320, height: 240)
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .maxPixel(160),
-                format: .preserve,
-                metadata: .strip,
-                quality: .compression(0.8),
-                colorSpace: .preserve
+            using: WIImageProcess(
+                sizing: .resize(
+                    using: WIImageResize.maximumPixelSize(160)
+                ),
+                quality: 0.8,
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .strip,
+                    colorSpace: .preserve
+                )
             )
         )
 
@@ -1100,37 +1076,21 @@ struct WICompressImageIOCoreTests {
         #expect(!outputData.isEmpty)
     }
 
-    @Test("Size guard may return original when preserve policies are already satisfied")
-    func sizeGuardReturnsOriginalForPreservePolicies() throws {
-        let inputData = try Self.solidPNG(width: 1, height: 1)
-        let inputSource = try WIImageSource(data: inputData)
-
-        let outputData = try WICompress.compress(
-            inputData,
-            options: WICompressOptions(
-                resize: .luban,
-                format: .preserve,
-                metadata: .preserve,
-                quality: .compression(0.6)
-            )
-        )
-
-        #expect(inputSource.info.orientation == 1)
-        #expect(outputData == inputData)
-    }
-
-    @Test("Size guard does not bypass orientation normalization for stripped metadata")
-    func sizeGuardDoesNotBypassOrientationNormalization() throws {
+    @Test("Process normalizes orientation when stripping metadata")
+    func processNormalizesOrientationWhenStrippingMetadata() throws {
         let inputData = try Self.orientationTaggedJPEG(width: 2, height: 4, orientation: 6)
         let inputInfo = try Self.imageInfo(inputData)
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .none,
-                format: .preserve,
-                metadata: .strip,
-                quality: .none
+            using: WIImageProcess(
+                sizing: .original,
+                quality: nil,
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .strip,
+                    colorSpace: .preserve
+                )
             )
         )
         let outputInfo = try Self.imageInfo(outputData)
@@ -1142,25 +1102,25 @@ struct WICompressImageIOCoreTests {
         #expect(outputInfo.displayHeight == inputInfo.displayHeight)
     }
 
-    // v1 documented behavior: `.preserve` keeps Exif/GPS/orientation but NOT the
-    // HDR gain map (the encoder does not set kCGImageDestinationPreserveGainMap).
-    // This locks the current trade-off; it will flip intentionally when gain-map
-    // preservation lands (see PLAN §8.3 / §17).
+    // Ordinary metadata preservation does not preserve auxiliary HDR gain maps.
     @available(iOS 14.1, macOS 11.0, *)
-    @Test("Preserve metadata drops the HDR gain map in v1")
-    func preserveMetadataDropsGainMap() throws {
+    @Test("Process metadata preservation drops the HDR gain map")
+    func processMetadataPreservationDropsGainMap() throws {
         let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
         let inputData = try Data(contentsOf: url)
 
         try #require(Self.hasGainMap(inputData), "Fixture should contain an HDR gain map")
 
-        let outputData = try WICompress.compress(
+        let outputData = try WICompress.process(
             inputData,
-            options: WICompressOptions(
-                resize: .luban,
-                format: .preserve,
-                metadata: .preserve,
-                quality: .compression(0.6)
+            using: WIImageProcess(
+                sizing: .resize(using: WIImageResize.luban),
+                quality: 0.6,
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .preserve,
+                    colorSpace: .preserve
+                )
             )
         )
 
@@ -1173,7 +1133,7 @@ struct WICompressImageIOCoreTests {
         let inputData = try Data(contentsOf: url)
 
         #expect(throws: WICompressError.animatedSourceUnsupported(frameCount: 4)) {
-            _ = try WICompress.compress(inputData)
+            _ = try WICompress.process(inputData)
         }
     }
 }

@@ -9,6 +9,14 @@
 import Foundation
 import UniformTypeIdentifiers
 
+struct WIResolvedOutputColorSpace: Sendable, Equatable {
+    let target: WIColorSpace?
+
+    var requiresConversion: Bool {
+        target != nil
+    }
+}
+
 struct WIResolvedImageOutput: Sendable, Equatable {
     let destinationFormat: WIImageFormat
     let destinationTypeIdentifier: String

@@ -8,16 +8,19 @@ WICompress operates directly on original image `Data` or file `URL` input.
 ImageIO handles format inspection, orientation, alpha, metadata, color profiles,
 resizing, and encoding; the public API stays simple and returns compressed bytes.
 
-The upload-style entry point applies ``WICompressOptions`` policies and returns `Data`:
+The Process entry point declares one deterministic operation and returns `Data`:
 
 ```swift
-let uploadData = try WICompress.compress(
+let uploadData = try WICompress.process(
     originalData,
-    options: WICompressOptions(
-        resize: .maxPixel(1600),
-        format: .jpeg(background: .white),
-        metadata: .strip,
-        quality: .compression(0.7)
+    using: WIImageProcess(
+        sizing: .resize(using: WIImageResize.maximumPixelSize(1600)),
+        quality: 0.7,
+        output: WIImageOutput(
+            representation: .jpeg(background: .white),
+            metadata: .strip,
+            colorSpace: .convert(to: .sRGB)
+        )
     )
 )
 ```
@@ -45,20 +48,27 @@ All failures are thrown as ``WICompressError``; the core never imports UIKit or 
 ### Essentials
 
 - ``WICompress/WICompress``
-- ``WICompressOptions``
+- ``WIImageProcess``
 - ``WICompressError``
 
-### Compression Policies
+### Process
 
-- ``WIResizePolicy``
-- ``WIFormatPolicy``
+- ``WIImageSizing``
+- ``WIImageResizing``
+- ``WIImageResize``
+- ``WIImageCrop``
+- ``WIPixelSize``
+
+### Output
+
+- ``WIImageOutput``
+- ``WIImageRepresentation``
 - ``WIJPEGBackground``
-- ``WIMetadataPolicy``
-- ``WIQualityPolicy``
+- ``WIImageMetadata``
+- ``WIImageColorSpace``
 
 ### Color Handling
 
-- ``WIOutputColorSpace``
 - ``WIColorSpace``
 - ``WIColor``
 
@@ -66,12 +76,10 @@ All failures are thrown as ``WICompressError``; the core never imports UIKit or 
 
 - ``WICompressionTarget``
 - ``WICompressionSizing``
-- ``WIImageOutput``
 - ``WIAspectRatio``
 - ``WICropAnchor``
 - ``WICompressionResult``
 
 ### Values
 
-- ``WISize``
 - ``WIImageFormat``

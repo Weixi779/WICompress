@@ -46,8 +46,8 @@ public enum WICompressError: Error, Sendable, Equatable {
     case resourceLimitExceeded(attemptCount: Int)
     /// Multi-frame image data is not supported.
     case animatedSourceUnsupported(frameCount: Int)
-    /// The options and image facts could not produce a valid write plan.
-    case writePlanUnavailable
+    /// The request and image facts could not produce a valid execution plan.
+    case executionPlanUnavailable
     /// ImageIO could not create the downsampled bitmap.
     case thumbnailCreationFailed
     /// ImageIO could not create an output destination.
@@ -99,8 +99,8 @@ extension WICompressError: LocalizedError {
             return "Target compression exceeded its resource budget after \(attemptCount) attempts."
         case .animatedSourceUnsupported(let frameCount):
             return "Animated images are not supported (\(frameCount) frames)."
-        case .writePlanUnavailable:
-            return "Could not resolve a valid write plan for the given options."
+        case .executionPlanUnavailable:
+            return "Could not resolve a valid image execution plan."
         case .thumbnailCreationFailed:
             return "Failed to create a downsampled image during compression."
         case .destinationCreationFailed(let format):

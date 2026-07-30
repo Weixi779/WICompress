@@ -41,7 +41,7 @@ Please include:
 
 - the input image (or its format, pixel size, and source, if it cannot be
   shared)
-- the exact `WICompressOptions` or `WICompressionTarget` used
+- the exact `WIImageProcess` or `WICompressionTarget` used
 - the thrown `WICompressError` or the unexpected output
 - platform and OS version
 

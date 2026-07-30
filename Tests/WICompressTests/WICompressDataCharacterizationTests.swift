@@ -46,17 +46,17 @@ struct WICompressDataCharacterizationTests {
             .map(Fixture.init(url:))
     }
 
-    @Test("Resources fixtures are discoverable for Data API")
+    @Test("Resources fixtures are discoverable for Process Data API")
     func fixturesAreDiscoverable() {
         #expect(!Self.fixtures.isEmpty)
     }
 
-    @Test("Data API preserves format and display-size contract", arguments: fixtures)
-    func dataAPIContract(_ fixture: Fixture) throws {
+    @Test("Process Data API preserves format and display-size contract", arguments: fixtures)
+    func processDataAPIContract(_ fixture: Fixture) throws {
         let inputData = try Data(contentsOf: fixture.url)
         let inputInfo = try Self.imageInfo(inputData)
 
-        let outputData = try WICompress.compress(inputData)
+        let outputData = try WICompress.process(inputData)
         let outputInfo = try Self.imageInfo(outputData)
 
         let ratio = WILuban.ratio(

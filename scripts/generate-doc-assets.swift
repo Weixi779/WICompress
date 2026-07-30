@@ -26,7 +26,7 @@ struct Sample {
 }
 
 enum SampleCompression {
-    case options(WICompressOptions)
+    case process(WIImageProcess)
     case target(WICompressionTarget)
 }
 
@@ -57,31 +57,37 @@ enum GenerateDocAssets {
                 title: "HEIC photo - flowers",
                 filename: "real_heic_4032x3024_o6_gps_hdr.heic",
                 note: "Default compression keeps HEIC and preserves the display result",
-                compression: .options(.default)
+                compression: .process(.default)
             ),
             Sample(
                 title: "HEIC -> JPEG (forced format)",
                 filename: "real_heic_4032x3024_o6_gps_hdr.heic",
-                note: "Force JPEG output with .format(.jpeg); the HEIC source is transcoded and resized for upload endpoints that only accept JPEG",
-                compression: .options(WICompressOptions(format: .jpeg(background: .disallow)))
+                note: "Explicit JPEG representation transcodes and resizes the HEIC source for upload endpoints that only accept JPEG",
+                compression: .process(
+                    WIImageProcess(
+                        output: WIImageOutput(
+                            representation: .jpeg()
+                        )
+                    )
+                )
             ),
             Sample(
                 title: "HEIC photo - large landscape",
                 filename: "real_heic_5712x4284_o6_gps_hdr.heic",
                 note: "Large HEIC photos get resized and re-encoded for upload",
-                compression: .options(.default)
+                compression: .process(.default)
             ),
             Sample(
                 title: "HEIC photo - circle cutout",
                 filename: "real_heic_3001x2458_alpha_circle.heic",
                 note: "Transparent HEIC artwork stays clean while file size drops",
-                compression: .options(.default)
+                compression: .process(.default)
             ),
             Sample(
                 title: "JPEG - landscape photo",
                 filename: "real_jpeg_2098x1350_landscape.jpg",
                 note: "JPEG gets the expected upload-style size reduction",
-                compression: .options(.default)
+                compression: .process(.default)
             ),
             Sample(
                 title: "Target API - share thumbnail",
@@ -106,13 +112,13 @@ enum GenerateDocAssets {
                 title: "PNG - panoramic screenshot",
                 filename: "real_png_1928x464_pano.png",
                 note: "Long PNG keeps full resolution - Luban sizes by the short side, so long images are not over-shrunk",
-                compression: .options(.default)
+                compression: .process(.default)
             ),
             Sample(
                 title: "PNG - alpha no-op case",
                 filename: "real_png_1086x1630_alpha.png",
-                note: "This PNG does not need resize; size guard returns original and alpha remains",
-                compression: .options(.default)
+                note: "This PNG does not need resize; Process returns the original and alpha remains",
+                compression: .process(.default)
             ),
         ]
         let canvasHeight = headerHeight + samples.count * rowHeight + bottomPadding
@@ -127,8 +133,8 @@ enum GenerateDocAssets {
             let inputData = try Data(contentsOf: inputURL)
             let outputData: Data
             switch sample.compression {
-            case .options(let options):
-                outputData = try WICompress.compress(inputData, options: options)
+            case .process(let process):
+                outputData = try WICompress.process(inputData, using: process)
             case .target(let target):
                 outputData = try WICompress.compress(inputData, to: target).data
             }

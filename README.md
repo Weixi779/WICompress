@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Weixi779/WICompress/actions/workflows/ci.yml/badge.svg)](https://github.com/Weixi779/WICompress/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-blue)
-![Swift](https://img.shields.io/badge/Swift-6.0%2B-orange)
+![Swift](https://img.shields.io/badge/Swift-6.2%2B-orange)
 ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen)
 ![License](https://img.shields.io/github/license/Weixi779/WICompress)
 
@@ -20,17 +20,20 @@ or choose PNG/JPEG from alpha-channel presence, strips metadata for privacy, and
 resizes images without depending on `UIImage` or `NSImage`.
 
 ```swift
-let compressedData = try WICompress.compress(originalData)
+let compressedData = try WICompress.process(originalData)
 ```
 
 ```swift
-let uploadData = try WICompress.compress(
+let uploadData = try WICompress.process(
     originalData,
-    options: WICompressOptions(
-        resize: .maxPixel(1600),
-        format: .jpeg(background: .white),
-        metadata: .strip,
-        quality: .compression(0.7)
+    using: WIImageProcess(
+        sizing: .resize(using: WIImageResize.maximumPixelSize(1600)),
+        quality: 0.7,
+        output: WIImageOutput(
+            representation: .jpeg(background: .white),
+            metadata: .strip,
+            colorSpace: .convert(to: .sRGB)
+        )
     )
 )
 ```
@@ -43,8 +46,8 @@ let uploadData = try WICompress.compress(
   lossy quality are configured for common app uploads.
 - **Target contracts**: use `maxBytes` with geometry intent when an SDK or
   backend requires a hard byte ceiling.
-- **Flexible resize policies**: use Luban, cap the longest side, or fit an image
-  into caller-supplied minimum/maximum display dimensions.
+- **Composable processing**: choose crop, resizing, quality, and output as
+  independent parts of one deterministic `WIImageProcess`.
 - **Format control**: preserve the source container or explicitly output JPEG,
   PNG, HEIC, or choose PNG for alpha-channel sources and JPEG otherwise.
 - **Alpha-safe JPEG conversion**: transparent sources require an explicit white
@@ -59,13 +62,13 @@ let uploadData = try WICompress.compress(
 ## Requirements and Installation
 
 - iOS 14+ / macOS 11+ / Mac Catalyst 14+ / tvOS 14+ / watchOS 7+ / visionOS 1+
-- Swift 6.0+ (Xcode 16+)
+- Swift 6.2+ (Xcode 26+)
 
 Add WICompress to your project with Swift Package Manager:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Weixi779/WICompress.git", from: "1.4.0")
+    .package(url: "https://github.com/Weixi779/WICompress.git", from: "2.0.0")
 ]
 ```
 
@@ -109,42 +112,48 @@ The example demonstrates:
 ```swift
 import WICompress
 
-let compressedData = try WICompress.compress(originalData)
+let compressedData = try WICompress.process(originalData)
 ```
 
 Compress a file URL:
 
 ```swift
-let compressedData = try WICompress.compress(contentsOf: imageURL)
+let compressedData = try WICompress.process(contentsOf: imageURL)
 ```
 
-Use explicit options:
+Declare an explicit process:
 
 ```swift
-let compressedData = try WICompress.compress(
+let compressedData = try WICompress.process(
     originalData,
-    options: WICompressOptions(
-        resize: .luban,
-        format: .preserve,
-        metadata: .strip,
-        quality: .compression(0.7)
+    using: WIImageProcess(
+        sizing: .resize(using: WIImageResize.luban),
+        quality: 0.7,
+        output: WIImageOutput(
+            representation: .preserve,
+            metadata: .strip,
+            colorSpace: .preserve
+        )
     )
 )
 ```
 
-Fit image assets into a caller-defined display-size range:
+Crop and resize in one operation:
 
 ```swift
-let assetData = try WICompress.compress(
+let assetData = try WICompress.process(
     originalData,
-    options: WICompressOptions(
-        resize: .fit(
-            minSize: WISize(width: 40, height: 50),
-            maxSize: WISize(width: 400, height: 467)
+    using: WIImageProcess(
+        sizing: .resize(
+            using: WIImageResize.constrained(
+                within: WIPixelSize(width: 400, height: 467)
+            )
         ),
-        format: .pngIfAlphaOtherwiseJPEG,
-        metadata: .strip,
-        quality: .compression(0.7)
+        crop: .aspectRatio(width: 1, height: 1),
+        quality: 0.7,
+        output: WIImageOutput(
+            representation: .pngIfAlphaOtherwiseJPEG
+        )
     )
 )
 ```
@@ -183,7 +192,7 @@ guard let originalData = try await photosPickerItem.loadTransferable(type: Data.
     throw MyError.missingImageData
 }
 
-let compressedData = try WICompress.compress(originalData)
+let compressedData = try WICompress.process(originalData)
 let previewImage = UIImage(data: compressedData)
 ```
 
@@ -191,164 +200,40 @@ This shape avoids asking callers to pass both a rendered image and separate
 format data. ImageIO can inspect dimensions, orientation, format, and metadata
 directly from the original bytes.
 
-## Options
+## Image Process
 
-`WICompressOptions.default` is tuned for upload-style compression:
-
-```swift
-WICompressOptions(
-    resize: .luban,
-    format: .preserve,
-    metadata: .strip,
-    quality: .compression(0.6),
-    colorSpace: .preserve
-)
-```
-
-### Resize
+`WIImageProcess` describes one deterministic operation. Its default uses the
+Luban-derived resizing algorithm, quality `0.6`, source representation,
+stripped metadata, and preserved color-space semantics.
 
 ```swift
-public struct WISize {
-    public var width: Double
-    public var height: Double
-}
-
-public enum WIResizePolicy {
-    case none
-    case luban
-    case maxPixel(Int)
-    case fit(minSize: WISize, maxSize: WISize)
+public struct WIImageProcess {
+    public let sizing: WIImageSizing
+    public let crop: WIImageCrop?
+    public let quality: Double?
+    public let output: WIImageOutput
 }
 ```
 
-- `.luban`: default. Downsamples large images using the Luban ratio.
-- `.maxPixel(value)`: caps the longest display side to `value` pixels and never
-  upscales smaller images.
-- `.fit(minSize:maxSize:)`: keeps aspect ratio, upscales only when both display
-  sides are below `minSize`, downscales when either side exceeds `maxSize`, and
-  leaves the image unchanged when it is already within `maxSize` and not below
-  `minSize`. This policy can enlarge small bitmap assets; the core remains
-  UIKit/AppKit-free.
-- `.none`: keeps the source display dimensions.
+Sizing deliberately has only two branches: keep the current pixels or ask a
+`WIImageResizing` implementation for a complete target size. Built-ins include
+`luban`, `maximumPixelSize`, `constrained`, `scaled`, and `exact`. Applications
+can implement `WIImageResizing` when sizing follows product-specific rules.
 
-### Format
+Crop is an optional aspect ratio plus a normalized `WICropAnchor`; it is
+resolved before resizing. Output independently declares representation
+(`preserve`, JPEG, PNG, HEIC, or alpha-aware PNG/JPEG), metadata
+(`strip` / `preserve`), and color space (`preserve` / `convert`).
 
-```swift
-public enum WIJPEGBackground {
-    case disallow
-    case white
-    case black
-    case color(WIColor)
-}
-
-public enum WIFormatPolicy {
-    case preserve
-    case jpeg(background: WIJPEGBackground = .disallow)
-    case pngIfAlphaOtherwiseJPEG
-    case png
-    case heic
-}
-```
-
-- `.preserve`: default. Keeps the source image container.
-- `.jpeg(background:)`: writes JPEG. Transparent sources require `.white`,
-  `.black`, or `.color(WIColor)`; `.disallow` throws instead of silently
-  flattening alpha.
-- `.pngIfAlphaOtherwiseJPEG`: writes PNG when the source has an alpha channel,
-  otherwise writes JPEG.
-- `.png`: writes PNG. The quality policy is ignored because PNG is lossless.
-- `.heic`: writes HEIC when the current platform can encode it.
-
-Explicit format conversion and alpha-aware format selection always rewrite the
-image. The size guard will not return original bytes when the caller requested a
-non-preserving destination policy.
-
-### Metadata
-
-```swift
-public enum WIMetadataPolicy {
-    case strip
-    case preserve
-}
-```
-
-- `.strip`: default. Removes strippable metadata such as Exif/GPS/TIFF/maker
-  dictionaries when rewriting is required.
-- `.preserve`: keeps normal metadata and orientation tags by using the
-  source-copy write path when possible.
-
-When format conversion forces the redraw path, `.preserve` re-attaches ordinary
-metadata dictionaries where ImageIO supports them. Orientation is still baked
-into pixels and reset to `1`, because preserving the original rotation tag after
-redraw would double-rotate readers.
-
-Color profiles are display semantics, not privacy metadata. Display P3 profiles
-are expected to survive both source-copy and redraw paths.
-
-HDR gain maps are not preserved by the initial public release. They require a
-separate policy and test contract because gain maps are auxiliary image data,
-not ordinary Exif/GPS metadata.
-
-### Color Space
-
-```swift
-public enum WIColorSpace {
-    case sRGB
-    case displayP3
-    case iccProfile(Data)
-}
-
-public enum WIOutputColorSpace {
-    case preserve
-    case convert(to: WIColorSpace)
-    case preserveIfSupported(Set<WIColorSpace>, otherwise: WIColorSpace)
-}
-
-public struct WIColor {
-    public var red: Double
-    public var green: Double
-    public var blue: Double
-    public var alpha: Double
-    public var colorSpace: WIColorSpace
-}
-```
-
-- `.preserve`: default. Keeps normal source display semantics. RGB profiles
-  such as Display P3 survive copy and redraw paths when ImageIO can represent
-  them.
-- `.convert(to:)`: redraws into the requested color space. Explicit conversion
-  is never bypassed by the size guard.
-- `.preserveIfSupported(_:otherwise:)`: keeps known supported spaces, such as
-  sRGB and Display P3, and converts unsupported or unknown sources to the
-  fallback.
-
-Color-space inspection is lazy. The default `.preserve` policy does not decode
-pixels only to identify the source profile.
-
-### Quality
-
-```swift
-public enum WIQualityPolicy {
-    case none
-    case compression(Double)
-}
-```
-
-- `.compression(value)`: clamps `value` into `0.0...1.0` and applies it to
-  lossy destination formats such as JPEG and HEIC.
-- `.none`: does not set `kCGImageDestinationLossyCompressionQuality`.
-
-`.none` does not mean lossless and does not promise byte-for-byte output unless
-the write plan can safely return the original data.
-
-PNG is lossless; the quality policy is intentionally a no-op for PNG.
+Quality is a fixed `0...1` value for lossy output, or `nil` to omit an explicit
+ImageIO quality value. PNG remains lossless. Transparent sources converted to
+JPEG require an explicit `WIJPEGBackground`.
 
 ## Target Compression
 
 `WICompressionTarget` is for APIs that need output bytes to satisfy a contract,
-for example "thumbnail data must be under 32 KB." It is separate from
-`WICompressOptions` because the compressor controls quality, dimensions, and
-attempt count internally.
+for example "thumbnail data must be under 32 KB." Unlike Process, the compressor
+controls quality, dimensions, and attempt count internally.
 
 ```swift
 public struct WICompressionTarget {
@@ -395,7 +280,7 @@ All public APIs throw `WICompressError`.
 
 ```swift
 do {
-    let compressedData = try WICompress.compress(data)
+    let compressedData = try WICompress.process(data)
 } catch let error as WICompressError {
     // Decide whether to show an error, retry, or keep the original data.
     print(error)
@@ -438,11 +323,10 @@ For Live Photos, compressing the still image resource alone is not enough: the
 paired video resource and pairing metadata also need to be handled. That belongs
 in a Photos-level workflow, not the v1 ImageIO core.
 
-## Upgrading From 0.x
+## Upgrading to 2.0
 
-WICompress 1.0.0 replaces the old `UIImage`-oriented API with the `Data`/`URL`
-core API shown above. See [CHANGELOG.md](CHANGELOG.md) for the breaking change
-summary.
+WICompress 2.0 replaces the 1.x options and policy surface with the Process and
+Target domains shown above. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 

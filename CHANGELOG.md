@@ -5,6 +5,33 @@ All notable changes to WICompress will be documented in this file.
 The format is based on Keep a Changelog, and this project follows Semantic
 Versioning.
 
+## [2.0.0] - Unreleased
+
+WICompress 2.0 replaces the 1.x policy surface with two explicit product
+domains: deterministic image processing and byte-target compression.
+
+### Added
+
+- `WICompress.process(_:using:)` and its file URL terminal with
+  `WIImageProcess`.
+- Extensible `WIImageResizing`, built-in `WIImageResize` algorithms, and
+  aspect-ratio crop with normalized anchors.
+- Shared `WIImageOutput` requirements for representation, metadata, and color
+  space.
+- Package-only `WIImageIO` and `WIImageRaster` modules.
+
+### Changed
+
+- Target compression now uses `WICompressionSizing` plus the shared
+  `WIImageOutput` and execution-plan boundary.
+- The package requires Swift 6.2 and Xcode 26.
+
+### Removed
+
+- The 1.x `WICompressOptions` terminal and its resize, format, metadata,
+  quality, and color-space policy types.
+- The legacy write-plan resolver and encoder adapter.
+
 ## [1.4.0] - 2026-07-10
 
 Broadens platform support and adds open-source infrastructure. No public API

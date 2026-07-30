@@ -1,5 +1,5 @@
 //
-//  WIColorSpacePolicy.swift
+//  WIColor.swift
 //  WICompress
 //
 //  Created by weixi on 2026/6/27.
@@ -9,7 +9,7 @@
 import Foundation
 import CoreGraphics
 
-/// Output color-space target used by color-space policies.
+/// Concrete color space used by image output and color values.
 public enum WIColorSpace: Sendable, Hashable {
     /// Standard sRGB color space.
     case sRGB
@@ -17,16 +17,6 @@ public enum WIColorSpace: Sendable, Hashable {
     case displayP3
     /// A caller-supplied ICC profile.
     case iccProfile(Data)
-}
-
-/// Output color-space handling policy.
-public enum WIOutputColorSpace: Sendable, Equatable {
-    /// Preserve normal source display semantics.
-    case preserve
-    /// Convert output pixels to a target color space.
-    case convert(to: WIColorSpace)
-    /// Preserve supported source spaces, otherwise convert to a fallback.
-    case preserveIfSupported(Set<WIColorSpace>, otherwise: WIColorSpace)
 }
 
 /// RGB color value with an explicit color space.

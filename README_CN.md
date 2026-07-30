@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Weixi779/WICompress/actions/workflows/ci.yml/badge.svg)](https://github.com/Weixi779/WICompress/actions/workflows/ci.yml)
 ![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-blue)
-![Swift](https://img.shields.io/badge/Swift-6.0%2B-orange)
+![Swift](https://img.shields.io/badge/Swift-6.2%2B-orange)
 ![SPM Support](https://img.shields.io/badge/SPM-Supported-brightgreen)
 ![License](https://img.shields.io/github/license/Weixi779/WICompress)
 
@@ -19,17 +19,20 @@ JPEG、PNG 或 HEIC，或者按 alpha 通道自动选择 PNG / JPEG；默认剥�
 metadata，并且不依赖 `UIImage` / `NSImage`。
 
 ```swift
-let compressedData = try WICompress.compress(originalData)
+let compressedData = try WICompress.process(originalData)
 ```
 
 ```swift
-let uploadData = try WICompress.compress(
+let uploadData = try WICompress.process(
     originalData,
-    options: WICompressOptions(
-        resize: .maxPixel(1600),
-        format: .jpeg(background: .white),
-        metadata: .strip,
-        quality: .compression(0.7)
+    using: WIImageProcess(
+        sizing: .resize(using: WIImageResize.maximumPixelSize(1600)),
+        quality: 0.7,
+        output: WIImageOutput(
+            representation: .jpeg(background: .white),
+            metadata: .strip,
+            colorSpace: .convert(to: .sRGB)
+        )
     )
 )
 ```
@@ -40,7 +43,8 @@ let uploadData = try WICompress.compress(
 - **适合上传的默认值**：Luban resize、metadata strip、JPEG/HEIC 有损质量。
 - **目标约束压缩**：当 SDK 或后端要求明确字节上限时，可以用 `maxBytes`
   搭配 geometry 表达目标。
-- **Resize 策略灵活**：支持 Luban、最长边限制，以及按最小/最大展示尺寸区间 fit。
+- **处理过程可组合**：crop、resizing、quality 和 output 是
+  `WIImageProcess` 中彼此独立的部分。
 - **格式可控**：默认保持源格式，也可以显式输出 JPEG、PNG、HEIC，或按 alpha
   通道有无选择 PNG / JPEG。
 - **透明图转 JPEG 更安全**：必须显式选择白底或黑底，不会偷偷铺底。
@@ -51,13 +55,13 @@ let uploadData = try WICompress.compress(
 ## 系统要求与安装
 
 - iOS 14+ / macOS 11+ / Mac Catalyst 14+ / tvOS 14+ / watchOS 7+ / visionOS 1+
-- Swift 6.0+（Xcode 16+）
+- Swift 6.2+（Xcode 26+）
 
 通过 Swift Package Manager 集成：
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Weixi779/WICompress.git", from: "1.4.0")
+    .package(url: "https://github.com/Weixi779/WICompress.git", from: "2.0.0")
 ]
 ```
 
@@ -88,7 +92,7 @@ target API 分享缩略图示例。前三行优先展示 HEIC，因为这是最�
 示例覆盖：
 
 - `PhotosPicker` 和 `PHPickerViewController` 获取原始图片 `Data`
-- `WICompress.compress(_:)` 压缩
+- `WICompress.process(_:)` 处理
 - 格式检测
 - 原图 / 压缩图预览
 - 文件大小和压缩比展示
@@ -98,42 +102,48 @@ target API 分享缩略图示例。前三行优先展示 HEIC，因为这是最�
 ```swift
 import WICompress
 
-let compressedData = try WICompress.compress(originalData)
+let compressedData = try WICompress.process(originalData)
 ```
 
 压缩文件 URL：
 
 ```swift
-let compressedData = try WICompress.compress(contentsOf: imageURL)
+let compressedData = try WICompress.process(contentsOf: imageURL)
 ```
 
 显式配置：
 
 ```swift
-let compressedData = try WICompress.compress(
+let compressedData = try WICompress.process(
     originalData,
-    options: WICompressOptions(
-        resize: .luban,
-        format: .preserve,
-        metadata: .strip,
-        quality: .compression(0.7)
+    using: WIImageProcess(
+        sizing: .resize(using: WIImageResize.luban),
+        quality: 0.7,
+        output: WIImageOutput(
+            representation: .preserve,
+            metadata: .strip,
+            colorSpace: .preserve
+        )
     )
 )
 ```
 
-把图片资产 fit 到调用方定义的展示尺寸区间：
+在一次操作中裁剪和调整像素尺寸：
 
 ```swift
-let assetData = try WICompress.compress(
+let assetData = try WICompress.process(
     originalData,
-    options: WICompressOptions(
-        resize: .fit(
-            minSize: WISize(width: 40, height: 50),
-            maxSize: WISize(width: 400, height: 467)
+    using: WIImageProcess(
+        sizing: .resize(
+            using: WIImageResize.constrained(
+                within: WIPixelSize(width: 400, height: 467)
+            )
         ),
-        format: .pngIfAlphaOtherwiseJPEG,
-        metadata: .strip,
-        quality: .compression(0.7)
+        crop: .aspectRatio(width: 1, height: 1),
+        quality: 0.7,
+        output: WIImageOutput(
+            representation: .pngIfAlphaOtherwiseJPEG
+        )
     )
 )
 ```
@@ -172,156 +182,46 @@ guard let originalData = try await photosPickerItem.loadTransferable(type: Data.
     throw MyError.missingImageData
 }
 
-let compressedData = try WICompress.compress(originalData)
+let compressedData = try WICompress.process(originalData)
 let previewImage = UIImage(data: compressedData)
 ```
 
 这样调用方不需要同时传入「渲染后的图片」和「原始格式数据」。ImageIO 可以
 直接从原始字节读取格式、尺寸、方向和 metadata。
 
-## Options
+## Image Process
 
-默认配置面向普通上传压缩：
-
-```swift
-WICompressOptions(
-    resize: .luban,
-    format: .preserve,
-    metadata: .strip,
-    quality: .compression(0.6),
-    colorSpace: .preserve
-)
-```
-
-### Resize
+`WIImageProcess` 描述一次确定性的图片处理。默认使用 Luban resize、`0.6`
+quality、保持源容器、移除 metadata，并保留源图色彩语义。
 
 ```swift
-public struct WISize {
-    public var width: Double
-    public var height: Double
-}
-
-public enum WIResizePolicy {
-    case none
-    case luban
-    case maxPixel(Int)
-    case fit(minSize: WISize, maxSize: WISize)
+public struct WIImageProcess {
+    public let sizing: WIImageSizing
+    public let crop: WIImageCrop?
+    public let quality: Double?
+    public let output: WIImageOutput
 }
 ```
 
-- `.luban`：默认值。按 Luban 策略对大图等比下采样。
-- `.maxPixel(value)`：把最长展示边限制到 `value` 像素，不会放大小图。
-- `.fit(minSize:maxSize:)`：保持比例；只有宽高都小于 `minSize` 时才放大；
-  只要任意一边超过 `maxSize` 就缩小，确保输出整体落进 `maxSize`；已经在
-  `maxSize` 内且不满足小图放大条件时不额外缩放。这个策略可以放大小图 bitmap，
-  同时核心仍不依赖 UIKit / AppKit。
-- `.none`：保留源图展示尺寸。
+Sizing 刻意只保留两条分支：保留当前像素尺寸，或者交给一个
+`WIImageResizing` 实现返回完整目标尺寸。内置算法包括 `luban`、
+`maximumPixelSize`、`constrained`、`scaled` 和 `exact`。尺寸受业务规则
+控制时，应用可以自行实现 `WIImageResizing`。
 
-### Format
+Crop 是可选的宽高比与归一化 `WICropAnchor`，先于 resizing 解析。Output
+独立声明 representation（保持源容器、JPEG、PNG、HEIC、按 Alpha 选择
+PNG/JPEG）、metadata（strip / preserve）和 color space（preserve /
+convert）。
 
-```swift
-public enum WIJPEGBackground {
-    case disallow
-    case white
-    case black
-    case color(WIColor)
-}
-
-public enum WIFormatPolicy {
-    case preserve
-    case jpeg(background: WIJPEGBackground = .disallow)
-    case pngIfAlphaOtherwiseJPEG
-    case png
-    case heic
-}
-```
-
-- `.preserve`：默认值。保持源图容器格式。
-- `.jpeg(background:)`：输出 JPEG。透明源图需要显式选择 `.white`、
-  `.black` 或 `.color(WIColor)` 背景；`.disallow` 会抛错，避免偷偷铺底。
-- `.pngIfAlphaOtherwiseJPEG`：源图有 alpha 通道时输出 PNG，否则输出 JPEG。
-- `.png`：输出 PNG。PNG 是无损格式，quality 策略会被忽略。
-- `.heic`：在当前平台支持 HEIC 写出时输出 HEIC。
-
-显式格式转换和按 alpha 自动选择格式都会重写图片。调用方指定了非 preserve 的
-目标格式策略时，size guard 不会再返回原始字节。
-
-### Metadata
-
-```swift
-public enum WIMetadataPolicy {
-    case strip
-    case preserve
-}
-```
-
-- `.strip`：默认值。重写图片时剥离 Exif / GPS / TIFF / maker notes 等可剥离 metadata。
-- `.preserve`：尽量保留普通 metadata 和 orientation tag，内部会优先走 source-copy 写入路径。
-
-如果格式转换强制走 redraw path，`.preserve` 会尽量重新附加普通 metadata
-字典。方向信息仍会被烘焙进像素并重置为 `1`，否则读取方会对已经旋转过的像素
-再次旋转。
-
-色彩 profile 不是 Exif/GPS 这类隐私 metadata，而是显示语义的一部分。
-Display P3 profile 在 `copyFromSource` 和 `redrawBitmap` 两条路径下都应该保留。
-
-初始公开版不承诺保留 HDR gain map。Gain map 是辅助图像数据，不是普通
-Exif/GPS 字典，后续需要单独的 policy 和测试契约。
-
-### Color Space
-
-```swift
-public enum WIColorSpace {
-    case sRGB
-    case displayP3
-    case iccProfile(Data)
-}
-
-public enum WIOutputColorSpace {
-    case preserve
-    case convert(to: WIColorSpace)
-    case preserveIfSupported(Set<WIColorSpace>, otherwise: WIColorSpace)
-}
-
-public struct WIColor {
-    public var red: Double
-    public var green: Double
-    public var blue: Double
-    public var alpha: Double
-    public var colorSpace: WIColorSpace
-}
-```
-
-- `.preserve`：默认值。保留正常的源图显示语义。ImageIO 能表达时，
-  Display P3 这类 RGB profile 会在 copy 和 redraw 路径下保留。
-- `.convert(to:)`：重绘到指定色彩空间。显式色彩转换不会被 size guard 绕过。
-- `.preserveIfSupported(_:otherwise:)`：保留已知支持的色彩空间，例如 sRGB 和
-  Display P3；不支持或未知的源图会转换到 fallback。
-
-色彩空间检查是惰性的。默认 `.preserve` 策略不会为了识别源 profile 额外解码像素。
-
-### Quality
-
-```swift
-public enum WIQualityPolicy {
-    case none
-    case compression(Double)
-}
-```
-
-- `.compression(value)`：内部 clamp 到 `0.0...1.0`，只对 JPEG / HEIC 这类有损格式生效。
-- `.none`：不设置 `kCGImageDestinationLossyCompressionQuality`。
-
-`.none` 不等于无损，也不等于一定原样返回。真正原样返回只会在当前 options
-允许且原始 data 已满足所有可观察 policy 时发生。
-
-PNG 是无损格式，quality 对 PNG 不会被理解为有损压缩。
+Quality 对有损输出使用固定的 `0...1` 值；传 `nil` 表示不显式设置 ImageIO
+quality。PNG 始终无损。透明源图转换为 JPEG 时必须显式选择
+`WIJPEGBackground`。
 
 ## Target Compression
 
 `WICompressionTarget` 用来表达“输出必须满足某个目标契约”的压缩，例如
-“缩略图 data 必须小于 32KB”。它和 `WICompressOptions` 分开建模，因为这类
-压缩需要库在内部控制 quality、尺寸和尝试次数。
+“缩略图 data 必须小于 32KB”。它与 Process 不同：quality、尺寸和尝试次数
+由压缩器在内部控制。
 
 ```swift
 public struct WICompressionTarget {
@@ -364,7 +264,7 @@ public API 使用 `throws`：
 
 ```swift
 do {
-    let compressedData = try WICompress.compress(data)
+    let compressedData = try WICompress.process(data)
 } catch let error as WICompressError {
     print(error)
 }
@@ -406,10 +306,10 @@ Live Photo 不是单张图片压缩。它至少包含 still photo resource、pai
 resource，以及二者之间的配对 metadata。首版 ImageIO core 只处理单张 still
 image data，不处理 Photos 层的资源配对。
 
-## 从 0.x 升级
+## 升级到 2.0
 
-WICompress 1.0.0 用上文展示的 `Data` / `URL` 核心 API 替换旧的
-`UIImage` API。破坏性变更摘要见 [CHANGELOG.md](CHANGELOG.md)。
+WICompress 2.0 使用上文的 Process 与 Target domain 替换 1.x options /
+policy API。版本说明见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可证
 

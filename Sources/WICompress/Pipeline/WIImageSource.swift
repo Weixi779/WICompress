@@ -91,25 +91,6 @@ final class WIImageSource {
         }
     }
 
-    func colorSpaceInfoIfNeeded(
-        for policy: WIOutputColorSpace
-    ) throws(WICompressError) -> WISourceColorSpaceInfo? {
-        guard policy.requiresSourceColorSpaceInspection else {
-            return nil
-        }
-
-        let colorSpace: WIImageIO.WIImageColorSpace?
-        do {
-            colorSpace = try imageIOSource.colorSpace()
-        } catch {
-            throw Self.map(error)
-        }
-
-        return WISourceColorSpaceInfo(
-            colorSpace: colorSpace.map(WIColorSpace.init)
-        )
-    }
-
     func processColorSpaceInfoIfNeeded(
         for decision: WIImageColorSpace
     ) throws(WICompressError) -> WISourceColorSpaceInfo? {
@@ -177,17 +158,6 @@ private extension WIColorSpace {
             self = .displayP3
         case .iccProfile(let data):
             self = .iccProfile(data)
-        }
-    }
-}
-
-private extension WIOutputColorSpace {
-    var requiresSourceColorSpaceInspection: Bool {
-        switch self {
-        case .preserve:
-            return false
-        case .convert, .preserveIfSupported:
-            return true
         }
     }
 }

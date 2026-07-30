@@ -43,49 +43,6 @@ public struct WICompress: Sendable {
         )
     }
 
-    /// Compresses image data according to the supplied options.
-    public static func compress(
-        _ data: Data,
-        options: WICompressOptions = .default
-    ) throws(WICompressError) -> Data {
-        let imageSource = try WIImageSource(data: data)
-        let sourceColorSpace = try imageSource.colorSpaceInfoIfNeeded(for: options.colorSpace)
-        let writePlan = try WIWritePlanResolver.resolve(
-            options: options,
-            info: imageSource.info,
-            sourceColorSpace: sourceColorSpace
-        )
-        let encodedData = try WIImageEncoder.encode(imageSource, plan: writePlan)
-
-        if writePlan.path != .returnOriginal,
-           encodedData.count >= data.count,
-           WIWritePlanResolver.canReturnOriginalForSizeGuard(
-                options: options,
-                info: imageSource.info,
-                sourceColorSpace: sourceColorSpace
-           ) {
-            // Never trade policy correctness for bytes saved.
-            return data
-        }
-
-        return encodedData
-    }
-
-    /// Reads and compresses image data from a file URL.
-    public static func compress(
-        contentsOf url: URL,
-        options: WICompressOptions = .default
-    ) throws(WICompressError) -> Data {
-        let data: Data
-        do {
-            data = try Data(contentsOf: url)
-        } catch {
-            throw WICompressError.fileReadFailed(url)
-        }
-
-        return try compress(data, options: options)
-    }
-
     /// Compresses image data to satisfy a target contract.
     public static func compress(
         _ data: Data,

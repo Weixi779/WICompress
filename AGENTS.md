@@ -78,9 +78,7 @@ Sources/WICompress/
   Algorithm/
 ```
 
-During the 2.0 migration, the new Process entry and the two 1.x entry shapes
-coexist. `process(_:using:)` is the forward, deterministic `Data`/`URL` in,
-`Data` out path:
+Process is the deterministic `Data`/`URL` in, `Data` out path:
 
 ```text
 Data / URL + WIImageProcess
@@ -99,26 +97,15 @@ Data / URL + WIImageProcess
 The Process file terminal keeps a file-backed ImageIO source. It reads the
 complete original bytes only when a return-original operation needs them.
 
-The legacy Process-based `compress(_:options:)` remains temporarily:
-
-```text
-Data / URL
-  -> WIImageSource (Inspect)        decode source, read WIImageInfo (no UIKit)
-  -> WIWritePlanResolver            map (options, info) -> WIWritePlan + write path
-  -> WIImageEncoder (Execute)       run the chosen write path
-  -> size guard                     return original if re-encode did not help and policy allows
-  -> Data
-```
-
 Target-based `compress(_:to:)` declares an output contract (`maxBytes` plus
-geometry/output) and returns a `WICompressionResult`:
+sizing/output) and returns a `WICompressionResult`:
 
 ```text
 Data / URL + WICompressionTarget
   -> WICompressionTargetValidator   reject illegal targets up front
   -> passthrough check              return original when it already satisfies the target
   -> WICompressionSolver            iterative search: shrink (outer) + quality (inner)
-       uses WICompressionTargetResolver to build each WIWritePlan
+       uses WICompressionTargetResolver to build each WIExecutionPlan
        uses Algorithm/ math (size estimation, layout, ranking)
   -> hard byte check                never return data above maxBytes
   -> WICompressionResult
@@ -126,21 +113,20 @@ Data / URL + WICompressionTarget
 
 Key types:
 
-1. **WICompress** - public API: `process(_:using:)`, legacy
-   `compress(_:options:)`, and target `compress(_:to:)`.
+1. **WICompress** - public Process `process(_:using:)` and Target
+   `compress(_:to:)` terminals for `Data` and file `URL`.
 2. **WIImageProcess** - immutable forward-processing description with sizing,
    optional aspect-ratio crop, fixed lossy quality, and `WIImageOutput`.
 3. **WIImageResizing** / **WIImageResize** - complete pixel-size decision slot
    and built-in Luban, boundary, scale, and exact-size implementations.
-4. **WICompressOptions** - legacy `resize` / `format` / `metadata` / `quality` policies
-   (see `WIResizePolicy`, `WIFormatPolicy`, `WIJPEGBackground`,
-   `WIMetadataPolicy`, `WIQualityPolicy`).
+4. **WIImageOutput** - shared representation, metadata, and color-space
+   requirements used by both Process and Target.
 5. **WIImageSource** / **WIImageInfo** - ImageIO source wrapper and inspected facts
    (format, pixel size, orientation, frame count, alpha, gain map, writability).
 6. **WIExecutionPlan** - resolved Process execution facts; it contains no
    resizing algorithm, crop intent, or public Policy.
-7. **WIWritePlanResolver** / **WIWritePlan** - the legacy Process decision core.
-   Picks one of `returnOriginal` / `copyFromSource` / `redrawBitmap`.
+7. **WIImageProcessResolver** - resolves Process input into a shared
+   `WIExecutionPlan`.
 8. **WIImageEncoder** - executes resolved plans through WIImageIO and WIImageRaster.
 9. **WIImageFormat** - `UTType`-based container detection (JPEG/PNG/HEIF/unknown).
 10. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
@@ -157,30 +143,28 @@ Key types:
 
 ## Key Implementation Details
 
-- **Two ImageIO write paths**: `copyFromSource` preserves metadata/orientation
-  tags and is used for `.metadata(.preserve)`. `redrawBitmap` downsamples via
-  `CGImageSourceCreateThumbnailAtIndex` with transform, bakes orientation, and
-  resets the tag to 1; it is used for the default `.strip` upload path.
-- **Explicit format conversion**: `.format(.jpeg/.png/.heic)` always uses
-  `redrawBitmap` and never returns the original through the size guard. JPEG
-  conversion rejects transparent sources by default; callers must choose
+- **Resolved operations**: `copyFromSource` preserves metadata/orientation tags;
+  `render` bakes orientation, crop, sizing, color conversion, and backgrounds
+  into pixels; `returnOriginal` is used only when every observable requirement
+  already holds.
+- **Explicit format conversion**: JPEG/PNG/HEIC output always rewrites the
+  image. JPEG conversion rejects transparent sources by default; callers choose
   `.jpeg(background: .white/.black)` to flatten alpha intentionally.
 - **UIKit-free / cross-platform core**: no `#if os(iOS)`, no UIKit/CoreImage.
   Builds and is fully tested on macOS via `swift test`.
 - **Typed throws**: the whole throwing surface uses `throws(WICompressError)`.
   Builds cleanly under Swift 6 language mode and strict concurrency; public
   types are `Sendable`.
-- **Resize policies**: Luban ratio is computed from EXIF-oriented display
+- **Image resizing**: Luban ratio is computed from EXIF-oriented display
   dimensions. The default long-image branch constrains the short side
   (`ceil(shortSide / 1280)`), matching original Luban. Dividing the long side
-  over-shrinks panoramas and long screenshots. `.maxPixel(Int)` caps the longest
-  display side and never upscales.
+  over-shrinks panoramas and long screenshots. `maximumPixelSize(_:)` caps the
+  longest display side and never upscales.
 - **Format/quality coupling**: quality is only written for lossy destinations
   (JPEG/HEIC). PNG ignores it. Writability is checked at runtime via
   `CGImageDestinationCopyTypeIdentifiers()`.
-- **Size guard**: never returns the original if it would violate a policy, for
-  example `.strip` must not hand back a GPS-bearing original, and explicit
-  destination formats must not hand back source-format bytes.
+- **Passthrough**: never returns the original if it would violate Process or
+  Target output requirements.
 - **Error handling**: throws `WICompressError`, never returns optional/nil.
 
 ## Code Style
@@ -224,9 +208,9 @@ Tests are organized by `@Suite` and filtered by `@Tag`:
 |---|---|
 | `.luban` | Luban algorithm logic (`WILuban.ratio`, `WILuban.ensureEven`) |
 | `.format` | Image format detection (`WIImageFormat`) |
-| `.compression` | Compression and resize behavior (`WICompress` public API) |
-| `.imageIOCore` | ImageIO core: write-path resolution, encoder, real-image contracts |
-| `.publicAPI` | Public surface: options defaults, error mapping, entry points |
+| `.compression` | Process and Target behavior (`WICompress` public API) |
+| `.imageIOCore` | ImageIO core: execution resolution, encoder, real-image contracts |
+| `.publicAPI` | Public surface: defaults, error mapping, entry points |
 | `.edgeCase` | Boundary values and edge inputs |
 | `.algorithm` | Pure target-search math (`WICompressionSizeEstimation`, `WICompressionRanking`) |
 

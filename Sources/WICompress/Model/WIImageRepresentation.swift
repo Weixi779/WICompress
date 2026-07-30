@@ -1,5 +1,5 @@
 //
-//  WIFormatPolicy.swift
+//  WIImageRepresentation.swift
 //  WICompress
 //
 //  Created by weixi on 2026/6/22.
@@ -33,6 +33,3 @@ public enum WIImageRepresentation: Sendable, Equatable {
     /// Encode the output as HEIC.
     case heic
 }
-
-/// Legacy name retained while the 1.x Process surface is being removed.
-public typealias WIFormatPolicy = WIImageRepresentation

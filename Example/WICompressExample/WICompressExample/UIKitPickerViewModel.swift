@@ -45,9 +45,9 @@ final class UIKitPickerViewModel {
         logger.info("Raw data prefix: \(hexString)")
         
         do {
-            let compressedData = try WICompress.compress(
+            let compressedData = try WICompress.process(
                 imageGroup.rawData,
-                options: WICompressOptions(quality: .compression(0.7))
+                using: WIImageProcess(quality: 0.7)
             )
             guard let compressedUIImage = UIImage(data: compressedData) else {
                 logger.error("Compression output could not be decoded!")

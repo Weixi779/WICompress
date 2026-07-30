@@ -43,8 +43,7 @@ Implementation status:
   `WIImageEncoder`.
 - Completed: synchronous `WIImageProcess` vertical slice with public
   `WIPixelSize`, resizing slot and built-ins, aspect-ratio crop, shared Output
-  values, pure geometry resolution, and a resolved execution plan independent
-  of `WICompressOptions`.
+  values, pure geometry resolution, and a resolved execution plan.
 - Completed: file-backed Process URL execution, on-demand original-byte reads,
   two-axis-safe thumbnail sampling, and overflow validation before Raster.
 - Completed: Target now uses the shared `WIImageOutput`; its frozen default is
@@ -54,9 +53,8 @@ Implementation status:
   resolves crop and base size once, and drives the shared `WIExecutionPlan`
   directly. The old public geometry/preference/canvas domain and transitional
   `WIWritePlan` adapter have been removed.
-- In migration: the 1.x Process surface remains available as a compatibility
-  guard while the new Process path is reviewed; it will be removed before the
-  2.0 cut rather than maintained as a second architecture.
+- Completed: the 1.x Options/Policy terminals, legacy resolver, and write-plan
+  adapter have been removed rather than maintained as a second architecture.
 - Next: add the Swift 6.2 asynchronous terminals over the same synchronous
   execution core.
 
