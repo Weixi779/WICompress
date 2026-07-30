@@ -73,12 +73,33 @@ Sources/WICompress/
   WICompress.swift
   Model/
   Policies/
+  Process/
   Pipeline/
   Algorithm/
 ```
 
-There are two public entry points. Process-based `compress(_:options:)` is
-`Data`/`URL` in, `Data` out:
+During the 2.0 migration, the new Process entry and the two 1.x entry shapes
+coexist. `process(_:using:)` is the forward, deterministic `Data`/`URL` in,
+`Data` out path:
+
+```text
+Data / URL + WIImageProcess
+  -> WIImageSource
+  -> WIImageProcessResolver
+       crop -> WIImageResizing -> resolved geometry
+       output + quality -> WIExecutionPlan
+  -> WIImageEncoder
+       no crop shrink -> two-axis-safe ImageIO thumbnail
+       axis upscaling -> full source
+       crop -> oriented source + WIImageRaster
+       encode -> WIImageIO
+  -> Data
+```
+
+The Process file terminal keeps a file-backed ImageIO source. It reads the
+complete original bytes only when a return-original operation needs them.
+
+The legacy Process-based `compress(_:options:)` remains temporarily:
 
 ```text
 Data / URL
@@ -105,21 +126,27 @@ Data / URL + WICompressionTarget
 
 Key types:
 
-1. **WICompress** - public API: `compress(_:options:) throws(WICompressError) -> Data`
-   and `compress(contentsOf:options:)`.
-2. **WICompressOptions** - `resize` / `format` / `metadata` / `quality` policies
+1. **WICompress** - public API: `process(_:using:)`, legacy
+   `compress(_:options:)`, and target `compress(_:to:)`.
+2. **WIImageProcess** - immutable forward-processing description with sizing,
+   optional aspect-ratio crop, fixed lossy quality, and `WIImageOutput`.
+3. **WIImageResizing** / **WIImageResize** - complete pixel-size decision slot
+   and built-in Luban, boundary, scale, and exact-size implementations.
+4. **WICompressOptions** - legacy `resize` / `format` / `metadata` / `quality` policies
    (see `WIResizePolicy`, `WIFormatPolicy`, `WIJPEGBackground`,
    `WIMetadataPolicy`, `WIQualityPolicy`).
-3. **WIImageSource** / **WIImageInfo** - ImageIO source wrapper and inspected facts
+5. **WIImageSource** / **WIImageInfo** - ImageIO source wrapper and inspected facts
    (format, pixel size, orientation, frame count, alpha, gain map, writability).
-4. **WIWritePlanResolver** / **WIWritePlan** - the decision core. Picks one of
+6. **WIExecutionPlan** - resolved Process execution facts; it contains no
+   resizing algorithm, crop intent, or public Policy.
+7. **WIWritePlanResolver** / **WIWritePlan** - the legacy/Target decision core. Picks one of
    `returnOriginal` / `copyFromSource` / `redrawBitmap` / `redrawCanvas`
    (the last bakes fit/fill/exact-canvas geometry for the target API).
-5. **WIImageEncoder** - executes the plan via `CGImageDestination`.
-6. **WIImageFormat** - `UTType`-based container detection (JPEG/PNG/HEIF/unknown).
-7. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
-8. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
-9. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
+8. **WIImageEncoder** - executes resolved plans through WIImageIO and WIImageRaster.
+9. **WIImageFormat** - `UTType`-based container detection (JPEG/PNG/HEIF/unknown).
+10. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
+11. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
+12. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
    (`geometry` / `output` / `preference`) returning `WICompressionResult`.
    `WICompressionTargetValidator` checks legality, `WICompressionTargetResolver`
    builds the write plan, and `WICompressionSolver` runs the byte-budget search.

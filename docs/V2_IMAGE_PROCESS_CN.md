@@ -1,6 +1,7 @@
 # WICompress 2.0 Image Process
 
-状态：Process Domain 行为合同已冻结；最终 Swift 拼写在实施设计阶段确认。
+状态：Process Domain、同步 Swift API 与执行边界已落地；异步 terminal 和 1.x
+Process 删除尚未实施。
 
 本文记录 `WIImageProcess` 正向处理产品线已经接受的职责、尺寸插槽、裁切语义、
 输出组合与执行边界。1.x 事实和调研证据保留在
@@ -47,7 +48,45 @@ WIImageProcess
 ```
 
 这些分组表达不同所有者和组合关系，不再合并为一个 `Policy`。最终类型名、初始化器标签
-和默认参数可以在 API 实施设计中调整，但不能改变本文的可观察语义。
+和默认参数已经由 Phase 4 同步纵向切片确认。
+
+## Swift API
+
+同步入口保持静态 facade，Process 本身只是一份不可变描述：
+
+```swift
+let process = WIImageProcess(
+    sizing: .resize(
+        using: WIImageResize.constrained(
+            within: WIPixelSize(width: 2_048, height: 2_048)
+        )
+    ),
+    crop: .aspectRatio(width: 1, height: 1, anchor: .center),
+    quality: 0.7,
+    output: WIImageOutput(
+        representation: .pngIfAlphaOtherwiseJPEG,
+        metadata: .strip,
+        colorSpace: .convert(to: .sRGB)
+    )
+)
+
+let data = try WICompress.process(sourceData, using: process)
+```
+
+文件入口使用同一 Process：
+
+```swift
+let data = try WICompress.process(contentsOf: url, using: process)
+```
+
+文件 terminal 直接建立 file-backed ImageIO source，不在入口处读取完整 `Data`。
+只有 passthrough 需要返回原始 bytes 时，才按需读取文件；decode、thumbnail、copy 和
+encode 路径继续由 URL source 驱动。
+
+`WIImageResize` 提供 `.luban`、`.maximumPixelSize(_:)`、
+`.constrained(within:allowingUpscaling:)`、`.scaled(by:)` 和 `.exact(_:)`。
+调用方也可以直接实现 `WIImageResizing`。这些便利实现不会扩展
+`WIImageSizing` 的核心 case。
 
 ## Sizing 与 Resizing 插槽
 
@@ -81,8 +120,9 @@ point 或 Target solver context。
 Domain。压缩向的内置实现默认只缩小；只有名称和调用显式表达允许放大时，才接受大于输入
 的结果。
 
-Execution Core 会验证返回尺寸为正数、算术没有溢出并符合当前操作合同。无效尺寸明确
-失败，不 silent clamp，也不由 Raster 层再次解释。
+Execution Core 会验证返回尺寸为正数，并按 Raster 的 64-byte row alignment 规则检查
+row bytes 与总 bitmap bytes 的算术溢出。无效尺寸明确失败，不 silent clamp，也不由
+Raster 层再次解释。固定内存预算仍属于后续资源策略，不在这一层暗中引入。
 
 ## Cropping
 
@@ -200,7 +240,31 @@ async terminal -> 在非 caller-actor 的执行上下文完成相同工作
 ```
 
 配置本身没有 async 版本。inspect、crop、resize 和 encode 也不分别成为 public
-suspension point。最终 base name、overload 和 Swift 6.2 并发标注在实施设计阶段确认。
+suspension point。
+
+当前同步 base name 已确认为 `WICompress.process(_:using:)` 与
+`WICompress.process(contentsOf:using:)`。异步 overload 尚未加入；它必须消费同一个
+`WIImageProcessResolver -> WIExecutionPlan -> WIImageEncoder` 核心，不能建立第二套
+resolver 或改变执行语义。
+
+## 当前实施状态
+
+- 已实现 public `WIPixelSize`、`WIImageResizing`、内置 `WIImageResize`、
+  `WIImageSizing`、aspect-ratio crop/anchor、`WIImageOutput` 和
+  `WIImageProcess`。
+- 已实现纯 `crop -> resizing` geometry resolver；无效 quality、crop 和 resizing
+  结果明确失败。
+- 已实现同步 Data/file terminal 和独立 `WIExecutionPlan`；新 Process 不经过
+  `WICompressOptions` 或 `WIWritePlanResolver`。
+- 无 crop 的缩小复用 ImageIO thumbnail；thumbnail max pixel 由目标宽、高两个轴
+  共同反推，不能先把任一目标轴所需的源样本降掉再放大。需要放大任一轴时使用完整
+  source。crop 使用完整 oriented source，并在 Raster 中把
+  crop/resize/color/background 融合成一次绘制。
+- file terminal 保持 file-backed source；只有 return-original passthrough 才按需
+  读取完整原始 `Data`。
+- 1.x `compress(_:options:)`、旧 Policy 名称与 Target path 暂时保留为迁移护栏。
+- 尚未实现 async terminal，也尚未把 `WICompressionTarget` 迁移到共享
+  `WIImageOutput` / `WIExecutionPlan`。
 
 ## 已接受
 

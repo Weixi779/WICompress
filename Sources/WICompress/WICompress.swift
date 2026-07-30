@@ -11,6 +11,38 @@ import Foundation
 /// ImageIO-backed image compression entry point.
 public struct WICompress: Sendable {
 
+    /// Processes image data according to one immutable Process description.
+    public static func process(
+        _ data: Data,
+        using process: WIImageProcess = .default
+    ) throws(WICompressError) -> Data {
+        let imageSource = try WIImageSource(data: data)
+        return try self.process(imageSource, using: process)
+    }
+
+    /// Reads and processes image data from a file URL.
+    public static func process(
+        contentsOf url: URL,
+        using process: WIImageProcess = .default
+    ) throws(WICompressError) -> Data {
+        let imageSource = try WIImageSource(contentsOf: url)
+        return try self.process(imageSource, using: process)
+    }
+
+    private static func process(
+        _ imageSource: WIImageSource,
+        using process: WIImageProcess
+    ) throws(WICompressError) -> Data {
+        let executionPlan = try WIImageProcessResolver.resolve(
+            process,
+            imageSource: imageSource
+        )
+        return try WIImageEncoder.encode(
+            imageSource,
+            plan: executionPlan
+        )
+    }
+
     /// Compresses image data according to the supplied options.
     public static func compress(
         _ data: Data,

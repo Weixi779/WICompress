@@ -8,12 +8,12 @@
 
 import Foundation
 
-/// Integer pixel size used internally by rendering and encoding plans.
-struct WIPixelSize: Sendable, Equatable {
-    var width: Int
-    var height: Int
+/// A two-dimensional size measured in pixels.
+public struct WIPixelSize: Sendable, Hashable {
+    public let width: Int
+    public let height: Int
 
-    init(width: Int, height: Int) {
+    public init(width: Int, height: Int) {
         self.width = width
         self.height = height
     }

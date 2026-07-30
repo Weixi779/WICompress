@@ -8,10 +8,13 @@
 
 import Foundation
 
-/// Metadata handling policy.
-public enum WIMetadataPolicy: Sendable, Equatable {
+/// Metadata handling applied to encoded output.
+public enum WIImageMetadata: Sendable, Equatable {
     /// Strip non-display metadata such as Exif and GPS.
     case strip
     /// Preserve source metadata where ImageIO supports it.
     case preserve
 }
+
+/// Legacy name retained while the 1.x Process surface is being removed.
+public typealias WIMetadataPolicy = WIImageMetadata

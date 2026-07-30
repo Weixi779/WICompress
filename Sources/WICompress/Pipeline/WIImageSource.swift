@@ -10,12 +10,17 @@ import Foundation
 import WIImageIO
 
 final class WIImageSource {
-    let data: Data
+    enum Backing {
+        case data(Data)
+        case file(URL)
+    }
+
+    let backing: Backing
     let info: WIImageInfo
 
     let imageIOSource: WIImageIO.WIImageSource
 
-    init(data: Data) throws(WICompressError) {
+    convenience init(data: Data) throws(WICompressError) {
         let imageIOSource: WIImageIO.WIImageSource
         do {
             imageIOSource = try WIImageIO.WIImageSource(data: data)
@@ -23,12 +28,36 @@ final class WIImageSource {
             throw Self.map(error)
         }
 
+        try self.init(
+            backing: .data(data),
+            imageIOSource: imageIOSource
+        )
+    }
+
+    convenience init(contentsOf url: URL) throws(WICompressError) {
+        let imageIOSource: WIImageIO.WIImageSource
+        do {
+            imageIOSource = try WIImageIO.WIImageSource(contentsOf: url)
+        } catch {
+            throw Self.map(error)
+        }
+
+        try self.init(
+            backing: .file(url),
+            imageIOSource: imageIOSource
+        )
+    }
+
+    private init(
+        backing: Backing,
+        imageIOSource: WIImageIO.WIImageSource
+    ) throws(WICompressError) {
         let descriptor = imageIOSource.descriptor
         guard descriptor.frameCount == 1 else {
             throw .animatedSourceUnsupported(frameCount: descriptor.frameCount)
         }
 
-        self.data = data
+        self.backing = backing
         self.imageIOSource = imageIOSource
         self.info = WIImageInfo(
             sourceFormat: WIImageFormat(descriptor.format),
@@ -45,10 +74,42 @@ final class WIImageSource {
         )
     }
 
+    func originalData() throws(WICompressError) -> Data {
+        switch backing {
+        case .data(let data):
+            return data
+        case .file(let url):
+            do {
+                return try Data(contentsOf: url)
+            } catch {
+                throw .fileReadFailed(url)
+            }
+        }
+    }
+
     func colorSpaceInfoIfNeeded(
         for policy: WIOutputColorSpace
     ) throws(WICompressError) -> WISourceColorSpaceInfo? {
         guard policy.requiresSourceColorSpaceInspection else {
+            return nil
+        }
+
+        let colorSpace: WIImageIO.WIImageColorSpace?
+        do {
+            colorSpace = try imageIOSource.colorSpace()
+        } catch {
+            throw Self.map(error)
+        }
+
+        return WISourceColorSpaceInfo(
+            colorSpace: colorSpace.map(WIColorSpace.init)
+        )
+    }
+
+    func processColorSpaceInfoIfNeeded(
+        for decision: WIImageColorSpace
+    ) throws(WICompressError) -> WISourceColorSpaceInfo? {
+        guard case .convert = decision else {
             return nil
         }
 

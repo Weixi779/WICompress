@@ -12,10 +12,53 @@ import WIImageIO
 import WIImageRaster
 
 enum WIImageEncoder {
+    static func encode(
+        _ imageSource: WIImageSource,
+        plan: WIExecutionPlan
+    ) throws(WICompressError) -> Data {
+        switch plan.operation {
+        case .returnOriginal:
+            return try imageSource.originalData()
+        case .copyFromSource:
+            do {
+                return try imageSource.imageIOSource.copy(
+                    as: plan.destinationTypeIdentifier,
+                    options: WIImageCopyOptions(
+                        compressionQuality: plan.quality
+                    )
+                )
+            } catch {
+                throw map(error, destinationFormat: plan.destinationFormat)
+            }
+        case .render(let geometry):
+            let image = try render(
+                imageSource,
+                geometry: geometry,
+                destinationFormat: plan.destinationFormat,
+                jpegBackground: plan.jpegBackground,
+                outputColorSpace: plan.outputColorSpace
+            )
+            do {
+                return try WIImageTranscoder.encode(
+                    image,
+                    as: plan.destinationTypeIdentifier,
+                    options: WIImageEncodeOptions(
+                        compressionQuality: plan.quality
+                    ),
+                    preservingMetadataFrom: plan.metadata == .preserve
+                        ? imageSource.imageIOSource
+                        : nil
+                )
+            } catch {
+                throw map(error, destinationFormat: plan.destinationFormat)
+            }
+        }
+    }
+
     static func encode(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
         switch plan.path {
         case .returnOriginal:
-            return imageSource.data
+            return try imageSource.originalData()
         case .copyFromSource:
             return try encodeFromSource(imageSource, plan: plan)
         case .redrawBitmap:
@@ -44,6 +87,134 @@ enum WIImageEncoder {
         plan: WIWritePlan
     ) throws(WICompressError) -> Data {
         try encodeRenderedImage(image, imageSource: imageSource, plan: plan)
+    }
+
+    private static func render(
+        _ imageSource: WIImageSource,
+        geometry: WIResolvedRender,
+        destinationFormat: WIImageFormat,
+        jpegBackground: WIJPEGBackground?,
+        outputColorSpace: WIResolvedOutputColorSpace
+    ) throws(WICompressError) -> CGImage {
+        let sourceImage: CGImage
+        let sourceRect: WIRect
+        let orientation: WIImageRaster.Orientation
+        if usesFullOrientedSource(geometry, info: imageSource.info) {
+            if let maximumPixelSize = thumbnailMaximumPixelSize(
+                for: geometry,
+                info: imageSource.info
+            ) {
+                do {
+                    sourceImage = try imageSource.imageIOSource.thumbnail(
+                        options: WIThumbnailOptions(
+                            maximumPixelSize: maximumPixelSize
+                        )
+                    )
+                } catch {
+                    throw map(error, destinationFormat: destinationFormat)
+                }
+                sourceRect = WIRect(
+                    x: 0,
+                    y: 0,
+                    width: Double(sourceImage.width),
+                    height: Double(sourceImage.height)
+                )
+                orientation = .up
+            } else {
+                do {
+                    sourceImage = try imageSource.imageIOSource.image()
+                } catch {
+                    throw map(error, destinationFormat: destinationFormat)
+                }
+                sourceRect = geometry.sourceRect
+                guard let sourceOrientation = WIImageRaster.Orientation(
+                    rawValue: imageSource.info.orientation
+                ) else {
+                    throw .imageInfoUnavailable
+                }
+                orientation = sourceOrientation
+            }
+        } else {
+            do {
+                sourceImage = try imageSource.imageIOSource.image()
+            } catch {
+                throw map(error, destinationFormat: destinationFormat)
+            }
+            sourceRect = geometry.sourceRect
+            guard let sourceOrientation = WIImageRaster.Orientation(
+                rawValue: imageSource.info.orientation
+            ) else {
+                throw .imageInfoUnavailable
+            }
+            orientation = sourceOrientation
+        }
+
+        return try rasterImage(
+            sourceImage,
+            plan: WIImageRaster.Plan(
+                canvasSize: rasterPixelSize(geometry.canvasSize),
+                sourceRect: WIImageRaster.Rect(
+                    x: sourceRect.x,
+                    y: sourceRect.y,
+                    width: sourceRect.width,
+                    height: sourceRect.height
+                ),
+                destinationRect: WIImageRaster.Rect(
+                    x: geometry.destinationRect.x,
+                    y: geometry.destinationRect.y,
+                    width: geometry.destinationRect.width,
+                    height: geometry.destinationRect.height
+                ),
+                orientation: orientation,
+                alphaMode: rasterAlphaMode(
+                    destinationFormat: destinationFormat
+                ),
+                canvasBackground: geometry.canvasBackground.map(rasterColor),
+                imageBackground: rasterJPEGBackground(from: jpegBackground),
+                colorSpace: rasterColorSpace(from: outputColorSpace)
+            )
+        )
+    }
+
+    private static func thumbnailMaximumPixelSize(
+        for geometry: WIResolvedRender,
+        info: WIImageInfo
+    ) -> Int? {
+        let widthScale = geometry.destinationRect.width
+            / Double(info.displayWidth)
+        let heightScale = geometry.destinationRect.height
+            / Double(info.displayHeight)
+        let requiredScale = max(widthScale, heightScale)
+        guard requiredScale < 1 else {
+            return nil
+        }
+
+        let sourceMaximumPixelSize = max(
+            info.displayWidth,
+            info.displayHeight
+        )
+        guard let requiredMaximumPixelSize = Int(
+            exactly: (Double(sourceMaximumPixelSize) * requiredScale)
+                .rounded(.up)
+        ) else {
+            return nil
+        }
+        return min(
+            max(requiredMaximumPixelSize, 1),
+            sourceMaximumPixelSize
+        )
+    }
+
+    private static func usesFullOrientedSource(
+        _ geometry: WIResolvedRender,
+        info: WIImageInfo
+    ) -> Bool {
+        geometry.sourceRect == WIRect(
+            x: 0,
+            y: 0,
+            width: Double(info.displayWidth),
+            height: Double(info.displayHeight)
+        )
     }
 
     private static func encodeFromSource(_ imageSource: WIImageSource, plan: WIWritePlan) throws(WICompressError) -> Data {
@@ -183,7 +354,13 @@ enum WIImageEncoder {
     private static func rasterAlphaMode(
         for plan: WIWritePlan
     ) -> WIImageRaster.AlphaMode {
-        plan.destinationFormat == .jpeg ? .opaque : .preserve
+        rasterAlphaMode(destinationFormat: plan.destinationFormat)
+    }
+
+    private static func rasterAlphaMode(
+        destinationFormat: WIImageFormat
+    ) -> WIImageRaster.AlphaMode {
+        destinationFormat == .jpeg ? .opaque : .preserve
     }
 
     private static func rasterJPEGBackground(

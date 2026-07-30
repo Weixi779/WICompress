@@ -32,6 +32,12 @@ public enum WICompressError: Error, Sendable, Equatable {
     case colorConversionFailed
     /// JPEG background colors must be fully opaque.
     case nonOpaqueJPEGBackground
+    /// The Process quality must be finite and within the closed interval from zero to one.
+    case invalidProcessQuality
+    /// The Process crop ratio or anchor is invalid.
+    case invalidCrop
+    /// A resizing implementation returned a non-positive pixel size.
+    case invalidResizingResult
     /// The target compression request is not valid.
     case invalidTarget
     /// The target constraints cannot be satisfied by the supported encoder path.
@@ -77,6 +83,12 @@ extension WICompressError: LocalizedError {
             return "Failed to render the image into the requested color space."
         case .nonOpaqueJPEGBackground:
             return "Encoding JPEG with a custom background requires an opaque color."
+        case .invalidProcessQuality:
+            return "Image Process quality must be finite and between 0 and 1."
+        case .invalidCrop:
+            return "Image Process crop ratios must be positive and anchors must be between 0 and 1."
+        case .invalidResizingResult:
+            return "The image resizing implementation returned an invalid pixel size."
         case .invalidTarget:
             return "The compression target is invalid."
         case .targetUnsatisfiable(let smallestByteCount):

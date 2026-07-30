@@ -41,11 +41,19 @@ Implementation status:
   bitmap rendering, orientation normalization, crop/resize, two-layer
   backgrounds, alpha flattening, and color conversion no longer live in
   `WIImageEncoder`.
-- Next: replace the 1.x Process surface with the frozen `WIImageProcess` /
-  resizing-slot contract while preserving the current public behavior until the
-  2.0 cut.
-- Later: replace the Target policy surface with the frozen target contract, then
-  add synchronous and asynchronous terminals over the same execution core.
+- Completed: synchronous `WIImageProcess` vertical slice with public
+  `WIPixelSize`, resizing slot and built-ins, aspect-ratio crop, shared Output
+  values, pure geometry resolution, and a resolved execution plan independent
+  of `WICompressOptions`.
+- Completed: file-backed Process URL execution, on-demand original-byte reads,
+  two-axis-safe thumbnail sampling, and overflow validation before Raster.
+- In migration: the 1.x Process surface remains available as a compatibility
+  guard while the new Process path is reviewed; it will be removed before the
+  2.0 cut rather than maintained as a second architecture.
+- Next: replace the Target policy surface with the frozen target contract and
+  move it onto the shared Output / execution-plan boundary.
+- Later: add the Swift 6.2 asynchronous terminals over the same synchronous
+  execution core.
 
 Implementation details must not reopen the frozen product domains without
 conflicting evidence.

@@ -20,8 +20,8 @@ public enum WIJPEGBackground: Sendable, Equatable {
     case color(WIColor)
 }
 
-/// Destination container policy.
-public enum WIFormatPolicy: Sendable, Equatable {
+/// Encoded representation produced by an image operation.
+public enum WIImageRepresentation: Sendable, Equatable {
     /// Preserve the source image container format.
     case preserve
     /// Encode the output as JPEG.
@@ -33,3 +33,6 @@ public enum WIFormatPolicy: Sendable, Equatable {
     /// Encode the output as HEIC.
     case heic
 }
+
+/// Legacy name retained while the 1.x Process surface is being removed.
+public typealias WIFormatPolicy = WIImageRepresentation
