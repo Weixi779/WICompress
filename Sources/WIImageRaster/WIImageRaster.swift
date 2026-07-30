@@ -8,7 +8,7 @@
 
 import CoreGraphics
 import Foundation
-import WIImageCore
+import WIImageDomain
 
 package enum WIImageRaster {
     package static func image(
@@ -160,7 +160,7 @@ package enum WIImageRaster {
     }
 
     private static func preflightBitmapMemory(
-        for size: PixelSize
+        for size: WIPixelSize
     ) throws(Error) {
         let (minimumRowBytes, rowOverflow) = size.width.multipliedReportingOverflow(by: 4)
         guard !rowOverflow else {
@@ -199,7 +199,7 @@ package enum WIImageRaster {
     }
 
     private static func makeCGColorSpace(
-        _ colorSpace: ColorSpace
+        _ colorSpace: WIColorSpace
     ) throws(Error) -> CGColorSpace {
         do {
             return try colorSpace.makeCGColorSpace()
@@ -214,7 +214,7 @@ package enum WIImageRaster {
     }
 
     private static func cgColor(
-        _ color: Color,
+        _ color: WIColor,
         in destinationColorSpace: CGColorSpace
     ) throws(Error) -> CGColor {
         let sourceColorSpace = try makeCGColorSpace(color.colorSpace)

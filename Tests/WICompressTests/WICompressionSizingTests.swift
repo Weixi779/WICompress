@@ -7,8 +7,9 @@
 //
 
 import Testing
-@testable import WIImageCore
-@testable import WICompress
+import WICompress
+@testable import WICompressExecution
+@testable import WIImageDomain
 
 @Suite("Compression Sizing", .tags(.algorithm))
 struct WICompressionSizingTests {

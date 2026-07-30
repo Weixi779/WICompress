@@ -12,14 +12,14 @@
 
 `WICompress` 是一个基于 ImageIO 的 Swift 图片压缩库，直接处理原始图片
 `Data` 或文件 `URL`。底层由 ImageIO 负责格式识别、方向、alpha、metadata、
-色彩 profile、缩放和编码；public API 保持简单，最终返回压缩后的 `Data`。
+色彩 profile、缩放和编码；public API 保持简单，统一返回 `WIResult`。
 
 默认保留 JPEG / PNG / HEIC 源格式，也可以在上传端要求固定容器时显式转成
 JPEG、PNG 或 HEIC，或者按 alpha 通道自动选择 PNG / JPEG；默认剥离隐私
 metadata，并且不依赖 `UIImage` / `NSImage`。
 
 ```swift
-let compressedData = try WICompressor.process(originalData)
+let result = try WICompressor.process(originalData)
 ```
 
 ```swift
@@ -34,12 +34,13 @@ let uploadData = try WICompressor.process(
             colorSpace: .convert(to: .sRGB)
         )
     )
-)
+).data
 ```
 
 ## 为什么用 WICompress
 
-- **Data in, Data out**：保留相册、文件或网络拿到的原始字节，直接传给压缩器。
+- **Data in, structured result out**：保留相册、文件或网络拿到的原始字节，
+  从 `WIResult` 获取编码数据、格式、像素尺寸和字节数。
 - **适合上传的默认值**：Luban resize、metadata strip、JPEG/HEIC 有损质量。
 - **目标约束压缩**：当 SDK 或后端要求明确字节上限时，可以用 `maxBytes`
   搭配 geometry 表达目标。
@@ -102,19 +103,19 @@ target API 分享缩略图示例。前三行优先展示 HEIC，因为这是最�
 ```swift
 import WICompress
 
-let compressedData = try WICompressor.process(originalData)
+let result = try WICompressor.process(originalData)
 ```
 
 压缩文件 URL：
 
 ```swift
-let compressedData = try WICompressor.process(contentsOf: imageURL)
+let result = try WICompressor.process(contentsOf: imageURL)
 ```
 
 显式配置：
 
 ```swift
-let compressedData = try WICompressor.process(
+let result = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(using: WIImageResize.luban),
@@ -131,7 +132,7 @@ let compressedData = try WICompressor.process(
 在一次操作中裁剪和调整像素尺寸：
 
 ```swift
-let assetData = try WICompressor.process(
+let asset = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(
@@ -182,8 +183,8 @@ guard let originalData = try await photosPickerItem.loadTransferable(type: Data.
     throw MyError.missingImageData
 }
 
-let compressedData = try WICompressor.process(originalData)
-let previewImage = UIImage(data: compressedData)
+let result = try WICompressor.process(originalData)
+let previewImage = UIImage(data: result.data)
 ```
 
 这样调用方不需要同时传入「渲染后的图片」和「原始格式数据」。ImageIO 可以
@@ -252,7 +253,7 @@ Sizing 只定义 byte search 开始前的 base candidate：
 必要时再缩小尺寸；PNG 保持无损并通过缩小尺寸满足限制。若不存在满足 output 合同和
 字节上限的结果，会抛 `WICompressError.targetUnsatisfiable`。
 
-Target compression 返回 `WICompressionResult`，包含输出 `Data`、容器格式、
+所有 terminal 都返回 `WIResult`，包含输出 `Data`、容器格式、
 整数像素尺寸和字节数。
 
 WICompress 不内置平台分享 preset。分享 SDK 的限制和推荐值会变化，业务代码应
@@ -264,7 +265,7 @@ public API 使用 `throws`：
 
 ```swift
 do {
-    let compressedData = try WICompressor.process(data)
+    let result = try WICompressor.process(data)
 } catch let error as WICompressError {
     print(error)
 }

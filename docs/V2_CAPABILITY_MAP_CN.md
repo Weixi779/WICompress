@@ -52,7 +52,7 @@
 | R2 | 从文件读取并压缩 | `compress(contentsOf:options:)` | 读取失败映射为 `fileReadFailed` |
 | R3 | 声明压缩过程 | `WICompressOptions` | 调用方指定 resize、格式、metadata、quality、颜色空间 |
 | R4 | 声明最终字节上限 | `compress(_:to:)` | 成功结果保证 `byteCount <= maxBytes`，否则失败 |
-| R5 | 获取目标压缩的结构化结果 | `WICompressionResult` | 返回 `Data`、格式、像素尺寸和字节数 |
+| R5 | 获取压缩的结构化结果 | `WIResult` | Process 与 Target 均返回 `Data`、格式、像素尺寸和字节数 |
 | R6 | 保持原始显示尺寸 | `.none` / `.original` | 不主动缩放；target solver 在软几何下仍可因字节限制缩小 |
 | R7 | 使用 Luban 规则缩放 | `.resize(.luban)` | 根据 EXIF 方向后的显示尺寸推导最长边，不放大 |
 | R8 | 限制最长边 | `.maxPixel(Int)` / `.fit(maxLongSide:)` | 保持宽高比，不放大 |
@@ -70,14 +70,14 @@
 | R20 | 为画布和 JPEG 背景声明颜色 | `WIColor` | RGBA 值带显式 sRGB、Display P3 或 ICC 色彩空间 |
 | R21 | 在满足策略时返回原图 | passthrough / size guard | 只有原图满足所有可观察要求时才允许返回 |
 | R22 | 拒绝不支持的输入和组合 | `WICompressError` | 无效图片、动图、不可写格式、非法 target 等都有明确错误 |
-| R23 | 从图片字节检测容器 | `WIImageFormat(data:)` | 识别 JPEG、PNG、HEIF/HEIC 或 unknown |
+| R23 | 读取最终图片容器 | `WIResult.format` | ImageIO inspection 产生 JPEG、PNG、HEIF/HEIC 或 unknown；2.0 不提供独立 Data detection API |
 
 ## 当前公共入口
 
 | 入口 | 输入 | 调用方控制 | 库控制 | 输出 |
 |---|---|---|---|---|
-| 过程式压缩 | `Data` / file `URL` | resize、format、metadata、quality、color space | ImageIO 路径选择、原图保护 | `Data` |
-| 目标式压缩 | `Data` / file `URL` | maxBytes、geometry、output、preference | quality 搜索、允许时的尺寸搜索、尝试次数、候选选择 | `WICompressionResult` |
+| 过程式压缩 | `Data` / file `URL` | resize、format、metadata、quality、color space | ImageIO 路径选择、原图保护 | `WIResult` |
+| 目标式压缩 | `Data` / file `URL` | maxBytes、geometry、output、preference | quality 搜索、允许时的尺寸搜索、尝试次数、候选选择 | `WIResult` |
 
 这两条入口共享 ImageIO 检测、格式解析、颜色处理和编码能力，但控制权相反：
 
@@ -150,11 +150,11 @@ Data
   -> final encoded Data
 ```
 
-当前产品层 `WIImageSource` 持有 Data/file backing、`WIImageIO.Source` 与
-`WIImageInfo`，本身不是 decoded bitmap。底层 `CGImageSource` 由同步、作用域内的
-`WIImageIO.Source` 管理，只在按需读取某些颜色空间信息，或进入 render 时创建
-`CGImage`。这层 source handle 对单次处理和 target solver 的多次尝试有价值，但没有
-理由直接成为长期存在的 public `ImageResource`。
+当前 Execution 层 `WIImageSource` 持有 Data/file backing 与 `WIImageIO.Source`，
+并直接消费其 `Descriptor`，本身不是 decoded bitmap。底层 `CGImageSource` 由同步、
+作用域内的 `WIImageIO.Source` 管理，只在按需读取某些颜色空间信息，或进入 render
+时创建 `CGImage`。这层 source handle 对单次处理和 target solver 的多次尝试有价值，
+但没有理由直接成为长期存在的 public `ImageResource`。
 
 这些生命周期事实最终支持了“纯描述值 + 一次 terminal execution”、不公开长期
 ImageResource 和不提供 Processor Chain。结论正文与剩余 API 问题已迁移到
@@ -371,7 +371,7 @@ flowchart LR
 
     Resolve --> Transform["Image processing<br/>按 concrete PixelSize resize · color render"]
     Transform --> Encode["ImageIO encode<br/>container · quality · metadata"]
-    Encode --> Result["Data / WICompressionResult"]
+    Encode --> Result["WIResult"]
 ```
 
 ## 当前组装矩阵

@@ -32,7 +32,7 @@ import WICompress
 ```swift
 import WICompress
 
-let output = try WICompressor.process(
+let result = try WICompressor.process(
     input,
     using: WIImageProcess()
 )
@@ -43,8 +43,9 @@ deprecated wrapper 或 `.shared` 单例；这能避免 package/module 名和执�
 同一个 `WICompress` 标识符。
 
 对于已经采用 2.0 Process/Target Domain 的代码，本次 facade 重命名不改变同步方法的
-参数标签、返回值、typed error 或执行语义。异步 terminal 属于后续独立阶段，不通过
-本次重命名提前加入。
+参数标签、typed error 或执行语义。Process 与 Target 现在统一返回 `WIResult`；
+原先直接使用 Process `Data` 的位置改为读取 `result.data`。异步 terminal 属于后续
+独立阶段，不通过本次重命名提前加入。
 
 ## Domain 迁移
 

@@ -22,43 +22,48 @@ let package = Package(
     dependencies: [],
     targets: [
         .target(
-            name: "WIImageCore",
+            name: "WIImageDomain",
             dependencies: [],
-            path: "Sources/WIImageCore"
+            path: "Sources/WIImageDomain"
         ),
         .target(
             name: "WIImageIO",
-            dependencies: ["WIImageCore"],
+            dependencies: ["WIImageDomain"],
             path: "Sources/WIImageIO"
         ),
         .target(
             name: "WIImageRaster",
-            dependencies: ["WIImageCore"],
+            dependencies: ["WIImageDomain"],
             path: "Sources/WIImageRaster"
         ),
         .target(
+            name: "WICompressExecution",
+            dependencies: ["WIImageDomain", "WIImageIO", "WIImageRaster"],
+            path: "Sources/WICompressExecution"
+        ),
+        .target(
             name: "WICompress",
-            dependencies: ["WIImageCore", "WIImageIO", "WIImageRaster"],
+            dependencies: ["WIImageDomain", "WIImageIO", "WICompressExecution"],
             path: "Sources/WICompress"
         ),
         .testTarget(
-            name: "WIImageCoreTests",
-            dependencies: ["WIImageCore"],
-            path: "Tests/WIImageCoreTests"
+            name: "WIImageDomainTests",
+            dependencies: ["WIImageDomain"],
+            path: "Tests/WIImageDomainTests"
         ),
         .testTarget(
             name: "WIImageIOTests",
-            dependencies: ["WIImageCore", "WIImageIO"],
+            dependencies: ["WIImageDomain", "WIImageIO"],
             path: "Tests/WIImageIOTests"
         ),
         .testTarget(
             name: "WIImageRasterTests",
-            dependencies: ["WIImageCore", "WIImageRaster"],
+            dependencies: ["WIImageDomain", "WIImageRaster"],
             path: "Tests/WIImageRasterTests"
         ),
         .testTarget(
             name: "WICompressTests",
-            dependencies: ["WICompress", "WIImageCore"],
+            dependencies: ["WICompress", "WICompressExecution", "WIImageDomain", "WIImageIO"],
             path: "Tests/WICompressTests",
             resources: [.copy("Resources")]
         ),

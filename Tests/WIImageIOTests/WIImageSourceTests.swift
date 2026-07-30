@@ -11,7 +11,7 @@ import Foundation
 import ImageIO
 import Testing
 import UniformTypeIdentifiers
-@testable import WIImageCore
+@testable import WIImageDomain
 @testable import WIImageIO
 
 extension Tag {

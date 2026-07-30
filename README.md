@@ -13,14 +13,14 @@ Compress images for upload with a small, predictable Swift API.
 `WICompress` is an ImageIO-backed Swift image compression library that operates
 directly on original image `Data` or file `URL` input. ImageIO handles format
 inspection, orientation, alpha, metadata, color profiles, resizing, and encoding;
-the public API stays simple and returns compressed `Data`.
+the public API stays simple and returns one `WIResult`.
 
 It preserves JPEG/PNG/HEIC by default, can convert to an explicit output format
 or choose PNG/JPEG from alpha-channel presence, strips metadata for privacy, and
 resizes images without depending on `UIImage` or `NSImage`.
 
 ```swift
-let compressedData = try WICompressor.process(originalData)
+let result = try WICompressor.process(originalData)
 ```
 
 ```swift
@@ -35,13 +35,13 @@ let uploadData = try WICompressor.process(
             colorSpace: .convert(to: .sRGB)
         )
     )
-)
+).data
 ```
 
 ## Why WICompress
 
-- **Data in, Data out**: keep picker/file/network bytes and pass them directly
-  to the compressor.
+- **Data in, structured result out**: keep picker/file/network bytes, then use
+  the encoded data, format, pixel size, and byte count from one `WIResult`.
 - **Upload-ready defaults**: Luban resize, metadata stripping, and JPEG/HEIC
   lossy quality are configured for common app uploads.
 - **Target contracts**: use `maxBytes` with geometry intent when an SDK or
@@ -112,19 +112,19 @@ The example demonstrates:
 ```swift
 import WICompress
 
-let compressedData = try WICompressor.process(originalData)
+let result = try WICompressor.process(originalData)
 ```
 
 Compress a file URL:
 
 ```swift
-let compressedData = try WICompressor.process(contentsOf: imageURL)
+let result = try WICompressor.process(contentsOf: imageURL)
 ```
 
 Declare an explicit process:
 
 ```swift
-let compressedData = try WICompressor.process(
+let result = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(using: WIImageResize.luban),
@@ -141,7 +141,7 @@ let compressedData = try WICompressor.process(
 Crop and resize in one operation:
 
 ```swift
-let assetData = try WICompressor.process(
+let asset = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(
@@ -192,8 +192,8 @@ guard let originalData = try await photosPickerItem.loadTransferable(type: Data.
     throw MyError.missingImageData
 }
 
-let compressedData = try WICompressor.process(originalData)
-let previewImage = UIImage(data: compressedData)
+let result = try WICompressor.process(originalData)
+let previewImage = UIImage(data: result.data)
 ```
 
 This shape avoids asking callers to pass both a rendered image and separate
@@ -267,7 +267,7 @@ PNG stays lossless and reduces dimensions. If no result can satisfy both the
 output contract and byte ceiling, WICompress throws
 `WICompressError.targetUnsatisfiable`.
 
-Target compression returns `WICompressionResult`, including the encoded `Data`,
+Every terminal returns `WIResult`, including the encoded `Data`,
 container format, integer pixel size, and byte count.
 
 WICompress does not ship platform-specific sharing presets. Sharing SDK rules
@@ -280,7 +280,7 @@ All public APIs throw `WICompressError`.
 
 ```swift
 do {
-    let compressedData = try WICompressor.process(data)
+    let result = try WICompressor.process(data)
 } catch let error as WICompressError {
     // Decide whether to show an error, retry, or keep the original data.
     print(error)

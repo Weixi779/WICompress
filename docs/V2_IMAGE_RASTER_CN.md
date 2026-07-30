@@ -40,7 +40,7 @@ DrawingContext、UIKit renderer、processor chain 或 UI placement。
 新增独立、非 product 的 package target，本文概念上称为 `WIImageRaster`：
 
 ```text
-WIImageCore ──────────┐
+WIImageDomain ────────┐
                      ▼
 WIImageIO ── decode ──┤
                      ▼
@@ -58,7 +58,7 @@ WIImageIO ── encode ◀── CGImage
 - 跨 target 只暴露一个 package-level 图片绘制入口。
 - 不依赖 Process、Target、solver、Luban、UIKit 或 AppKit。
 - primitive 保持同步，不拥有 queue、actor、Task 或 cancellation。
-- target 与入口命名确认为 `WIImageRaster`；通用像素事实来自 `WIImageCore`，
+- target 与入口命名确认为 `WIImageRaster`；通用像素事实来自 `WIImageDomain`，
   Raster 只保留 `Plan`、`AlphaMode` 和 `OutputColorSpace`。
 
 ## 唯一模块入口

@@ -10,8 +10,9 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Testing
-@testable import WIImageCore
-@testable import WICompress
+import WICompress
+@testable import WICompressExecution
+@testable import WIImageDomain
 
 @Suite("WIImageProcess", .tags(.imageProcess, .publicAPI))
 struct WIImageProcessTests {
@@ -234,7 +235,7 @@ struct WIImageProcessTests {
             "real_jpeg_2098x1350_landscape",
             extension: "jpg"
         )
-        let output = try WICompressor.process(
+        let result = try WICompressor.process(
             data,
             using: WIImageProcess(
                 sizing: .resize(
@@ -245,11 +246,13 @@ struct WIImageProcessTests {
                 quality: 0.7
             )
         )
-        let outputSource = try WIImageSource(data: output)
+        let outputSource = try WIImageSource(data: result.data)
 
-        #expect(outputSource.info.displayWidth == 320)
-        #expect(outputSource.info.displayHeight == 180)
-        #expect(outputSource.info.sourceFormat == .jpeg)
+        #expect(result.pixelSize == WIPixelSize(width: 320, height: 180))
+        #expect(result.format == .jpeg)
+        #expect(result.byteCount == result.data.count)
+        #expect(outputSource.descriptor.orientedPixelSize == result.pixelSize)
+        #expect(outputSource.descriptor.format == result.format)
     }
 
     @Test("Process crop fixes the encoded aspect ratio before resizing")
@@ -270,12 +273,12 @@ struct WIImageProcessTests {
                 quality: nil,
                 output: WIImageOutput(representation: .png)
             )
-        )
+        ).data
         let outputSource = try WIImageSource(data: output)
 
-        #expect(outputSource.info.displayWidth == 512)
-        #expect(outputSource.info.displayHeight == 512)
-        #expect(outputSource.info.sourceFormat == .png)
+        #expect(outputSource.descriptor.orientedPixelSize.width == 512)
+        #expect(outputSource.descriptor.orientedPixelSize.height == 512)
+        #expect(outputSource.descriptor.format == .png)
     }
 
     @Test("Non-center Process crop uses EXIF-oriented coordinates")
@@ -298,7 +301,7 @@ struct WIImageProcessTests {
                 quality: nil,
                 output: WIImageOutput(representation: .png)
             )
-        )
+        ).data
         let outputRed = try Self.redValues(in: output, x: 2)
         let oracleRed = try Self.redValues(in: oracle, x: 2)
         let keptDifferences = zip(
@@ -330,7 +333,7 @@ struct WIImageProcessTests {
                 quality: nil,
                 output: WIImageOutput(representation: .png)
             )
-        )
+        ).data
         let redValues = try Self.redValues(in: output, x: 50)
         let transitions = zip(redValues, redValues.dropFirst())
             .count { first, second in
@@ -355,9 +358,9 @@ struct WIImageProcessTests {
                     representation: .pngIfAlphaOtherwiseJPEG
                 )
             )
-        )
+        ).data
 
-        #expect(try WIImageSource(data: output).info.sourceFormat == .png)
+        #expect(try WIImageSource(data: output).descriptor.format == .png)
     }
 
     @Test("Transparent sources require an explicit JPEG background")
@@ -392,7 +395,7 @@ struct WIImageProcessTests {
                 quality: nil,
                 output: WIImageOutput(metadata: .preserve)
             )
-        )
+        ).data
 
         #expect(output == data)
     }
@@ -438,12 +441,12 @@ struct WIImageProcessTests {
                     metadata: .preserve
                 )
             )
-        )
+        ).data
         let outputSource = try WIImageSource(data: output)
 
-        #expect(outputSource.info.hasGPS)
-        #expect(outputSource.info.orientation == .up)
-        #expect(outputSource.info.sourceFormat == .jpeg)
+        #expect(outputSource.descriptor.hasGPS)
+        #expect(outputSource.descriptor.orientation == .up)
+        #expect(outputSource.descriptor.format == .jpeg)
     }
 
     @Test("Process converts rendered pixels to sRGB")
@@ -464,7 +467,7 @@ struct WIImageProcessTests {
                     colorSpace: .convert(to: .sRGB)
                 )
             )
-        )
+        ).data
         let outputSource = try WIImageSource(data: output)
         let colorSpace = try #require(
             try outputSource.processColorSpaceInfoIfNeeded(
@@ -506,16 +509,16 @@ struct WIImageProcessTests {
         }
         #expect(backingURL == url)
 
-        let dataOutput = try WICompressor.process(data, using: process)
-        let fileOutput = try WICompressor.process(
+        let dataResult = try WICompressor.process(data, using: process)
+        let fileResult = try WICompressor.process(
             contentsOf: url,
             using: process
         )
-        let dataInfo = try WIImageSource(data: dataOutput).info
-        let fileInfo = try WIImageSource(data: fileOutput).info
 
-        #expect(fileInfo.displayDimensions == dataInfo.displayDimensions)
-        #expect(fileInfo.sourceFormat == dataInfo.sourceFormat)
+        #expect(fileResult.data == dataResult.data)
+        #expect(fileResult.format == dataResult.format)
+        #expect(fileResult.pixelSize == dataResult.pixelSize)
+        #expect(fileResult.byteCount == dataResult.byteCount)
     }
 
     @Test("File-backed sources load original bytes only on demand")

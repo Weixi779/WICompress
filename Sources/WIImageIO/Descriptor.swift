@@ -7,14 +7,14 @@
 //
 
 import Foundation
-import WIImageCore
+import WIImageDomain
 
 package struct Descriptor: Sendable, Equatable {
-    package let format: ImageFormat
+    package let format: WIImageFormat
     package let typeIdentifier: String?
     package let byteCount: Int
-    package let pixelSize: PixelSize
-    package let orientedPixelSize: PixelSize
+    package let pixelSize: WIPixelSize
+    package let orientedPixelSize: WIPixelSize
     package let orientation: Orientation
     package let frameCount: Int
     package let hasAlpha: Bool?

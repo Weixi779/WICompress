@@ -45,18 +45,19 @@ final class UIKitPickerViewModel {
         logger.info("Raw data prefix: \(hexString)")
         
         do {
-            let compressedData = try WICompressor.process(
+            let result = try WICompressor.process(
                 imageGroup.rawData,
                 using: WIImageProcess(quality: 0.7)
             )
-            guard let compressedUIImage = UIImage(data: compressedData) else {
+            guard let compressedUIImage = UIImage(data: result.data) else {
                 logger.error("Compression output could not be decoded!")
                 return
             }
 
             self.compressedImageGroup = ImageGroup(
-                image: compressedUIImage, 
-                rawData: compressedData
+                image: compressedUIImage,
+                rawData: result.data,
+                imageFormat: result.format
             )
             logger.info("Compression successful!")
             logger.info("Compressed format: \(self.compressedImageGroup?.format ?? "unknown")")

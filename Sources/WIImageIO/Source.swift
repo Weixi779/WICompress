@@ -9,7 +9,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
-import WIImageCore
+import WIImageDomain
 
 package final class Source {
     package let byteCount: Int
@@ -39,7 +39,7 @@ package final class Source {
         self.descriptor = try Self.inspect(source, byteCount: byteCount)
     }
 
-    package func colorSpace() throws(Error) -> ColorSpace? {
+    package func colorSpace() throws(Error) -> WIColorSpace? {
         guard let image = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
             throw .imageCreationFailed
         }
@@ -233,7 +233,7 @@ package final class Source {
         let typeIdentifier = CGImageSourceGetType(source) as String?
 
         return Descriptor(
-            format: ImageFormat(typeIdentifier: typeIdentifier),
+            format: WIImageFormat.detected(from: typeIdentifier),
             typeIdentifier: typeIdentifier,
             byteCount: byteCount,
             pixelSize: pixelSize,
@@ -252,9 +252,12 @@ package final class Source {
     private static func makePixelSize(
         width: Int,
         height: Int
-    ) throws(Error) -> PixelSize {
+    ) throws(Error) -> WIPixelSize {
         do {
-            return try PixelSize(width: width, height: height)
+            return try WIPixelSize(
+                validatingWidth: width,
+                height: height
+            )
         } catch {
             switch error {
             case .invalidDimensions:

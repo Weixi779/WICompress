@@ -6,12 +6,12 @@ Compress JPEG, PNG, and HEIC image data with a small, predictable ImageIO-backed
 
 ``WICompressor`` operates directly on original image `Data` or file `URL` input.
 ImageIO handles format inspection, orientation, alpha, metadata, color profiles,
-resizing, and encoding; the public API stays simple and returns compressed bytes.
+resizing, and encoding; every terminal returns one ``WIResult``.
 
-The Process entry point declares one deterministic operation and returns `Data`:
+The Process entry point declares one deterministic operation:
 
 ```swift
-let uploadData = try WICompressor.process(
+let result = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(using: WIImageResize.maximumPixelSize(1600)),
@@ -78,7 +78,7 @@ All failures are thrown as ``WICompressError``; the core never imports UIKit or 
 - ``WICompressionSizing``
 - ``WIAspectRatio``
 - ``WICropAnchor``
-- ``WICompressionResult``
+- ``WIResult``
 
 ### Values
 

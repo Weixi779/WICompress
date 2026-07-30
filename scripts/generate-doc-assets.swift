@@ -10,6 +10,7 @@ import CoreGraphics
 import CoreText
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 import WICompress
 
 private let canvasWidth = 1600
@@ -134,7 +135,7 @@ enum GenerateDocAssets {
             let outputData: Data
             switch sample.compression {
             case .process(let process):
-                outputData = try WICompressor.process(inputData, using: process)
+                outputData = try WICompressor.process(inputData, using: process).data
             case .target(let target):
                 outputData = try WICompressor.compress(inputData, to: target).data
             }
@@ -289,7 +290,9 @@ func summarize(data: Data, maxPixel: Int) throws -> ImageSummary {
     return ImageSummary(
         data: data,
         thumbnail: thumbnail,
-        format: formatName(for: WIImageFormat(data: data)),
+        format: formatName(
+            forTypeIdentifier: CGImageSourceGetType(source) as String?
+        ),
         displaySize: displaySize
     )
 }
@@ -395,17 +398,20 @@ func formatBytes(_ byteCount: Int) -> String {
     return formatter.string(fromByteCount: Int64(byteCount))
 }
 
-func formatName(for format: WIImageFormat) -> String {
-    switch format {
-    case .jpeg:
-        return "JPEG"
-    case .png:
-        return "PNG"
-    case .heif:
-        return "HEIC"
-    case .unknown:
+func formatName(forTypeIdentifier typeIdentifier: String?) -> String {
+    guard let typeIdentifier, let type = UTType(typeIdentifier) else {
         return "Unknown"
     }
+    if type.conforms(to: .jpeg) {
+        return "JPEG"
+    }
+    if type.conforms(to: .png) {
+        return "PNG"
+    }
+    if type.conforms(to: .heic) || type.conforms(to: .heif) {
+        return "HEIC"
+    }
+    return "Unknown"
 }
 
 func intValue(_ value: Any?) -> Int? {

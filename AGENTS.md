@@ -65,22 +65,28 @@ stale snippets.
 
 ## Architecture
 
-The package is split into three package-only infrastructure targets and one
-public product target:
+The package is split into four supporting targets and one public umbrella
+product target:
 
 ```text
-WIImageCore
-  ↑        ↑
-WIImageIO  WIImageRaster
-     ↑       ↑
-       WICompress
+             WIImageDomain
+               ↑       ↑
+       WIImageIO       WIImageRaster
+               ↑       ↑
+           WICompressExecution
+                   ↑
+               WICompress
 ```
 
-`WIImageCore` owns shared package-level pixel facts: `PixelSize`, `Rect`,
-`Orientation`, `ImageFormat`, `ColorSpace`, and `Color`. Public Domain values
-remain in `WICompress` and convert once at the resolver/product boundary.
+`WIImageDomain` owns the public Process, Target, Output, pixel-size, and color
+values used directly by package execution. Package-only validation, `Rect`, and
+`Orientation` live beside those values; there are no mirrored Core models.
+`WIImageIO` owns the public result fact `WIImageFormat` and all package-only
+ImageIO primitives. `WICompressExecution` owns Source, resolvers, plans, encoder,
+solver, `WICompressError`, and `WIResult`. `WICompress` re-exports the public
+contracts and contains only the terminal facade.
 
-Process is the deterministic `Data`/`URL` in, `Data` out path:
+Process is the deterministic `Data`/`URL` in, `WIResult` out path:
 
 ```text
 Data / URL + WIImageProcess
@@ -94,13 +100,15 @@ Data / URL + WIImageProcess
        crop -> oriented source + WIImageRaster
        encode -> WIImageIO
   -> Data
+  -> ImageIO inspection
+  -> WIResult
 ```
 
 The Process file terminal keeps a file-backed ImageIO source. It reads the
 complete original bytes only when a return-original operation needs them.
 
 Target-based `compress(_:to:)` declares an output contract (`maxBytes` plus
-sizing/output) and returns a `WICompressionResult`:
+sizing/output) and returns a `WIResult`:
 
 ```text
 Data / URL + WICompressionTarget
@@ -110,7 +118,7 @@ Data / URL + WICompressionTarget
        uses WICompressionTargetResolver to build each WIExecutionPlan
        uses Algorithm/ math (size estimation, layout, ranking)
   -> hard byte check                never return data above maxBytes
-  -> WICompressionResult
+  -> WIResult
 ```
 
 Key types:
@@ -123,20 +131,21 @@ Key types:
    and built-in Luban, boundary, scale, and exact-size implementations.
 4. **WIImageOutput** - shared representation, metadata, and color-space
    requirements used by both Process and Target.
-5. **WIImageSource** / **WIImageInfo** - product source wrapper over
-   `WIImageIO.Source` and its inspected Core facts
+5. **WIImageSource** - execution source wrapper over `WIImageIO.Source`; it
+   consumes the ImageIO `Descriptor` directly instead of copying inspected facts
    (format, pixel size, orientation, frame count, alpha, gain map, writability).
 6. **WIExecutionPlan** - resolved Process execution facts; it contains no
    resizing algorithm, crop intent, or public Policy.
 7. **WIImageProcessResolver** - resolves Process input into a shared
    `WIExecutionPlan`.
 8. **WIImageEncoder** - executes resolved plans through WIImageIO and WIImageRaster.
-9. **WIImageFormat** - `UTType`-based container detection (JPEG/PNG/HEIF/unknown).
+9. **WIImageFormat** - public ImageIO-produced result fact
+   (JPEG/PNG/HEIF/unknown); callers do not initialize it from arbitrary data.
 10. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
 11. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
 12. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
    (`maxBytes` / `WICompressionSizing` / shared `WIImageOutput`) returning
-   `WICompressionResult`.
+   `WIResult`.
    `WICompressionTargetValidator` checks legality, `WICompressionTargetResolver`
    produces shared `WIExecutionPlan` values, and `WICompressionSolver` runs the
    byte-budget search.
@@ -210,7 +219,6 @@ Tests are organized by `@Suite` and filtered by `@Tag`:
 | Tag | Scope |
 |---|---|
 | `.luban` | Luban algorithm logic (`WILuban.ratio`, `WILuban.ensureEven`) |
-| `.format` | Image format detection (`WIImageFormat`) |
 | `.compression` | Process and Target behavior (`WICompressor` public API) |
 | `.imageIOCore` | ImageIO core: execution resolution, encoder, real-image contracts |
 | `.publicAPI` | Public surface: defaults, error mapping, entry points |

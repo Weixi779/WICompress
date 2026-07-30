@@ -9,7 +9,8 @@
 import Foundation
 import ImageIO
 import Testing
-@testable import WICompress
+import WICompress
+@testable import WIImageDomain
 
 @Suite("WICompress Data Characterization", .tags(.imageIOCore, .compression))
 struct WICompressDataCharacterizationTests {
@@ -56,7 +57,7 @@ struct WICompressDataCharacterizationTests {
         let inputData = try Data(contentsOf: fixture.url)
         let inputInfo = try Self.imageInfo(inputData)
 
-        let outputData = try WICompressor.process(inputData)
+        let outputData = try WICompressor.process(inputData).data
         let outputInfo = try Self.imageInfo(outputData)
 
         let ratio = WILuban.ratio(
@@ -66,7 +67,7 @@ struct WICompressDataCharacterizationTests {
         let expectedWidth = max(inputInfo.displayWidth / ratio, 1)
         let expectedHeight = max(inputInfo.displayHeight / ratio, 1)
 
-        #expect(WIImageFormat(data: outputData) == WIImageFormat(data: inputData))
+        #expect(try imageFormat(of: outputData) == imageFormat(of: inputData))
         #expect(abs(outputInfo.displayWidth - expectedWidth) <= 1)
         #expect(abs(outputInfo.displayHeight - expectedHeight) <= 1)
     }

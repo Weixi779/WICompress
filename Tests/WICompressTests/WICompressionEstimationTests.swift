@@ -7,7 +7,8 @@
 //
 
 import Testing
-@testable import WICompress
+import WICompress
+@testable import WICompressExecution
 
 @Suite("Compression Size Estimation", .tags(.algorithm))
 struct WICompressionEstimationTests {

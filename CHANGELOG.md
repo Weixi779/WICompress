@@ -18,7 +18,9 @@ domains: deterministic image processing and byte-target compression.
   aspect-ratio crop with normalized anchors.
 - Shared `WIImageOutput` requirements for representation, metadata, and color
   space.
-- Package-only `WIImageIO` and `WIImageRaster` modules.
+- One `WIResult` from every Process and Target terminal.
+- Package-only `WIImageDomain`, `WIImageIO`, `WIImageRaster`, and
+  `WICompressExecution` modules behind the public umbrella.
 
 ### Changed
 
@@ -26,6 +28,8 @@ domains: deterministic image processing and byte-target compression.
   the uninhabited `WICompressor` namespace.
 - Target compression now uses `WICompressionSizing` plus the shared
   `WIImageOutput` and execution-plan boundary.
+- Process terminals now return `WIResult`; callers that only need encoded bytes
+  read `result.data`.
 - The package requires Swift 6.2 and Xcode 26.
 
 ### Removed

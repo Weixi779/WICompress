@@ -8,7 +8,7 @@
 
 import Foundation
 import Testing
-@testable import WICompress
+import WICompress
 
 @Suite("WICompressor Public Surface", .tags(.publicAPI))
 struct WICompressorPublicSurfaceTests {
@@ -152,7 +152,7 @@ struct WICompressorPublicSurfaceTests {
     @Test("No-op Process returns the original data")
     func noOpProcessReturnsOriginalData() throws {
         let input = try Self.tinyPNGData()
-        let output = try WICompressor.process(
+        let result = try WICompressor.process(
             input,
             using: WIImageProcess(
                 sizing: .original,
@@ -165,7 +165,10 @@ struct WICompressorPublicSurfaceTests {
             )
         )
 
-        #expect(output == input)
+        #expect(result.data == input)
+        #expect(result.format == .png)
+        #expect(result.pixelSize == WIPixelSize(width: 1, height: 1))
+        #expect(result.byteCount == input.count)
     }
 
     @Test("Preserve target can return original data")
@@ -185,7 +188,7 @@ struct WICompressorPublicSurfaceTests {
 
         #expect(result.data == input)
         #expect(result.format == .png)
-        #expect(result.pixelSize == WISize(width: 1, height: 1))
+        #expect(result.pixelSize == WIPixelSize(width: 1, height: 1))
         #expect(result.byteCount == input.count)
     }
 
@@ -206,7 +209,7 @@ struct WICompressorPublicSurfaceTests {
 
         #expect(result.data == input)
         #expect(result.format == .heif)
-        #expect(result.pixelSize == WISize(width: 3024, height: 4032))
+        #expect(result.pixelSize == WIPixelSize(width: 3024, height: 4032))
         #expect(result.byteCount == input.count)
     }
 

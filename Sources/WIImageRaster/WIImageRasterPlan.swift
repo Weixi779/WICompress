@@ -6,7 +6,7 @@
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
-import WIImageCore
+import WIImageDomain
 
 extension WIImageRaster {
     package enum AlphaMode: Sendable, Equatable {
@@ -16,7 +16,7 @@ extension WIImageRaster {
 
     package enum OutputColorSpace: Sendable, Equatable {
         case source
-        case convert(ColorSpace)
+        case convert(WIColorSpace)
 
         package static var sRGB: Self {
             .convert(.sRGB)
@@ -24,23 +24,23 @@ extension WIImageRaster {
     }
 
     package struct Plan: Sendable, Equatable {
-        package var canvasSize: PixelSize
+        package var canvasSize: WIPixelSize
         package var sourceRect: Rect
         package var destinationRect: Rect
         package var orientation: Orientation
         package var alphaMode: AlphaMode
-        package var canvasBackground: Color?
-        package var imageBackground: Color?
+        package var canvasBackground: WIColor?
+        package var imageBackground: WIColor?
         package var colorSpace: OutputColorSpace
 
         package init(
-            canvasSize: PixelSize,
+            canvasSize: WIPixelSize,
             sourceRect: Rect,
             destinationRect: Rect,
             orientation: Orientation = .up,
             alphaMode: AlphaMode = .preserve,
-            canvasBackground: Color? = nil,
-            imageBackground: Color? = nil,
+            canvasBackground: WIColor? = nil,
+            imageBackground: WIColor? = nil,
             colorSpace: OutputColorSpace = .source
         ) {
             self.canvasSize = canvasSize

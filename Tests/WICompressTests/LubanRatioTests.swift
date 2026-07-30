@@ -7,7 +7,7 @@
 //
 
 import Testing
-@testable import WICompress
+@testable import WIImageDomain
 
 @Suite("Luban Ratio Policy", .tags(.luban))
 struct LubanRatioTests {

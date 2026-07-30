@@ -10,7 +10,9 @@ import Foundation
 import CoreGraphics
 import ImageIO
 import Testing
-@testable import WICompress
+import WICompress
+@testable import WICompressExecution
+@testable import WIImageDomain
 
 @Suite("WICompress ImageIO Core", .tags(.imageIOCore, .compression))
 struct WICompressImageIOCoreTests {
@@ -356,7 +358,7 @@ struct WICompressImageIOCoreTests {
         let inputData = try Data(contentsOf: url)
         let inputInfo = try Self.imageInfo(inputData)
 
-        let outputData = try WICompressor.process(inputData)
+        let outputData = try WICompressor.process(inputData).data
         let outputInfo = try Self.imageInfo(outputData)
 
         let ratio = WILuban.ratio(
@@ -364,7 +366,7 @@ struct WICompressImageIOCoreTests {
             height: inputInfo.displayHeight
         )
 
-        #expect(WIImageFormat(data: outputData) == WIImageFormat(data: inputData))
+        #expect(try imageFormat(of: outputData) == imageFormat(of: inputData))
         #expect(outputInfo.hasGPS == false)
         #expect(outputInfo.orientation == 1)
         #expect(outputInfo.displayWidth == max(inputInfo.displayWidth / ratio, 1))
@@ -389,10 +391,10 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(WIImageFormat(data: outputData) == WIImageFormat(data: inputData))
+        #expect(try imageFormat(of: outputData) == imageFormat(of: inputData))
         #expect(outputInfo.hasGPS == true)
         #expect(outputInfo.orientation == inputInfo.orientation)
         #expect(outputInfo.displayWidth == inputInfo.displayWidth)
@@ -404,10 +406,10 @@ struct WICompressImageIOCoreTests {
         let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")
         let inputData = try Data(contentsOf: url)
 
-        let outputData = try WICompressor.process(inputData)
+        let outputData = try WICompressor.process(inputData).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(WIImageFormat(data: outputData) == .png)
+        #expect(try imageFormat(of: outputData) == .png)
         #expect(outputInfo.hasAlpha == true)
     }
 
@@ -431,10 +433,10 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(try imageFormat(of: outputData) == .jpeg)
         #expect(outputInfo.hasAlpha != true)
         #expect(outputInfo.orientation == 1)
         #expect(outputInfo.displayWidth == inputInfo.displayWidth)
@@ -480,10 +482,10 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(WIImageFormat(data: outputData) == .png)
+        #expect(try imageFormat(of: outputData) == .png)
         #expect(outputInfo.hasAlpha == true)
         #expect(outputInfo.displayWidth == inputInfo.displayWidth)
         #expect(outputInfo.displayHeight == inputInfo.displayHeight)
@@ -507,10 +509,10 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(try imageFormat(of: outputData) == .jpeg)
         #expect(outputInfo.hasAlpha != true)
         #expect(outputInfo.displayWidth == inputInfo.displayWidth)
         #expect(outputInfo.displayHeight == inputInfo.displayHeight)
@@ -534,10 +536,10 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(WIImageFormat(data: outputData) == .png)
+        #expect(try imageFormat(of: outputData) == .png)
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) <= 600)
     }
 
@@ -557,9 +559,9 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
 
-        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(try imageFormat(of: outputData) == .jpeg)
         #expect(outputData != inputData)
     }
 
@@ -583,10 +585,10 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(try imageFormat(of: outputData) == .jpeg)
         #expect(outputInfo.hasGPS == true)
         #expect(outputInfo.orientation == 1)
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) <= 1200)
@@ -614,7 +616,7 @@ struct WICompressImageIOCoreTests {
             imageSource: inputSource
         )
 
-        let outputData = try WICompressor.process(inputData, using: process)
+        let outputData = try WICompressor.process(inputData, using: process).data
         let outputInfo = try Self.imageInfo(outputData)
 
         #expect(executionPlan.operation == .copyFromSource)
@@ -643,7 +645,7 @@ struct WICompressImageIOCoreTests {
             imageSource: inputSource
         )
 
-        let outputData = try WICompressor.process(inputData, using: process)
+        let outputData = try WICompressor.process(inputData, using: process).data
         let outputInfo = try Self.imageInfo(outputData)
 
         guard case .render = executionPlan.operation else {
@@ -690,10 +692,10 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .convert(to: .sRGB)
                 )
             )
-        )
+        ).data
         let outputColorSpaceName = try Self.decodedColorSpaceName(outputData)
 
-        #expect(WIImageFormat(data: outputData) == WIImageFormat(data: inputData))
+        #expect(try imageFormat(of: outputData) == imageFormat(of: inputData))
         #expect(outputColorSpaceName == CGColorSpace.sRGB as String)
     }
 
@@ -744,9 +746,9 @@ struct WICompressImageIOCoreTests {
         #expect(result.format == .jpeg)
         #expect(result.byteCount <= 10_000)
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) < 1200)
-        #expect(result.pixelSize == WISize(
-            width: Double(outputInfo.displayWidth),
-            height: Double(outputInfo.displayHeight)
+        #expect(result.pixelSize == WIPixelSize(
+            width: outputInfo.displayWidth,
+            height: outputInfo.displayHeight
         ))
     }
 
@@ -816,9 +818,9 @@ struct WICompressImageIOCoreTests {
         #expect(result.format == .png)
         #expect(result.byteCount <= 100_000)
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) < 1200)
-        #expect(result.pixelSize == WISize(
-            width: Double(outputInfo.displayWidth),
-            height: Double(outputInfo.displayHeight)
+        #expect(result.pixelSize == WIPixelSize(
+            width: outputInfo.displayWidth,
+            height: outputInfo.displayHeight
         ))
     }
 
@@ -1017,7 +1019,7 @@ struct WICompressImageIOCoreTests {
         let outputInfo = try Self.imageInfo(result.data)
 
         #expect(result.format == .heif)
-        #expect(result.pixelSize == WISize(width: 200, height: 200))
+        #expect(result.pixelSize == WIPixelSize(width: 200, height: 200))
         #expect(outputInfo.hasGPS == true)
         #expect(outputInfo.orientation == 1)
         #expect(outputInfo.displayWidth == 200)
@@ -1044,11 +1046,11 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .convert(to: .sRGB)
                 )
             )
-        )
+        ).data
         let outputInfo = try Self.imageInfo(outputData)
         let outputColorSpaceName = try Self.decodedColorSpaceName(outputData)
 
-        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(try imageFormat(of: outputData) == .jpeg)
         #expect(outputInfo.hasAlpha != true)
         #expect(outputColorSpaceName == CGColorSpace.sRGB as String)
     }
@@ -1070,9 +1072,9 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
 
-        #expect(WIImageFormat(data: outputData) == .jpeg)
+        #expect(try imageFormat(of: outputData) == .jpeg)
         #expect(!outputData.isEmpty)
     }
 
@@ -1092,7 +1094,7 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
         let outputInfo = try Self.imageInfo(outputData)
 
         #expect(inputInfo.orientation == 6)
@@ -1122,7 +1124,7 @@ struct WICompressImageIOCoreTests {
                     colorSpace: .preserve
                 )
             )
-        )
+        ).data
 
         #expect(Self.hasGainMap(outputData) == false)
     }

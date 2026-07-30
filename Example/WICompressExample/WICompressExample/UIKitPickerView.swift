@@ -85,7 +85,11 @@ struct ImagePickerView: UIViewControllerRepresentable {
                     let loadedData = try await data
                     
                     await MainActor.run {
-                        self.parent.selectedImageGroup = ImageGroup(image: loadedImage, rawData: loadedData)
+                        self.parent.selectedImageGroup = ImageGroup(
+                            image: loadedImage,
+                            rawData: loadedData,
+                            imageFormat: ExampleImageInspector.format(of: loadedData)
+                        )
                     }
                 } catch {
                     print("Failed to load image: \(error)")

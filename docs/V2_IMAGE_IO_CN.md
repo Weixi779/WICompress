@@ -46,12 +46,14 @@ render 和 encode 仍然耦合在 WICompress pipeline 中。
 
 ## Target 与可见性
 
-新增独立 SwiftPM target：
+独立 SwiftPM target 的依赖位置：
 
 ```text
-WIImageCore
+WIImageDomain
     ↑
 WIImageIO
+    ↑
+WICompressExecution
     ↑
 WICompress
 ```
@@ -59,7 +61,9 @@ WICompress
 首版约束：
 
 - `WIImageIO` 是 package 内部 target，不声明独立 library product。
-- 跨 target 使用 `package` 访问级别，不扩大 WICompress 的公共 API。
+- Source、Descriptor、options 与 codec primitives 使用 `package` 访问级别。
+- `WIImageFormat` 是唯一公开的 ImageIO 结果事实，由 Source inspection 产生；它不提供
+  public Data initializer 或公开 detection terminal。
 - 依赖 Foundation、CoreGraphics、ImageIO 与 UniformTypeIdentifiers。
 - 不依赖 WICompress 的 Process、Target、solver、Luban 或平台 UI 框架。
 - 不使用公共单例、全局 mutable registry、内部 queue 或 actor。

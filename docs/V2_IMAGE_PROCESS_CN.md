@@ -70,13 +70,13 @@ let process = WIImageProcess(
     )
 )
 
-let data = try WICompressor.process(sourceData, using: process)
+let result = try WICompressor.process(sourceData, using: process)
 ```
 
 文件入口使用同一 Process：
 
 ```swift
-let data = try WICompressor.process(contentsOf: url, using: process)
+let result = try WICompressor.process(contentsOf: url, using: process)
 ```
 
 文件 terminal 直接建立 file-backed ImageIO source，不在入口处读取完整 `Data`。
@@ -217,8 +217,9 @@ Quality 不属于 Output，因为 Target 中的 quality 由 solver 所有。Outp
 
 ## Passthrough 与结果
 
-Process 的最小结果保持为 encoded `Data`。Process 不为固定执行结果再引入一层必选包装
-类型；公开 inspection 或结构化结果只有出现真实消费者时再单独设计。
+Process 与 Target 统一返回 `WIResult`。它只承载执行已经产生的 `data`、`format`、
+`pixelSize` 和 `byteCount`，不引入新的处理策略或生命周期。`WIResult` 没有 public
+initializer，只由 terminal 产出；只需要编码数据时读取 `result.data`。
 
 只有源数据已经满足全部声明且没有任何必须重写的决定时才允许 passthrough，包括：
 
@@ -271,7 +272,7 @@ resolver 或改变执行语义。
 ## 已接受
 
 - Process 与 Target 是两条产品线，只在 internal execution plan 汇合。
-- Process 返回 encoded `Data`，执行一次，不保证最终 byte count。
+- Process 返回 `WIResult`，执行一次，不以 byte count 作为反向求解目标。
 - Sizing 只有 original 或一个 `WIImageResizing` 插槽。
 - `WIImageResizing` 的合同是完整 `PixelSize -> PixelSize`。
 - WICompress 可以提供内置 resizing 实现，但不为每个算法扩展核心 enum。

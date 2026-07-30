@@ -7,16 +7,19 @@
 //
 
 import Foundation
+import ImageIO
 import Observation
 import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import WICompress
 import os
 
 struct ImageGroup {
     var image: UIImage
     var rawData: Data
+    var imageFormat: WIImageFormat
     
     // Computed properties for UI display
     var fileSize: String {
@@ -31,8 +34,7 @@ struct ImageGroup {
     }
     
     var format: String {
-        let wiFormat = WIImageFormat(data: rawData)
-        switch wiFormat {
+        switch imageFormat {
         case .jpeg: return "JPEG"
         case .png: return "PNG"
         case .heif: return "HEIC/HEIF"
@@ -41,8 +43,30 @@ struct ImageGroup {
     }
     
     var isLivePhoto: Bool {
-        let wiFormat = WIImageFormat(data: rawData)
-        return wiFormat.isHEIF
+        imageFormat.isHEIF
+    }
+}
+
+enum ExampleImageInspector {
+    static func format(of data: Data) -> WIImageFormat {
+        guard
+            let source = CGImageSourceCreateWithData(data as CFData, nil),
+            let typeIdentifier = CGImageSourceGetType(source) as String?,
+            let type = UTType(typeIdentifier)
+        else {
+            return .unknown
+        }
+
+        if type.conforms(to: .jpeg) {
+            return .jpeg
+        }
+        if type.conforms(to: .png) {
+            return .png
+        }
+        if type.conforms(to: .heic) || type.conforms(to: .heif) {
+            return .heif
+        }
+        return .unknown
     }
 }
 
@@ -75,18 +99,19 @@ final class WICompressExampleViewModel {
         logger.info("Original format: \(imageGroup.format)")
         
         do {
-            let compressedData = try WICompressor.process(
+            let result = try WICompressor.process(
                 imageGroup.rawData,
                 using: WIImageProcess(quality: 0.7)
             )
-            guard let compressedUIImage = UIImage(data: compressedData) else {
+            guard let compressedUIImage = UIImage(data: result.data) else {
                 logger.error("Compression output could not be decoded!")
                 return
             }
 
             self.compressedImageGroup = ImageGroup(
-                image: compressedUIImage, 
-                rawData: compressedData
+                image: compressedUIImage,
+                rawData: result.data,
+                imageFormat: result.format
             )
             logger.info("Compression successful!")
         } catch {
@@ -115,7 +140,11 @@ final class WICompressExampleViewModel {
             let data = try await selectedItem.loadTransferable(type: Data.self)
             
             if let data = data, let uiImage = UIImage(data: data) {
-                self.selectedImageGroup = ImageGroup(image: uiImage, rawData: data)
+                self.selectedImageGroup = ImageGroup(
+                    image: uiImage,
+                    rawData: data,
+                    imageFormat: ExampleImageInspector.format(of: data)
+                )
                 // Clear previous compressed result
                 self.compressedImageGroup = nil
             }
