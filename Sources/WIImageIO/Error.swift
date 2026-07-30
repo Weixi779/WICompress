@@ -1,5 +1,5 @@
 //
-//  WIImageIOError.swift
+//  Error.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/7/29.
@@ -8,7 +8,7 @@
 
 import Foundation
 
-package enum WIImageIOError: Error, Sendable, Equatable {
+package enum Error: Swift.Error, Sendable, Equatable {
     case invalidImageData
     case sourcePropertiesUnavailable
     case invalidPixelSize(width: Int, height: Int)

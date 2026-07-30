@@ -8,12 +8,13 @@
 
 import CoreGraphics
 import Foundation
+import WIImageCore
 
 package enum WIImageRaster {
     package static func image(
         _ sourceImage: CGImage,
         plan: Plan
-    ) throws(WIImageRasterError) -> CGImage {
+    ) throws(Error) -> CGImage {
         try validate(plan, sourceImage: sourceImage)
         try preflightBitmapMemory(for: plan.canvasSize)
 
@@ -62,19 +63,20 @@ package enum WIImageRaster {
             context.fill(destinationRect)
         }
 
-        let orientedSize = orientedPixelSize(
-            width: sourceImage.width,
-            height: sourceImage.height,
-            orientation: plan.orientation
-        )
+        let orientedWidth = plan.orientation.swapsDimensions
+            ? sourceImage.height
+            : sourceImage.width
+        let orientedHeight = plan.orientation.swapsDimensions
+            ? sourceImage.width
+            : sourceImage.height
         let sourceRect = plan.sourceRect
         let scaleX = plan.destinationRect.width / sourceRect.width
         let scaleY = plan.destinationRect.height / sourceRect.height
         let fullImageRect = Rect(
             x: plan.destinationRect.x - sourceRect.x * scaleX,
             y: plan.destinationRect.y - sourceRect.y * scaleY,
-            width: Double(orientedSize.width) * scaleX,
-            height: Double(orientedSize.height) * scaleY
+            width: Double(orientedWidth) * scaleX,
+            height: Double(orientedHeight) * scaleY
         )
         guard fullImageRect.isFiniteAndPositive else {
             throw .invalidDestinationRect
@@ -94,8 +96,8 @@ package enum WIImageRaster {
             y: fullImageBottomLeftRect.minY
         )
         context.scaleBy(
-            x: fullImageBottomLeftRect.width / Double(orientedSize.width),
-            y: fullImageBottomLeftRect.height / Double(orientedSize.height)
+            x: fullImageBottomLeftRect.width / Double(orientedWidth),
+            y: fullImageBottomLeftRect.height / Double(orientedHeight)
         )
         applyOrientationTransform(
             to: context,
@@ -124,13 +126,7 @@ package enum WIImageRaster {
     private static func validate(
         _ plan: Plan,
         sourceImage: CGImage
-    ) throws(WIImageRasterError) {
-        guard plan.canvasSize.width > 0, plan.canvasSize.height > 0 else {
-            throw .invalidPixelSize(
-                width: plan.canvasSize.width,
-                height: plan.canvasSize.height
-            )
-        }
+    ) throws(Error) {
         guard plan.sourceRect.isFiniteAndPositive else {
             throw .invalidSourceRect
         }
@@ -138,16 +134,17 @@ package enum WIImageRaster {
             throw .invalidDestinationRect
         }
 
-        let orientedSize = orientedPixelSize(
-            width: sourceImage.width,
-            height: sourceImage.height,
-            orientation: plan.orientation
-        )
+        let orientedWidth = plan.orientation.swapsDimensions
+            ? sourceImage.height
+            : sourceImage.width
+        let orientedHeight = plan.orientation.swapsDimensions
+            ? sourceImage.width
+            : sourceImage.height
         guard
             plan.sourceRect.x >= 0,
             plan.sourceRect.y >= 0,
-            plan.sourceRect.x + plan.sourceRect.width <= Double(orientedSize.width),
-            plan.sourceRect.y + plan.sourceRect.height <= Double(orientedSize.height)
+            plan.sourceRect.x + plan.sourceRect.width <= Double(orientedWidth),
+            plan.sourceRect.y + plan.sourceRect.height <= Double(orientedHeight)
         else {
             throw .sourceRectOutOfBounds
         }
@@ -164,7 +161,7 @@ package enum WIImageRaster {
 
     private static func preflightBitmapMemory(
         for size: PixelSize
-    ) throws(WIImageRasterError) {
+    ) throws(Error) {
         let (minimumRowBytes, rowOverflow) = size.width.multipliedReportingOverflow(by: 4)
         guard !rowOverflow else {
             throw .rowByteOverflow(width: size.width)
@@ -183,9 +180,9 @@ package enum WIImageRaster {
     }
 
     private static func resolvedColorSpace(
-        _ colorSpace: ColorSpace,
+        _ colorSpace: OutputColorSpace,
         sourceColorSpace: CGColorSpace?
-    ) throws(WIImageRasterError) -> CGColorSpace {
+    ) throws(Error) -> CGColorSpace {
         switch colorSpace {
         case .source:
             guard
@@ -196,38 +193,31 @@ package enum WIImageRaster {
             }
 
             return sourceColorSpace
-        case .sRGB:
-            guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
-                throw .unsupportedColorSpace
-            }
+        case .convert(let target):
+            return try makeCGColorSpace(target)
+        }
+    }
 
-            return colorSpace
-        case .displayP3:
-            guard let colorSpace = CGColorSpace(name: CGColorSpace.displayP3) else {
-                throw .unsupportedColorSpace
-            }
-
-            return colorSpace
-        case .iccProfile(let data):
-            guard let colorSpace = CGColorSpace(iccData: data as CFData) else {
+    private static func makeCGColorSpace(
+        _ colorSpace: ColorSpace
+    ) throws(Error) -> CGColorSpace {
+        do {
+            return try colorSpace.makeCGColorSpace()
+        } catch {
+            switch error {
+            case .invalidICCProfile:
                 throw .invalidICCProfile
-            }
-            guard colorSpace.model == .rgb else {
+            case .unavailable, .unsupportedModel:
                 throw .unsupportedColorSpace
             }
-
-            return colorSpace
         }
     }
 
     private static func cgColor(
         _ color: Color,
         in destinationColorSpace: CGColorSpace
-    ) throws(WIImageRasterError) -> CGColor {
-        let sourceColorSpace = try resolvedColorSpace(
-            color.colorSpace,
-            sourceColorSpace: nil
-        )
+    ) throws(Error) -> CGColor {
+        let sourceColorSpace = try makeCGColorSpace(color.colorSpace)
         let components = [
             clamped(color.red),
             clamped(color.green),
@@ -256,19 +246,6 @@ package enum WIImageRaster {
             return CGImageAlphaInfo.noneSkipLast.rawValue
         case .preserve:
             return CGImageAlphaInfo.premultipliedLast.rawValue
-        }
-    }
-
-    private static func orientedPixelSize(
-        width: Int,
-        height: Int,
-        orientation: Orientation
-    ) -> PixelSize {
-        switch orientation {
-        case .leftMirrored, .right, .rightMirrored, .left:
-            return PixelSize(width: height, height: width)
-        case .up, .upMirrored, .down, .downMirrored:
-            return PixelSize(width: width, height: height)
         }
     }
 
@@ -333,7 +310,7 @@ package enum WIImageRaster {
     }
 }
 
-private extension WIImageRaster.Rect {
+private extension Rect {
     var isFiniteAndPositive: Bool {
         x.isFinite &&
         y.isFinite &&

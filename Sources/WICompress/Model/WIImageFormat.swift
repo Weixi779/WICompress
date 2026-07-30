@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WIImageCore
 import WIImageIO
 
 /// Image container families supported by WICompress.
@@ -26,28 +27,19 @@ public enum WIImageFormat: Sendable, Equatable {
     }
 
     init(typeIdentifier: String?) {
-        self.init(WIImageIO.WIImageFormat(typeIdentifier: typeIdentifier))
-    }
-
-    var supportsLossyQuality: Bool {
-        switch self {
-        case .jpeg, .heif:
-            return true
-        case .png, .unknown:
-            return false
-        }
+        self.init(ImageFormat(typeIdentifier: typeIdentifier))
     }
 
     static func canWrite(typeIdentifier: String) -> Bool {
-        WIImageCapabilities.canEncode(typeIdentifier: typeIdentifier)
+        Capabilities.canEncode(typeIdentifier: typeIdentifier)
     }
 
     /// Detects the image format from container bytes.
     public init(data: Data) {
-        self.init(WIImageIO.WIImageFormat(data: data))
+        self.init(ImageFormat(data: data))
     }
 
-    private init(_ format: WIImageIO.WIImageFormat) {
+    init(_ format: ImageFormat) {
         switch format {
         case .jpeg:
             self = .jpeg

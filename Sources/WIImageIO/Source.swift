@@ -1,5 +1,5 @@
 //
-//  WIImageSource.swift
+//  Source.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/7/29.
@@ -9,14 +9,15 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import WIImageCore
 
-package final class WIImageSource {
+package final class Source {
     package let byteCount: Int
-    package let descriptor: WIImageDescriptor
+    package let descriptor: Descriptor
 
     private let cgImageSource: CGImageSource
 
-    package init(data: Data) throws(WIImageIOError) {
+    package init(data: Data) throws(Error) {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw .invalidImageData
         }
@@ -26,7 +27,7 @@ package final class WIImageSource {
         self.descriptor = try Self.inspect(source, byteCount: data.count)
     }
 
-    package init(contentsOf url: URL) throws(WIImageIOError) {
+    package init(contentsOf url: URL) throws(Error) {
         let byteCount = try Self.fileByteCount(for: url)
 
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
@@ -38,7 +39,7 @@ package final class WIImageSource {
         self.descriptor = try Self.inspect(source, byteCount: byteCount)
     }
 
-    package func colorSpace() throws(WIImageIOError) -> WIImageColorSpace? {
+    package func colorSpace() throws(Error) -> ColorSpace? {
         guard let image = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
             throw .imageCreationFailed
         }
@@ -65,8 +66,8 @@ package final class WIImageSource {
     }
 
     package func image(
-        options: WIImageDecodeOptions = .init()
-    ) throws(WIImageIOError) -> CGImage {
+        options: DecodeOptions = .init()
+    ) throws(Error) -> CGImage {
         try validateStaticImage()
 
         let properties: [CFString: Any] = [
@@ -84,8 +85,8 @@ package final class WIImageSource {
     }
 
     package func thumbnail(
-        options: WIThumbnailOptions
-    ) throws(WIImageIOError) -> CGImage {
+        options: ThumbnailOptions
+    ) throws(Error) -> CGImage {
         try validateStaticImage()
 
         var properties: [CFString: Any] = [
@@ -110,8 +111,8 @@ package final class WIImageSource {
 
     package func copy(
         `as` typeIdentifier: String,
-        options: WIImageCopyOptions = .init()
-    ) throws(WIImageIOError) -> Data {
+        options: CopyOptions = .init()
+    ) throws(Error) -> Data {
         try validateStaticImage()
 
         let outputData = NSMutableData()
@@ -146,7 +147,7 @@ package final class WIImageSource {
         return outputData as Data
     }
 
-    private func validateStaticImage() throws(WIImageIOError) {
+    private func validateStaticImage() throws(Error) {
         guard descriptor.frameCount == 1 else {
             throw .animatedSourceUnsupported(frameCount: descriptor.frameCount)
         }
@@ -168,7 +169,7 @@ package final class WIImageSource {
         }
     }
 
-    private static func fileByteCount(for url: URL) throws(WIImageIOError) -> Int {
+    private static func fileByteCount(for url: URL) throws(Error) -> Int {
         let resourceValues: URLResourceValues
         do {
             resourceValues = try url.resourceValues(forKeys: [.fileSizeKey])
@@ -200,7 +201,7 @@ package final class WIImageSource {
     private static func inspect(
         _ source: CGImageSource,
         byteCount: Int
-    ) throws(WIImageIOError) -> WIImageDescriptor {
+    ) throws(Error) -> Descriptor {
         let frameCount = CGImageSourceGetCount(source)
         guard frameCount > 0 else {
             throw .invalidImageData
@@ -214,17 +215,25 @@ package final class WIImageSource {
             throw .sourcePropertiesUnavailable
         }
 
-        let pixelSize = try WIPixelSize(width: pixelWidth, height: pixelHeight)
-        let orientation = properties.intValue(for: kCGImagePropertyOrientation) ?? 1
-        let swapsDimensions = [5, 6, 7, 8].contains(orientation)
-        let orientedPixelSize = try WIPixelSize(
-            width: swapsDimensions ? pixelHeight : pixelWidth,
-            height: swapsDimensions ? pixelWidth : pixelHeight
+        let pixelSize = try makePixelSize(
+            width: pixelWidth,
+            height: pixelHeight
+        )
+        guard let orientation = Orientation(
+            rawValue: properties.intValue(
+                for: kCGImagePropertyOrientation
+            ) ?? Orientation.up.rawValue
+        ) else {
+            throw .sourcePropertiesUnavailable
+        }
+        let orientedPixelSize = try makePixelSize(
+            width: orientation.swapsDimensions ? pixelHeight : pixelWidth,
+            height: orientation.swapsDimensions ? pixelWidth : pixelHeight
         )
         let typeIdentifier = CGImageSourceGetType(source) as String?
 
-        return WIImageDescriptor(
-            format: WIImageFormat(typeIdentifier: typeIdentifier),
+        return Descriptor(
+            format: ImageFormat(typeIdentifier: typeIdentifier),
             typeIdentifier: typeIdentifier,
             byteCount: byteCount,
             pixelSize: pixelSize,
@@ -235,9 +244,25 @@ package final class WIImageSource {
             hasMetadata: hasStrippableMetadata(in: properties),
             hasGPS: properties.dictionaryExists(for: kCGImagePropertyGPSDictionary),
             hasGainMap: hasGainMap(in: source),
-            isSourceFormatDecodable: typeIdentifier.map(WIImageCapabilities.canDecode(typeIdentifier:)) ?? false,
-            isSourceFormatWritable: typeIdentifier.map(WIImageCapabilities.canEncode(typeIdentifier:)) ?? false
+            isSourceFormatDecodable: typeIdentifier.map(Capabilities.canDecode(typeIdentifier:)) ?? false,
+            isSourceFormatWritable: typeIdentifier.map(Capabilities.canEncode(typeIdentifier:)) ?? false
         )
+    }
+
+    private static func makePixelSize(
+        width: Int,
+        height: Int
+    ) throws(Error) -> PixelSize {
+        do {
+            return try PixelSize(width: width, height: height)
+        } catch {
+            switch error {
+            case .invalidDimensions:
+                throw .invalidPixelSize(width: width, height: height)
+            case .pixelCountOverflow:
+                throw .pixelCountOverflow(width: width, height: height)
+            }
+        }
     }
 
     private static func hasStrippableMetadata(in properties: [CFString: Any]) -> Bool {

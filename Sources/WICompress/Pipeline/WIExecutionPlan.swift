@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WIImageCore
 
 struct WIExecutionPlan: Sendable, Equatable {
     enum Operation: Sendable, Equatable {
@@ -16,7 +17,7 @@ struct WIExecutionPlan: Sendable, Equatable {
     }
 
     let operation: Operation
-    let destinationFormat: WIImageFormat
+    let destinationFormat: ImageFormat
     let destinationTypeIdentifier: String
     let metadata: WIImageMetadata
     var quality: Double?
@@ -25,8 +26,8 @@ struct WIExecutionPlan: Sendable, Equatable {
 }
 
 struct WIResolvedRender: Sendable, Equatable {
-    let sourceRect: WIRect
-    let canvasSize: WIPixelSize
-    let destinationRect: WIRect
-    let canvasBackground: WIColor?
+    let sourceRect: Rect
+    let canvasSize: PixelSize
+    let destinationRect: Rect
+    let canvasBackground: Color?
 }

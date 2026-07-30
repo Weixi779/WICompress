@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WIImageCore
 
 enum WICompressionTargetResolver {
     static func sizing(
@@ -59,7 +60,7 @@ enum WICompressionTargetResolver {
             return true
         case .strip:
             return !imageSource.info.hasMetadata
-                && imageSource.info.orientation == 1
+                && imageSource.info.orientation == .up
         }
     }
 
@@ -71,7 +72,9 @@ enum WICompressionTargetResolver {
         quality: Double?
     ) throws(WICompressError) -> WIExecutionPlan {
         guard output.isWritable else {
-            throw .unsupportedDestinationFormat(output.destinationFormat)
+            throw .unsupportedDestinationFormat(
+                WIImageFormat(output.destinationFormat)
+            )
         }
 
         let resolvedQuality = output.destinationFormat.supportsLossyQuality
@@ -86,11 +89,20 @@ enum WICompressionTargetResolver {
         ) {
             operation = .copyFromSource
         } else {
+            let canvasSize: PixelSize
+            do {
+                canvasSize = try PixelSize(
+                    width: pixelSize.width,
+                    height: pixelSize.height
+                )
+            } catch {
+                throw .invalidTarget
+            }
             operation = .render(
                 WIResolvedRender(
                     sourceRect: sizing.sourceRect,
-                    canvasSize: pixelSize,
-                    destinationRect: WIRect(
+                    canvasSize: canvasSize,
+                    destinationRect: Rect(
                         x: 0,
                         y: 0,
                         width: Double(pixelSize.width),

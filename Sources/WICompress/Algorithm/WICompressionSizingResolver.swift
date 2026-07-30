@@ -7,14 +7,15 @@
 //
 
 import Foundation
+import WIImageCore
 
 struct WIResolvedCompressionSizing: Sendable, Equatable {
-    let sourceRect: WIRect
+    let sourceRect: Rect
     let basePixelSize: WIPixelSize
     let sourcePixelSize: WIPixelSize
 
     var hasCrop: Bool {
-        sourceRect != WIRect(
+        sourceRect != Rect(
             x: 0,
             y: 0,
             width: Double(sourcePixelSize.width),

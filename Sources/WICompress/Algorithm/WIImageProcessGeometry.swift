@@ -7,9 +7,10 @@
 //
 
 import Foundation
+import WIImageCore
 
 struct WIResolvedProcessGeometry: Sendable, Equatable {
-    let sourceRect: WIRect
+    let sourceRect: Rect
     let croppedPixelSize: WIPixelSize
     let targetPixelSize: WIPixelSize
 

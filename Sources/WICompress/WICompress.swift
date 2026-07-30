@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WIImageCore
 
 /// ImageIO-backed image compression entry point.
 public struct WICompress: Sendable {
@@ -117,7 +118,7 @@ public struct WICompress: Sendable {
     private static func compressionResult(for data: Data, info: WIImageInfo) -> WICompressionResult {
         WICompressionResult(
             data: data,
-            format: info.sourceFormat,
+            format: WIImageFormat(info.sourceFormat),
             pixelSize: info.displaySize,
             byteCount: data.count
         )

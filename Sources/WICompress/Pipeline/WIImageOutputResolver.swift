@@ -8,9 +8,10 @@
 
 import Foundation
 import UniformTypeIdentifiers
+import WIImageCore
 
 struct WIResolvedOutputColorSpace: Sendable, Equatable {
-    let target: WIColorSpace?
+    let target: ColorSpace?
 
     var requiresConversion: Bool {
         target != nil
@@ -18,7 +19,7 @@ struct WIResolvedOutputColorSpace: Sendable, Equatable {
 }
 
 struct WIResolvedImageOutput: Sendable, Equatable {
-    let destinationFormat: WIImageFormat
+    let destinationFormat: ImageFormat
     let destinationTypeIdentifier: String
     let jpegBackground: WIJPEGBackground?
     let colorSpace: WIResolvedOutputColorSpace
@@ -60,7 +61,7 @@ enum WIImageOutputResolver {
         for representation: WIImageRepresentation,
         info: WIImageInfo
     ) throws(WICompressError) -> (
-        format: WIImageFormat,
+        format: ImageFormat,
         typeIdentifier: String,
         jpegBackground: WIJPEGBackground?
     ) {
@@ -74,7 +75,9 @@ enum WIImageOutputResolver {
         case .jpeg(let background):
             try validateJPEGBackground(background)
             if background == .disallow, info.hasAlpha == true {
-                throw .transparentSourceRequiresBackground(info.sourceFormat)
+                throw .transparentSourceRequiresBackground(
+                    WIImageFormat(info.sourceFormat)
+                )
             }
 
             return (.jpeg, UTType.jpeg.identifier, background)
@@ -116,8 +119,11 @@ enum WIImageOutputResolver {
             return WIResolvedOutputColorSpace(target: nil)
         case .convert(let target):
             _ = try target.makeCGColorSpace()
+            let coreTarget = target.imageCoreValue
             return WIResolvedOutputColorSpace(
-                target: sourceColorSpace?.colorSpace == target ? nil : target
+                target: sourceColorSpace?.colorSpace == coreTarget
+                    ? nil
+                    : coreTarget
             )
         }
     }

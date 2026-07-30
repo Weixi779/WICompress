@@ -1,12 +1,12 @@
 //
-//  WIImageEncodingOptions.swift
+//  EncodingOptions.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/7/30.
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
-package struct WIImageCopyOptions: Hashable, Sendable {
+package struct CopyOptions: Hashable, Sendable {
     package var maximumPixelSize: Int?
     package var compressionQuality: Double?
 
@@ -19,7 +19,7 @@ package struct WIImageCopyOptions: Hashable, Sendable {
     }
 }
 
-package struct WIImageEncodeOptions: Hashable, Sendable {
+package struct EncodeOptions: Hashable, Sendable {
     package var compressionQuality: Double?
 
     package init(compressionQuality: Double? = nil) {

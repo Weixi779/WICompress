@@ -7,9 +7,10 @@
 //
 
 import Foundation
+import WIImageCore
 
 struct WIResolvedCropGeometry: Sendable, Equatable {
-    let sourceRect: WIRect
+    let sourceRect: Rect
     let pixelSize: WIPixelSize
 }
 
@@ -24,7 +25,7 @@ enum WIImageCropGeometry {
 
         guard let crop else {
             return WIResolvedCropGeometry(
-                sourceRect: WIRect(
+                sourceRect: Rect(
                     x: 0,
                     y: 0,
                     width: Double(sourcePixelSize.width),
@@ -100,7 +101,7 @@ enum WIImageCropGeometry {
         let originX = min(max(anchoredX, 0), availableX)
         let originY = min(max(anchoredY, 0), availableY)
         return WIResolvedCropGeometry(
-            sourceRect: WIRect(
+            sourceRect: Rect(
                 x: Double(originX),
                 y: Double(originY),
                 width: Double(cropWidth),

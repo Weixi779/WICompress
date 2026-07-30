@@ -1,5 +1,5 @@
 //
-//  WIImageTranscoder.swift
+//  Transcoder.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/7/30.
@@ -10,13 +10,13 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
-package enum WIImageTranscoder {
+package enum Transcoder {
     package static func encode(
         _ image: CGImage,
         `as` typeIdentifier: String,
-        options: WIImageEncodeOptions = .init(),
-        preservingMetadataFrom source: WIImageSource? = nil
-    ) throws(WIImageIOError) -> Data {
+        options: EncodeOptions = .init(),
+        preservingMetadataFrom source: Source? = nil
+    ) throws(Error) -> Data {
         let outputData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             outputData,

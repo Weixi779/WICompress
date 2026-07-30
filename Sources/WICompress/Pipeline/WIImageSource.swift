@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WIImageCore
 import WIImageIO
 
 final class WIImageSource {
@@ -18,16 +19,16 @@ final class WIImageSource {
     let backing: Backing
     let info: WIImageInfo
 
-    let imageIOSource: WIImageIO.WIImageSource
+    let imageIOSource: WIImageIO.Source
 
     var byteCount: Int {
         imageIOSource.byteCount
     }
 
     convenience init(data: Data) throws(WICompressError) {
-        let imageIOSource: WIImageIO.WIImageSource
+        let imageIOSource: WIImageIO.Source
         do {
-            imageIOSource = try WIImageIO.WIImageSource(data: data)
+            imageIOSource = try WIImageIO.Source(data: data)
         } catch {
             throw Self.map(error)
         }
@@ -39,9 +40,9 @@ final class WIImageSource {
     }
 
     convenience init(contentsOf url: URL) throws(WICompressError) {
-        let imageIOSource: WIImageIO.WIImageSource
+        let imageIOSource: WIImageIO.Source
         do {
-            imageIOSource = try WIImageIO.WIImageSource(contentsOf: url)
+            imageIOSource = try WIImageIO.Source(contentsOf: url)
         } catch {
             throw Self.map(error)
         }
@@ -54,7 +55,7 @@ final class WIImageSource {
 
     private init(
         backing: Backing,
-        imageIOSource: WIImageIO.WIImageSource
+        imageIOSource: WIImageIO.Source
     ) throws(WICompressError) {
         let descriptor = imageIOSource.descriptor
         guard descriptor.frameCount == 1 else {
@@ -64,10 +65,9 @@ final class WIImageSource {
         self.backing = backing
         self.imageIOSource = imageIOSource
         self.info = WIImageInfo(
-            sourceFormat: WIImageFormat(descriptor.format),
+            sourceFormat: descriptor.format,
             typeIdentifier: descriptor.typeIdentifier,
-            pixelWidth: descriptor.pixelSize.width,
-            pixelHeight: descriptor.pixelSize.height,
+            pixelSize: descriptor.pixelSize,
             orientation: descriptor.orientation,
             frameCount: descriptor.frameCount,
             isSourceFormatWritable: descriptor.isSourceFormatWritable,
@@ -98,7 +98,7 @@ final class WIImageSource {
             return nil
         }
 
-        let colorSpace: WIImageIO.WIImageColorSpace?
+        let colorSpace: ColorSpace?
         do {
             colorSpace = try imageIOSource.colorSpace()
         } catch {
@@ -106,11 +106,11 @@ final class WIImageSource {
         }
 
         return WISourceColorSpaceInfo(
-            colorSpace: colorSpace.map(WIColorSpace.init)
+            colorSpace: colorSpace
         )
     }
 
-    private static func map(_ error: WIImageIOError) -> WICompressError {
+    private static func map(_ error: WIImageIO.Error) -> WICompressError {
         switch error {
         case .invalidImageData:
             return .invalidImageData
@@ -130,34 +130,6 @@ final class WIImageSource {
         case .fileReadFailed(let url),
              .fileSizeUnavailable(let url):
             return .fileReadFailed(url)
-        }
-    }
-}
-
-private extension WIImageFormat {
-    init(_ format: WIImageIO.WIImageFormat) {
-        switch format {
-        case .jpeg:
-            self = .jpeg
-        case .png:
-            self = .png
-        case .heif:
-            self = .heif
-        case .unknown:
-            self = .unknown
-        }
-    }
-}
-
-private extension WIColorSpace {
-    init(_ colorSpace: WIImageIO.WIImageColorSpace) {
-        switch colorSpace {
-        case .sRGB:
-            self = .sRGB
-        case .displayP3:
-            self = .displayP3
-        case .iccProfile(let data):
-            self = .iccProfile(data)
         }
     }
 }

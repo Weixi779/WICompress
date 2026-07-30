@@ -7,17 +7,17 @@
 //
 
 import Foundation
+import WIImageCore
 
 struct WISourceColorSpaceInfo: Sendable, Equatable {
-    let colorSpace: WIColorSpace?
+    let colorSpace: ColorSpace?
 }
 
 struct WIImageInfo: Sendable, Equatable {
-    let sourceFormat: WIImageFormat
+    let sourceFormat: ImageFormat
     let typeIdentifier: String?
-    let pixelWidth: Int
-    let pixelHeight: Int
-    let orientation: Int
+    let pixelSize: PixelSize
+    let orientation: Orientation
     let frameCount: Int
     let isSourceFormatWritable: Bool
     let hasMetadata: Bool
@@ -26,11 +26,11 @@ struct WIImageInfo: Sendable, Equatable {
     let hasAlpha: Bool?
 
     var displayWidth: Int {
-        swapsDisplayDimensions ? pixelHeight : pixelWidth
+        orientation.swapsDimensions ? pixelSize.height : pixelSize.width
     }
 
     var displayHeight: Int {
-        swapsDisplayDimensions ? pixelWidth : pixelHeight
+        orientation.swapsDimensions ? pixelSize.width : pixelSize.height
     }
 
     var displaySize: WISize {
@@ -39,14 +39,5 @@ struct WIImageInfo: Sendable, Equatable {
 
     var displayDimensions: (width: Int, height: Int) {
         (displayWidth, displayHeight)
-    }
-
-    private var swapsDisplayDimensions: Bool {
-        switch orientation {
-        case 5, 6, 7, 8:
-            return true
-        default:
-            return false
-        }
     }
 }

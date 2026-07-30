@@ -65,18 +65,20 @@ stale snippets.
 
 ## Architecture
 
-The core is a UIKit-free ImageIO pipeline under `Sources/WICompress/`, grouped
-by role:
+The package is split into three package-only infrastructure targets and one
+public product target:
 
 ```text
-Sources/WICompress/
-  WICompress.swift
-  Model/
-  Policies/
-  Process/
-  Pipeline/
-  Algorithm/
+WIImageCore
+  ↑        ↑
+WIImageIO  WIImageRaster
+     ↑       ↑
+       WICompress
 ```
+
+`WIImageCore` owns shared package-level pixel facts: `PixelSize`, `Rect`,
+`Orientation`, `ImageFormat`, `ColorSpace`, and `Color`. Public Domain values
+remain in `WICompress` and convert once at the resolver/product boundary.
 
 Process is the deterministic `Data`/`URL` in, `Data` out path:
 
@@ -121,7 +123,8 @@ Key types:
    and built-in Luban, boundary, scale, and exact-size implementations.
 4. **WIImageOutput** - shared representation, metadata, and color-space
    requirements used by both Process and Target.
-5. **WIImageSource** / **WIImageInfo** - ImageIO source wrapper and inspected facts
+5. **WIImageSource** / **WIImageInfo** - product source wrapper over
+   `WIImageIO.Source` and its inspected Core facts
    (format, pixel size, orientation, frame count, alpha, gain map, writability).
 6. **WIExecutionPlan** - resolved Process execution facts; it contains no
    resizing algorithm, crop intent, or public Policy.

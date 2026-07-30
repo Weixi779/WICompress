@@ -8,6 +8,7 @@
 
 import Foundation
 import CoreGraphics
+import WIImageCore
 import WIImageIO
 import WIImageRaster
 
@@ -23,7 +24,7 @@ enum WIImageEncoder {
             do {
                 return try imageSource.imageIOSource.copy(
                     as: plan.destinationTypeIdentifier,
-                    options: WIImageCopyOptions(
+                    options: CopyOptions(
                         compressionQuality: plan.quality
                     )
                 )
@@ -63,10 +64,10 @@ enum WIImageEncoder {
         plan: WIExecutionPlan
     ) throws(WICompressError) -> Data {
         do {
-            return try WIImageTranscoder.encode(
+            return try Transcoder.encode(
                 image,
                 as: plan.destinationTypeIdentifier,
-                options: WIImageEncodeOptions(
+                options: EncodeOptions(
                     compressionQuality: plan.quality
                 ),
                 preservingMetadataFrom: plan.metadata == .preserve
@@ -81,13 +82,13 @@ enum WIImageEncoder {
     private static func render(
         _ imageSource: WIImageSource,
         geometry: WIResolvedRender,
-        destinationFormat: WIImageFormat,
+        destinationFormat: ImageFormat,
         jpegBackground: WIJPEGBackground?,
         outputColorSpace: WIResolvedOutputColorSpace
     ) throws(WICompressError) -> CGImage {
         let sourceImage: CGImage
-        let sourceRect: WIRect
-        let orientation: WIImageRaster.Orientation
+        let sourceRect: Rect
+        let orientation: Orientation
         if usesFullOrientedSource(geometry, info: imageSource.info) {
             if let maximumPixelSize = thumbnailMaximumPixelSize(
                 for: geometry,
@@ -95,14 +96,14 @@ enum WIImageEncoder {
             ) {
                 do {
                     sourceImage = try imageSource.imageIOSource.thumbnail(
-                        options: WIThumbnailOptions(
+                        options: ThumbnailOptions(
                             maximumPixelSize: maximumPixelSize
                         )
                     )
                 } catch {
                     throw map(error, destinationFormat: destinationFormat)
                 }
-                sourceRect = WIRect(
+                sourceRect = Rect(
                     x: 0,
                     y: 0,
                     width: Double(sourceImage.width),
@@ -116,12 +117,7 @@ enum WIImageEncoder {
                     throw map(error, destinationFormat: destinationFormat)
                 }
                 sourceRect = geometry.sourceRect
-                guard let sourceOrientation = WIImageRaster.Orientation(
-                    rawValue: imageSource.info.orientation
-                ) else {
-                    throw .imageInfoUnavailable
-                }
-                orientation = sourceOrientation
+                orientation = imageSource.info.orientation
             }
         } else {
             do {
@@ -130,35 +126,20 @@ enum WIImageEncoder {
                 throw map(error, destinationFormat: destinationFormat)
             }
             sourceRect = geometry.sourceRect
-            guard let sourceOrientation = WIImageRaster.Orientation(
-                rawValue: imageSource.info.orientation
-            ) else {
-                throw .imageInfoUnavailable
-            }
-            orientation = sourceOrientation
+            orientation = imageSource.info.orientation
         }
 
         return try rasterImage(
             sourceImage,
             plan: WIImageRaster.Plan(
-                canvasSize: rasterPixelSize(geometry.canvasSize),
-                sourceRect: WIImageRaster.Rect(
-                    x: sourceRect.x,
-                    y: sourceRect.y,
-                    width: sourceRect.width,
-                    height: sourceRect.height
-                ),
-                destinationRect: WIImageRaster.Rect(
-                    x: geometry.destinationRect.x,
-                    y: geometry.destinationRect.y,
-                    width: geometry.destinationRect.width,
-                    height: geometry.destinationRect.height
-                ),
+                canvasSize: geometry.canvasSize,
+                sourceRect: sourceRect,
+                destinationRect: geometry.destinationRect,
                 orientation: orientation,
                 alphaMode: rasterAlphaMode(
                     destinationFormat: destinationFormat
                 ),
-                canvasBackground: geometry.canvasBackground.map(rasterColor),
+                canvasBackground: geometry.canvasBackground,
                 imageBackground: rasterJPEGBackground(from: jpegBackground),
                 colorSpace: rasterColorSpace(from: outputColorSpace)
             )
@@ -198,7 +179,7 @@ enum WIImageEncoder {
         _ geometry: WIResolvedRender,
         info: WIImageInfo
     ) -> Bool {
-        geometry.sourceRect == WIRect(
+        geometry.sourceRect == Rect(
             x: 0,
             y: 0,
             width: Double(info.displayWidth),
@@ -217,69 +198,40 @@ enum WIImageEncoder {
         }
     }
 
-    private static func rasterPixelSize(
-        _ size: WIPixelSize
-    ) -> WIImageRaster.PixelSize {
-        WIImageRaster.PixelSize(width: size.width, height: size.height)
-    }
-
     private static func rasterAlphaMode(
-        destinationFormat: WIImageFormat
+        destinationFormat: ImageFormat
     ) -> WIImageRaster.AlphaMode {
         destinationFormat == .jpeg ? .opaque : .preserve
     }
 
     private static func rasterJPEGBackground(
         from background: WIJPEGBackground?
-    ) -> WIImageRaster.Color? {
+    ) -> Color? {
         switch background {
         case .white:
-            return rasterColor(WIColor(red: 1, green: 1, blue: 1))
+            return Color(red: 1, green: 1, blue: 1)
         case .black:
-            return rasterColor(WIColor(red: 0, green: 0, blue: 0))
+            return Color(red: 0, green: 0, blue: 0)
         case .color(let color):
-            return rasterColor(color)
+            return color.imageCoreValue
         case .disallow, nil:
             return nil
         }
     }
 
-    private static func rasterColor(_ color: WIColor) -> WIImageRaster.Color {
-        WIImageRaster.Color(
-            red: color.red,
-            green: color.green,
-            blue: color.blue,
-            alpha: color.alpha,
-            colorSpace: rasterColorSpace(from: color.colorSpace)
-        )
-    }
-
     private static func rasterColorSpace(
         from colorSpace: WIResolvedOutputColorSpace
-    ) -> WIImageRaster.ColorSpace {
+    ) -> WIImageRaster.OutputColorSpace {
         guard let target = colorSpace.target else {
             return .source
         }
 
-        return rasterColorSpace(from: target)
-    }
-
-    private static func rasterColorSpace(
-        from colorSpace: WIColorSpace
-    ) -> WIImageRaster.ColorSpace {
-        switch colorSpace {
-        case .sRGB:
-            return .sRGB
-        case .displayP3:
-            return .displayP3
-        case .iccProfile(let data):
-            return .iccProfile(data)
-        }
+        return .convert(target)
     }
 
     private static func map(
-        _ error: WIImageIOError,
-        destinationFormat: WIImageFormat
+        _ error: WIImageIO.Error,
+        destinationFormat: ImageFormat
     ) -> WICompressError {
         switch error {
         case .invalidImageData:
@@ -298,18 +250,19 @@ enum WIImageEncoder {
         case .animatedSourceUnsupported(let frameCount):
             return .animatedSourceUnsupported(frameCount: frameCount)
         case .destinationCreationFailed:
-            return .destinationCreationFailed(destinationFormat)
+            return .destinationCreationFailed(
+                WIImageFormat(destinationFormat)
+            )
         case .destinationFinalizationFailed:
-            return .encodeFailed(destinationFormat)
+            return .encodeFailed(WIImageFormat(destinationFormat))
         }
     }
 
     private static func map(
-        _ error: WIImageRasterError
+        _ error: WIImageRaster.Error
     ) -> WICompressError {
         switch error {
-        case .invalidPixelSize,
-             .invalidSourceRect,
+        case .invalidSourceRect,
              .invalidDestinationRect,
              .sourceRectOutOfBounds:
             return .executionPlanUnavailable

@@ -22,33 +22,43 @@ let package = Package(
     dependencies: [],
     targets: [
         .target(
-            name: "WIImageIO",
+            name: "WIImageCore",
             dependencies: [],
+            path: "Sources/WIImageCore"
+        ),
+        .target(
+            name: "WIImageIO",
+            dependencies: ["WIImageCore"],
             path: "Sources/WIImageIO"
         ),
         .target(
             name: "WIImageRaster",
-            dependencies: [],
+            dependencies: ["WIImageCore"],
             path: "Sources/WIImageRaster"
         ),
         .target(
             name: "WICompress",
-            dependencies: ["WIImageIO", "WIImageRaster"],
+            dependencies: ["WIImageCore", "WIImageIO", "WIImageRaster"],
             path: "Sources/WICompress"
         ),
         .testTarget(
+            name: "WIImageCoreTests",
+            dependencies: ["WIImageCore"],
+            path: "Tests/WIImageCoreTests"
+        ),
+        .testTarget(
             name: "WIImageIOTests",
-            dependencies: ["WIImageIO"],
+            dependencies: ["WIImageCore", "WIImageIO"],
             path: "Tests/WIImageIOTests"
         ),
         .testTarget(
             name: "WIImageRasterTests",
-            dependencies: ["WIImageRaster"],
+            dependencies: ["WIImageCore", "WIImageRaster"],
             path: "Tests/WIImageRasterTests"
         ),
         .testTarget(
             name: "WICompressTests",
-            dependencies: ["WICompress"],
+            dependencies: ["WICompress", "WIImageCore"],
             path: "Tests/WICompressTests",
             resources: [.copy("Resources")]
         ),

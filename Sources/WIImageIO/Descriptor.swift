@@ -1,5 +1,5 @@
 //
-//  WIImageDescriptor.swift
+//  Descriptor.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/7/29.
@@ -7,14 +7,15 @@
 //
 
 import Foundation
+import WIImageCore
 
-package struct WIImageDescriptor: Sendable, Equatable {
-    package let format: WIImageFormat
+package struct Descriptor: Sendable, Equatable {
+    package let format: ImageFormat
     package let typeIdentifier: String?
     package let byteCount: Int
-    package let pixelSize: WIPixelSize
-    package let orientedPixelSize: WIPixelSize
-    package let orientation: Int
+    package let pixelSize: PixelSize
+    package let orientedPixelSize: PixelSize
+    package let orientation: Orientation
     package let frameCount: Int
     package let hasAlpha: Bool?
     package let hasMetadata: Bool

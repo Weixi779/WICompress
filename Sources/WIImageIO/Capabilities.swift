@@ -1,5 +1,5 @@
 //
-//  WIImageCapabilities.swift
+//  Capabilities.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/7/29.
@@ -9,7 +9,7 @@
 import Foundation
 import ImageIO
 
-package enum WIImageCapabilities {
+package enum Capabilities {
     package static func canDecode(typeIdentifier: String) -> Bool {
         readableTypeIdentifiers.contains(typeIdentifier)
     }

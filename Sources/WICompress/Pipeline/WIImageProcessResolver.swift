@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WIImageCore
 
 enum WIImageProcessResolver {
     static func resolve(
@@ -52,7 +53,7 @@ enum WIImageProcessResolver {
 
         guard resolvedOutput.isWritable else {
             throw .unsupportedDestinationFormat(
-                resolvedOutput.destinationFormat
+                WIImageFormat(resolvedOutput.destinationFormat)
             )
         }
 
@@ -65,11 +66,20 @@ enum WIImageProcessResolver {
             operation = .copyFromSource
         } else {
             let targetSize = geometry.targetPixelSize
+            let canvasSize: PixelSize
+            do {
+                canvasSize = try PixelSize(
+                    width: targetSize.width,
+                    height: targetSize.height
+                )
+            } catch {
+                throw .invalidResizingResult
+            }
             operation = .render(
                 WIResolvedRender(
                     sourceRect: geometry.sourceRect,
-                    canvasSize: targetSize,
-                    destinationRect: WIRect(
+                    canvasSize: canvasSize,
+                    destinationRect: Rect(
                         x: 0,
                         y: 0,
                         width: Double(targetSize.width),
@@ -120,7 +130,7 @@ enum WIImageProcessResolver {
         case .preserve:
             return true
         case .strip:
-            return !info.hasMetadata && info.orientation == 1
+            return !info.hasMetadata && info.orientation == .up
         }
     }
 

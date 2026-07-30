@@ -8,6 +8,7 @@
 
 import CoreGraphics
 import Foundation
+import WIImageCore
 
 /// Target byte-budget search over one fixed crop and a uniformly scaled base size.
 enum WICompressionSolver {
@@ -322,7 +323,7 @@ enum WICompressionSolver {
         highQuality: Double,
         lowData: Data,
         outputPixelSize: WIPixelSize,
-        destinationFormat: WIImageFormat,
+        destinationFormat: ImageFormat,
         attemptCount: inout Int,
         maxEncodeAttempts: Int
     ) throws(WICompressError) -> WISolvedCompressionCandidate {

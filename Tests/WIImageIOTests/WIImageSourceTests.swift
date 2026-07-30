@@ -11,6 +11,7 @@ import Foundation
 import ImageIO
 import Testing
 import UniformTypeIdentifiers
+@testable import WIImageCore
 @testable import WIImageIO
 
 extension Tag {
@@ -28,7 +29,7 @@ struct WIImageSourceTests {
             orientation: 6,
             hasGPS: true
         )
-        let source = try WIImageSource(data: data)
+        let source = try Source(data: data)
         let descriptor = source.descriptor
 
         #expect(source.byteCount == data.count)
@@ -39,7 +40,7 @@ struct WIImageSourceTests {
         #expect(descriptor.pixelSize.pixelCount == 800)
         #expect(descriptor.orientedPixelSize.width == 20)
         #expect(descriptor.orientedPixelSize.height == 40)
-        #expect(descriptor.orientation == 6)
+        #expect(descriptor.orientation == .right)
         #expect(descriptor.frameCount == 1)
         #expect(descriptor.hasAlpha != true)
         #expect(descriptor.hasMetadata)
@@ -61,7 +62,7 @@ struct WIImageSourceTests {
         try data.write(to: url, options: .atomic)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let source = try WIImageSource(contentsOf: url)
+        let source = try Source(contentsOf: url)
 
         #expect(source.byteCount == data.count)
         #expect(source.descriptor.byteCount == data.count)
@@ -79,7 +80,7 @@ struct WIImageSourceTests {
             alpha: 96
         )
 
-        let descriptor = try WIImageSource(data: data).descriptor
+        let descriptor = try Source(data: data).descriptor
 
         #expect(descriptor.hasAlpha == true)
     }
@@ -93,18 +94,18 @@ struct WIImageSourceTests {
             frameCount: 2
         )
 
-        let source = try WIImageSource(data: data)
+        let source = try Source(data: data)
         let descriptor = source.descriptor
 
         #expect(descriptor.frameCount == 2)
         #expect(descriptor.format == .unknown)
-        #expect(throws: WIImageIOError.animatedSourceUnsupported(frameCount: 2)) {
+        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
             try source.image()
         }
-        #expect(throws: WIImageIOError.animatedSourceUnsupported(frameCount: 2)) {
-            try source.thumbnail(options: WIThumbnailOptions())
+        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
+            try source.thumbnail(options: ThumbnailOptions())
         }
-        #expect(throws: WIImageIOError.animatedSourceUnsupported(frameCount: 2)) {
+        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
             try source.copy(as: UTType.png.identifier)
         }
     }
@@ -124,20 +125,20 @@ struct WIImageSourceTests {
         try data.write(to: url, options: .atomic)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let dataSource = try WIImageSource(data: data)
-        let fileSource = try WIImageSource(contentsOf: url)
+        let dataSource = try Source(data: data)
+        let fileSource = try Source(contentsOf: url)
         let dataImage = try dataSource.image()
         let fileImage = try fileSource.image()
         let dataThumbnail = try dataSource.thumbnail(
-            options: WIThumbnailOptions(maximumPixelSize: 10)
+            options: ThumbnailOptions(maximumPixelSize: 10)
         )
         let fileThumbnail = try fileSource.thumbnail(
-            options: WIThumbnailOptions(maximumPixelSize: 10)
+            options: ThumbnailOptions(maximumPixelSize: 10)
         )
-        let dataCopy = try WIImageSource(
+        let dataCopy = try Source(
             data: dataSource.copy(as: UTType.jpeg.identifier)
         ).descriptor
-        let fileCopy = try WIImageSource(
+        let fileCopy = try Source(
             data: fileSource.copy(as: UTType.jpeg.identifier)
         ).descriptor
 
@@ -161,8 +162,8 @@ struct WIImageSourceTests {
             typeIdentifier: UTType.jpeg.identifier
         )
 
-        let image = try WIImageSource(data: data).image(
-            options: WIImageDecodeOptions(cacheImmediately: false)
+        let image = try Source(data: data).image(
+            options: DecodeOptions(cacheImmediately: false)
         )
 
         #expect(image.width == 40)
@@ -178,8 +179,8 @@ struct WIImageSourceTests {
             orientation: 6
         )
 
-        let thumbnail = try WIImageSource(data: data).thumbnail(
-            options: WIThumbnailOptions(maximumPixelSize: 10)
+        let thumbnail = try Source(data: data).thumbnail(
+            options: ThumbnailOptions(maximumPixelSize: 10)
         )
 
         #expect(thumbnail.width == 5)
@@ -196,7 +197,7 @@ struct WIImageSourceTests {
             hasGPS: true
         )
 
-        let copiedData = try WIImageSource(data: data).copy(
+        let copiedData = try Source(data: data).copy(
             as: UTType.jpeg.identifier
         )
         let properties = try Self.properties(in: copiedData)
@@ -214,14 +215,14 @@ struct WIImageSourceTests {
             orientation: 6,
             hasGPS: true
         )
-        let source = try WIImageSource(data: data)
-        let image = try source.thumbnail(options: WIThumbnailOptions())
+        let source = try Source(data: data)
+        let image = try source.thumbnail(options: ThumbnailOptions())
 
-        let strippedData = try WIImageTranscoder.encode(
+        let strippedData = try Transcoder.encode(
             image,
             as: UTType.jpeg.identifier
         )
-        let preservedData = try WIImageTranscoder.encode(
+        let preservedData = try Transcoder.encode(
             image,
             as: UTType.jpeg.identifier,
             preservingMetadataFrom: source
@@ -241,18 +242,18 @@ struct WIImageSourceTests {
             height: 4,
             typeIdentifier: UTType.png.identifier
         )
-        let source = try WIImageSource(data: data)
+        let source = try Source(data: data)
         let typeIdentifier = "com.wicompress.unsupported"
 
-        #expect(throws: WIImageIOError.destinationCreationFailed(typeIdentifier)) {
+        #expect(throws: WIImageIO.Error.destinationCreationFailed(typeIdentifier)) {
             try source.copy(as: typeIdentifier)
         }
     }
 
     @Test("Invalid encoded bytes fail explicitly")
     func invalidDataFails() {
-        #expect(throws: WIImageIOError.invalidImageData) {
-            try WIImageSource(data: Data([0x00, 0x01, 0x02]))
+        #expect(throws: WIImageIO.Error.invalidImageData) {
+            try Source(data: Data([0x00, 0x01, 0x02]))
         }
     }
 
@@ -262,18 +263,8 @@ struct WIImageSourceTests {
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("png")
 
-        #expect(throws: WIImageIOError.fileReadFailed(url)) {
-            try WIImageSource(contentsOf: url)
-        }
-    }
-
-    @Test("Pixel size validates dimensions and checked arithmetic")
-    func pixelSizeValidation() {
-        #expect(throws: WIImageIOError.invalidPixelSize(width: 0, height: 10)) {
-            try WIPixelSize(width: 0, height: 10)
-        }
-        #expect(throws: WIImageIOError.pixelCountOverflow(width: .max, height: 2)) {
-            try WIPixelSize(width: .max, height: 2)
+        #expect(throws: WIImageIO.Error.fileReadFailed(url)) {
+            try Source(contentsOf: url)
         }
     }
 

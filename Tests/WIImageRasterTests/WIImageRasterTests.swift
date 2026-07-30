@@ -10,6 +10,7 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Testing
+@testable import WIImageCore
 @testable import WIImageRaster
 
 extension Tag {
@@ -25,32 +26,18 @@ struct WIImageRasterTests {
         var alpha: UInt8
     }
 
-    @Test("Invalid canvas size is rejected")
-    func invalidCanvasSizeIsRejected() throws {
-        let image = try #require(Self.verticalBands(width: 4, height: 4))
-        let plan = WIImageRaster.Plan(
-            canvasSize: WIImageRaster.PixelSize(width: 0, height: 4),
-            sourceRect: WIImageRaster.Rect(x: 0, y: 0, width: 4, height: 4),
-            destinationRect: WIImageRaster.Rect(x: 0, y: 0, width: 4, height: 4)
-        )
-
-        #expect(throws: WIImageRasterError.invalidPixelSize(width: 0, height: 4)) {
-            try WIImageRaster.image(image, plan: plan)
-        }
-    }
-
     @Test("Invalid and out-of-bounds rects are rejected")
     func invalidRectsAreRejected() throws {
         let image = try #require(Self.verticalBands(width: 4, height: 4))
         let invalidSource = WIImageRaster.Plan(
-            canvasSize: WIImageRaster.PixelSize(width: 4, height: 4),
-            sourceRect: WIImageRaster.Rect(x: 0, y: 0, width: 0, height: 4),
-            destinationRect: WIImageRaster.Rect(x: 0, y: 0, width: 4, height: 4)
+            canvasSize: try PixelSize(width: 4, height: 4),
+            sourceRect: Rect(x: 0, y: 0, width: 0, height: 4),
+            destinationRect: Rect(x: 0, y: 0, width: 4, height: 4)
         )
         let invalidDestination = WIImageRaster.Plan(
-            canvasSize: WIImageRaster.PixelSize(width: 4, height: 4),
-            sourceRect: WIImageRaster.Rect(x: 0, y: 0, width: 4, height: 4),
-            destinationRect: WIImageRaster.Rect(
+            canvasSize: try PixelSize(width: 4, height: 4),
+            sourceRect: Rect(x: 0, y: 0, width: 4, height: 4),
+            destinationRect: Rect(
                 x: 0,
                 y: 0,
                 width: .infinity,
@@ -58,18 +45,18 @@ struct WIImageRasterTests {
             )
         )
         let outOfBoundsSource = WIImageRaster.Plan(
-            canvasSize: WIImageRaster.PixelSize(width: 4, height: 4),
-            sourceRect: WIImageRaster.Rect(x: 3, y: 0, width: 2, height: 4),
-            destinationRect: WIImageRaster.Rect(x: 0, y: 0, width: 4, height: 4)
+            canvasSize: try PixelSize(width: 4, height: 4),
+            sourceRect: Rect(x: 3, y: 0, width: 2, height: 4),
+            destinationRect: Rect(x: 0, y: 0, width: 4, height: 4)
         )
 
-        #expect(throws: WIImageRasterError.invalidSourceRect) {
+        #expect(throws: WIImageRaster.Error.invalidSourceRect) {
             try WIImageRaster.image(image, plan: invalidSource)
         }
-        #expect(throws: WIImageRasterError.invalidDestinationRect) {
+        #expect(throws: WIImageRaster.Error.invalidDestinationRect) {
             try WIImageRaster.image(image, plan: invalidDestination)
         }
-        #expect(throws: WIImageRasterError.sourceRectOutOfBounds) {
+        #expect(throws: WIImageRaster.Error.sourceRectOutOfBounds) {
             try WIImageRaster.image(image, plan: outOfBoundsSource)
         }
     }
@@ -78,21 +65,21 @@ struct WIImageRasterTests {
     func bitmapByteArithmeticRejectsOverflow() throws {
         let image = try #require(Self.verticalBands(width: 1, height: 1))
         let rowOverflow = WIImageRaster.Plan(
-            canvasSize: WIImageRaster.PixelSize(width: .max, height: 1),
-            sourceRect: WIImageRaster.Rect(x: 0, y: 0, width: 1, height: 1),
-            destinationRect: WIImageRaster.Rect(x: 0, y: 0, width: 1, height: 1)
+            canvasSize: try PixelSize(width: .max, height: 1),
+            sourceRect: Rect(x: 0, y: 0, width: 1, height: 1),
+            destinationRect: Rect(x: 0, y: 0, width: 1, height: 1)
         )
         let totalOverflow = WIImageRaster.Plan(
-            canvasSize: WIImageRaster.PixelSize(width: 1, height: .max),
-            sourceRect: WIImageRaster.Rect(x: 0, y: 0, width: 1, height: 1),
-            destinationRect: WIImageRaster.Rect(x: 0, y: 0, width: 1, height: 1)
+            canvasSize: try PixelSize(width: 1, height: .max),
+            sourceRect: Rect(x: 0, y: 0, width: 1, height: 1),
+            destinationRect: Rect(x: 0, y: 0, width: 1, height: 1)
         )
 
-        #expect(throws: WIImageRasterError.rowByteOverflow(width: .max)) {
+        #expect(throws: WIImageRaster.Error.rowByteOverflow(width: .max)) {
             try WIImageRaster.image(image, plan: rowOverflow)
         }
         #expect(
-            throws: WIImageRasterError.bitmapByteCountOverflow(
+            throws: WIImageRaster.Error.bitmapByteCountOverflow(
                 width: 1,
                 height: .max
             )
@@ -105,10 +92,10 @@ struct WIImageRasterTests {
     func backgroundsMustBeOpaque() throws {
         let image = try #require(Self.verticalBands(width: 1, height: 1))
         let plan = WIImageRaster.Plan(
-            canvasSize: WIImageRaster.PixelSize(width: 1, height: 1),
-            sourceRect: WIImageRaster.Rect(x: 0, y: 0, width: 1, height: 1),
-            destinationRect: WIImageRaster.Rect(x: 0, y: 0, width: 1, height: 1),
-            canvasBackground: WIImageRaster.Color(
+            canvasSize: try PixelSize(width: 1, height: 1),
+            sourceRect: Rect(x: 0, y: 0, width: 1, height: 1),
+            destinationRect: Rect(x: 0, y: 0, width: 1, height: 1),
+            canvasBackground: Color(
                 red: 0,
                 green: 0,
                 blue: 0,
@@ -116,7 +103,7 @@ struct WIImageRasterTests {
             )
         )
 
-        #expect(throws: WIImageRasterError.nonOpaqueBackground) {
+        #expect(throws: WIImageRaster.Error.nonOpaqueBackground) {
             try WIImageRaster.image(image, plan: plan)
         }
     }
@@ -127,9 +114,9 @@ struct WIImageRasterTests {
         let output = try WIImageRaster.image(
             source,
             plan: WIImageRaster.Plan(
-                canvasSize: WIImageRaster.PixelSize(width: 4, height: 4),
-                sourceRect: WIImageRaster.Rect(x: 2, y: 0, width: 4, height: 4),
-                destinationRect: WIImageRaster.Rect(x: 0, y: 0, width: 4, height: 4)
+                canvasSize: try PixelSize(width: 4, height: 4),
+                sourceRect: Rect(x: 2, y: 0, width: 4, height: 4),
+                destinationRect: Rect(x: 0, y: 0, width: 4, height: 4)
             )
         )
 
@@ -143,12 +130,12 @@ struct WIImageRasterTests {
         let output = try WIImageRaster.image(
             source,
             plan: WIImageRaster.Plan(
-                canvasSize: WIImageRaster.PixelSize(width: 4, height: 4),
-                sourceRect: WIImageRaster.Rect(x: 0, y: 0, width: 2, height: 2),
-                destinationRect: WIImageRaster.Rect(x: 1, y: 1, width: 2, height: 2),
+                canvasSize: try PixelSize(width: 4, height: 4),
+                sourceRect: Rect(x: 0, y: 0, width: 2, height: 2),
+                destinationRect: Rect(x: 1, y: 1, width: 2, height: 2),
                 alphaMode: .opaque,
-                canvasBackground: WIImageRaster.Color(red: 0, green: 1, blue: 0),
-                imageBackground: WIImageRaster.Color(red: 1, green: 1, blue: 1),
+                canvasBackground: Color(red: 0, green: 1, blue: 0),
+                imageBackground: Color(red: 1, green: 1, blue: 1),
                 colorSpace: .sRGB
             )
         )
@@ -169,9 +156,9 @@ struct WIImageRasterTests {
         let output = try WIImageRaster.image(
             source,
             plan: WIImageRaster.Plan(
-                canvasSize: WIImageRaster.PixelSize(width: 4, height: 4),
-                sourceRect: WIImageRaster.Rect(x: 0, y: 0, width: 2, height: 2),
-                destinationRect: WIImageRaster.Rect(x: 1, y: 1, width: 2, height: 2),
+                canvasSize: try PixelSize(width: 4, height: 4),
+                sourceRect: Rect(x: 0, y: 0, width: 2, height: 2),
+                destinationRect: Rect(x: 1, y: 1, width: 2, height: 2),
                 alphaMode: .preserve
             )
         )
@@ -182,10 +169,10 @@ struct WIImageRasterTests {
 
     @Test(
         "Orientation rendering matches the ImageIO display transform",
-        arguments: WIImageRaster.Orientation.allCases
+        arguments: Orientation.allCases
     )
     func orientationMatchesImageIO(
-        _ orientation: WIImageRaster.Orientation
+        _ orientation: Orientation
     ) throws {
         let data = try Self.quadrantJPEG(
             width: 8,
@@ -211,17 +198,17 @@ struct WIImageRasterTests {
         let output = try WIImageRaster.image(
             rawImage,
             plan: WIImageRaster.Plan(
-                canvasSize: WIImageRaster.PixelSize(
+                canvasSize: try PixelSize(
                     width: displayWidth,
                     height: displayHeight
                 ),
-                sourceRect: WIImageRaster.Rect(
+                sourceRect: Rect(
                     x: 0,
                     y: 0,
                     width: Double(displayWidth),
                     height: Double(displayHeight)
                 ),
-                destinationRect: WIImageRaster.Rect(
+                destinationRect: Rect(
                     x: 0,
                     y: 0,
                     width: Double(displayWidth),

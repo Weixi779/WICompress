@@ -8,6 +8,7 @@
 
 import Foundation
 import CoreGraphics
+import WIImageCore
 
 /// Concrete color space used by image output and color values.
 public enum WIColorSpace: Sendable, Hashable {
@@ -44,26 +45,39 @@ public struct WIColor: Sendable, Equatable {
 }
 
 extension WIColorSpace {
-    func makeCGColorSpace() throws(WICompressError) -> CGColorSpace {
+    var imageCoreValue: WIImageCore.ColorSpace {
         switch self {
         case .sRGB:
-            guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
-                throw WICompressError.unsupportedColorSpace
-            }
-
-            return colorSpace
+            return .sRGB
         case .displayP3:
-            guard let colorSpace = CGColorSpace(name: CGColorSpace.displayP3) else {
-                throw WICompressError.unsupportedColorSpace
-            }
-
-            return colorSpace
+            return .displayP3
         case .iccProfile(let data):
-            guard let colorSpace = CGColorSpace(iccData: data as CFData) else {
-                throw WICompressError.invalidICCProfile
-            }
-
-            return colorSpace
+            return .iccProfile(data)
         }
+    }
+
+    func makeCGColorSpace() throws(WICompressError) -> CGColorSpace {
+        do {
+            return try imageCoreValue.makeCGColorSpace()
+        } catch {
+            switch error {
+            case .invalidICCProfile:
+                throw .invalidICCProfile
+            case .unavailable, .unsupportedModel:
+                throw .unsupportedColorSpace
+            }
+        }
+    }
+}
+
+extension WIColor {
+    var imageCoreValue: WIImageCore.Color {
+        Color(
+            red: red,
+            green: green,
+            blue: blue,
+            alpha: alpha,
+            colorSpace: colorSpace.imageCoreValue
+        )
     }
 }

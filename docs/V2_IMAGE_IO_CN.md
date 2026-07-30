@@ -49,6 +49,8 @@ render 和 encode 仍然耦合在 WICompress pipeline 中。
 新增独立 SwiftPM target：
 
 ```text
+WIImageCore
+    ↑
 WIImageIO
     ↑
 WICompress
@@ -89,23 +91,23 @@ WICompress
 
 ## Source 与 Descriptor
 
-`WIImageSource` 是 ImageIO source 的同步、作用域内 handle。它可以持有
+`WIImageIO.Source` 是 ImageIO source 的同步、作用域内 handle。它可以持有
 `CGImageSource`，但不向调用方暴露该对象。
 
 ```swift
-package final class WIImageSource {
+package final class Source {
     package init(data: Data) throws
     package init(contentsOf url: URL) throws
 
     package var byteCount: Int { get }
-    package var descriptor: WIImageDescriptor { get }
+    package var descriptor: Descriptor { get }
 
     package func image(
-        options: WIImageDecodeOptions = .init()
+        options: DecodeOptions = .init()
     ) throws -> CGImage
 
     package func thumbnail(
-        options: WIThumbnailOptions
+        options: ThumbnailOptions
     ) throws -> CGImage
 }
 ```
@@ -130,7 +132,7 @@ package final class WIImageSource {
 - 两者是可能失败并执行实际 decode 的方法，不是暗示廉价访问的属性。
 - 首版不暴露 `image(at:)` 或 `thumbnail(at:)`；没有多帧产品合同。
 
-`WIImageDescriptor` 是可跨并发域传递的 source facts，至少覆盖：
+`WIImageIO.Descriptor` 是可跨并发域传递的 source facts，至少覆盖：
 
 ```text
 format
@@ -168,7 +170,7 @@ WICompress Execution 或更高层调用方负责决定限制：
 - 是否接受特定 color model。
 - 达到资源上限时的产品错误和 fallback。
 
-`WIImageSource` 首版不内置 Signal 聊天附件使用的固定阈值，也不新增 public
+`WIImageIO.Source` 首版不内置 Signal 聊天附件使用的固定阈值，也不新增 public
 `WIImageLimits`。压缩库可能需要处理对聊天应用过大但仍然合法的源图；没有明确资源预算
 前，外部项目的阈值不能自动成为 WICompress Requirement。
 
@@ -177,11 +179,11 @@ WICompress Execution 或更高层调用方负责决定限制：
 ImageIO options 使用强类型值，不向 WICompress 暴露 `[CFString: Any]`：
 
 ```swift
-package struct WIImageDecodeOptions: Hashable, Sendable {
+package struct DecodeOptions: Hashable, Sendable {
     package var cacheImmediately: Bool
 }
 
-package struct WIThumbnailOptions: Hashable, Sendable {
+package struct ThumbnailOptions: Hashable, Sendable {
     package var maximumPixelSize: Int?
     package var appliesOrientationTransform: Bool
     package var cacheImmediately: Bool
@@ -212,7 +214,7 @@ Thumbnail 应默认只缩小、不隐式放大；最终合同由调用它的 Exe
 ```text
 CGImage -> pixel encode -> Data
 
-WIImageSource -> copy from source -> Data
+WIImageIO.Source -> copy from source -> Data
 ```
 
 Pixel encode 用于已经由 `WIImageRaster` 完成 resize、crop、Alpha flatten 或 color
@@ -246,7 +248,7 @@ Data / file URL + Sendable options
 
 并发边界：
 
-- `WIImageSource` 是 scoped handle，不承诺 `Sendable`。
+- `WIImageIO.Source` 是 scoped handle，不承诺 `Sendable`。
 - descriptor、format 和 options 使用不可变或值语义，并保持 `Sendable`。
 - 同一个 source/destination 的操作由单一调用上下文有序执行。
 - 不同顶层压缩调用各自创建 source/destination，可以由 WICompress async engine 并发。
@@ -299,7 +301,7 @@ ImageIO 层使用 typed throws 表达基础设施失败，至少能够区分：
 - destination finalization failed。
 - animated source unsupported。
 
-`WIImageIOError` 在基础设施边界表达这些失败，`WICompress` 在产品边界统一映射为
+`WIImageIO.Error` 在基础设施边界表达这些失败，`WICompress` 在产品边界统一映射为
 `WICompressError`；ImageIO 层不以 `nil`、warning 或 silent fallback 隐藏失败。
 
 ## 迁移方向
@@ -308,8 +310,8 @@ ImageIO 层使用 typed throws 表达基础设施失败，至少能够区分：
 
 | 1.x 位置 | 2.0 归属 |
 |---|---|
-| `WIImageSource` 中的 source creation 和 properties 读取 | `WIImageIO` Source / Descriptor |
-| URL 入口中的 eager `Data(contentsOf:)` | File-backed `WIImageSource`，仅在需要原始 Data 时读取 |
+| `WIImageSource` 中的 source creation 和 properties 读取 | `WIImageIO.Source` / `Descriptor` |
+| URL 入口中的 eager `Data(contentsOf:)` | File-backed `WIImageIO.Source`，仅在需要原始 Data 时读取 |
 | `WIImageFormat` 的 type detection 与 runtime writability | `WIImageIO` Format / Capabilities |
 | `WIImageEncoder` 中的 thumbnail options | `WIImageIO` Thumbnail |
 | `WIImageEncoder` 中的 destination create/add/finalize | `WIImageIO` Encode / Copy |

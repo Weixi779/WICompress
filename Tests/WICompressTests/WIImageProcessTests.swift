@@ -10,6 +10,7 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Testing
+@testable import WIImageCore
 @testable import WICompress
 
 @Suite("WIImageProcess", .tags(.imageProcess, .publicAPI))
@@ -99,7 +100,7 @@ struct WIImageProcessTests {
         arguments: [
             (
                 WIImageCrop.aspectRatio(width: 1, height: 1),
-                WIRect(x: 500, y: 0, width: 3_000, height: 3_000)
+                Rect(x: 500, y: 0, width: 3_000, height: 3_000)
             ),
             (
                 WIImageCrop.aspectRatio(
@@ -107,7 +108,7 @@ struct WIImageProcessTests {
                     height: 1,
                     anchor: WICropAnchor(x: 0, y: 0.5)
                 ),
-                WIRect(x: 0, y: 0, width: 3_000, height: 3_000)
+                Rect(x: 0, y: 0, width: 3_000, height: 3_000)
             ),
             (
                 WIImageCrop.aspectRatio(
@@ -115,13 +116,13 @@ struct WIImageProcessTests {
                     height: 9,
                     anchor: WICropAnchor(x: 0.5, y: 1)
                 ),
-                WIRect(x: 0, y: 750, width: 4_000, height: 2_250)
+                Rect(x: 0, y: 750, width: 4_000, height: 2_250)
             ),
         ]
     )
     func aspectRatioCrop(
         _ crop: WIImageCrop,
-        expected: WIRect
+        expected: Rect
     ) throws {
         let geometry = try WIImageProcessGeometry.resolve(
             process: WIImageProcess(
@@ -441,7 +442,7 @@ struct WIImageProcessTests {
         let outputSource = try WIImageSource(data: output)
 
         #expect(outputSource.info.hasGPS)
-        #expect(outputSource.info.orientation == 1)
+        #expect(outputSource.info.orientation == .up)
         #expect(outputSource.info.sourceFormat == .jpeg)
     }
 
@@ -471,7 +472,7 @@ struct WIImageProcessTests {
             )
         )
 
-        #expect(colorSpace.colorSpace == WIColorSpace.sRGB)
+        #expect(colorSpace.colorSpace == .sRGB)
     }
 
     @Test("Data and file Process terminals have equivalent behavior")

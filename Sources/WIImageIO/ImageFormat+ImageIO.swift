@@ -1,5 +1,5 @@
 //
-//  WIImageFormat.swift
+//  ImageFormat+ImageIO.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/7/29.
@@ -9,13 +9,9 @@
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
+import WIImageCore
 
-package enum WIImageFormat: Sendable, Equatable {
-    case jpeg
-    case png
-    case heif
-    case unknown
-
+extension ImageFormat {
     package init(data: Data) {
         guard
             let source = CGImageSourceCreateWithData(data as CFData, nil),

@@ -7,12 +7,13 @@
 //
 
 import Foundation
+import WIImageCore
 
 /// A feasible encoded result collected during the target byte-budget search.
 struct WISolvedCompressionCandidate: Sendable, Equatable {
     var data: Data
     var pixelSize: WIPixelSize
-    var format: WIImageFormat
+    var format: ImageFormat
     var quality: Double
 
     var pixelArea: Double {

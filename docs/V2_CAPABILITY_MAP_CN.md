@@ -150,10 +150,11 @@ Data
   -> final encoded Data
 ```
 
-当前内部 `WIImageSource` 持有 `Data + CGImageSource + WIImageInfo`，本身不是 decoded
-bitmap。它只在按需读取某些颜色空间信息，或进入 render 时创建 `CGImage`。这层 source
-handle 对单次处理和 target solver 的多次尝试有价值，但没有理由直接成为长期存在的
-public `ImageResource`。
+当前产品层 `WIImageSource` 持有 Data/file backing、`WIImageIO.Source` 与
+`WIImageInfo`，本身不是 decoded bitmap。底层 `CGImageSource` 由同步、作用域内的
+`WIImageIO.Source` 管理，只在按需读取某些颜色空间信息，或进入 render 时创建
+`CGImage`。这层 source handle 对单次处理和 target solver 的多次尝试有价值，但没有
+理由直接成为长期存在的 public `ImageResource`。
 
 这些生命周期事实最终支持了“纯描述值 + 一次 terminal execution”、不公开长期
 ImageResource 和不提供 Processor Chain。结论正文与剩余 API 问题已迁移到

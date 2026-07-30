@@ -7,13 +7,14 @@
 //
 
 import Testing
+@testable import WIImageCore
 @testable import WICompress
 
 @Suite("Compression Sizing", .tags(.algorithm))
 struct WICompressionSizingTests {
     struct SizingCase: CustomTestStringConvertible, Sendable {
         let sizing: WICompressionSizing
-        let expectedSourceRect: WIRect
+        let expectedSourceRect: Rect
         let expectedBasePixelSize: WIPixelSize
         let testDescription: String
     }
@@ -21,7 +22,7 @@ struct WICompressionSizingTests {
     static let sizingCases: [SizingCase] = [
         SizingCase(
             sizing: WICompressionSizing(),
-            expectedSourceRect: WIRect(
+            expectedSourceRect: Rect(
                 x: 0,
                 y: 0,
                 width: 4000,
@@ -37,7 +38,7 @@ struct WICompressionSizingTests {
             sizing: WICompressionSizing(
                 aspectRatio: WIAspectRatio(width: 1, height: 1)
             ),
-            expectedSourceRect: WIRect(
+            expectedSourceRect: Rect(
                 x: 500,
                 y: 0,
                 width: 3000,
@@ -51,7 +52,7 @@ struct WICompressionSizingTests {
         ),
         SizingCase(
             sizing: WICompressionSizing(maximumPixelSize: 1000),
-            expectedSourceRect: WIRect(
+            expectedSourceRect: Rect(
                 x: 0,
                 y: 0,
                 width: 4000,
@@ -68,7 +69,7 @@ struct WICompressionSizingTests {
                 maximumPixelSize: 1000,
                 aspectRatio: WIAspectRatio(width: 1, height: 1)
             ),
-            expectedSourceRect: WIRect(
+            expectedSourceRect: Rect(
                 x: 500,
                 y: 0,
                 width: 3000,
@@ -109,7 +110,7 @@ struct WICompressionSizingTests {
         )
 
         #expect(
-            resolved.sourceRect == WIRect(
+            resolved.sourceRect == Rect(
                 x: 0,
                 y: 0,
                 width: 3000,
