@@ -181,13 +181,13 @@ struct WIImageProcessTests {
         )
 
         #expect(throws: WICompressError.invalidProcessQuality) {
-            try WICompress.process(
+            try WICompressor.process(
                 data,
                 using: WIImageProcess(quality: 1.1)
             )
         }
         #expect(throws: WICompressError.invalidCrop) {
-            try WICompress.process(
+            try WICompressor.process(
                 data,
                 using: WIImageProcess(
                     crop: .aspectRatio(width: 0, height: 1)
@@ -195,7 +195,7 @@ struct WIImageProcessTests {
             )
         }
         #expect(throws: WICompressError.invalidResizingResult) {
-            try WICompress.process(
+            try WICompressor.process(
                 data,
                 using: WIImageProcess(
                     sizing: .resize(
@@ -234,7 +234,7 @@ struct WIImageProcessTests {
             "real_jpeg_2098x1350_landscape",
             extension: "jpg"
         )
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             data,
             using: WIImageProcess(
                 sizing: .resize(
@@ -258,7 +258,7 @@ struct WIImageProcessTests {
             "real_jpeg_2098x1350_landscape",
             extension: "jpg"
         )
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             data,
             using: WIImageProcess(
                 sizing: .resize(
@@ -286,7 +286,7 @@ struct WIImageProcessTests {
             orientation: 6
         )
         let oracle = try Self.imageIOOrientedPNG(input)
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             input,
             using: WIImageProcess(
                 sizing: .original,
@@ -319,7 +319,7 @@ struct WIImageProcessTests {
     @Test("Aspect-changing resize preserves samples required by both axes")
     func aspectChangingResizePreservesRequiredSamples() throws {
         let input = try Self.horizontalStripesPNG(width: 400, height: 100)
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             input,
             using: WIImageProcess(
                 sizing: .resize(
@@ -346,7 +346,7 @@ struct WIImageProcessTests {
             "real_png_1086x1630_alpha",
             extension: "png"
         )
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             data,
             using: WIImageProcess(
                 sizing: .original,
@@ -370,7 +370,7 @@ struct WIImageProcessTests {
         #expect(
             throws: WICompressError.transparentSourceRequiresBackground(.png)
         ) {
-            try WICompress.process(
+            try WICompressor.process(
                 data,
                 using: WIImageProcess(
                     output: WIImageOutput(representation: .jpeg())
@@ -385,7 +385,7 @@ struct WIImageProcessTests {
             "synthetic_tiny_1x1",
             extension: "png"
         )
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             data,
             using: WIImageProcess(
                 sizing: .original,
@@ -426,7 +426,7 @@ struct WIImageProcessTests {
             "real_heic_4032x3024_o6_gps_hdr",
             extension: "heic"
         )
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             data,
             using: WIImageProcess(
                 sizing: .resize(
@@ -452,7 +452,7 @@ struct WIImageProcessTests {
             "real_heic_4032x3024_o1_gps_hdr",
             extension: "heic"
         )
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             data,
             using: WIImageProcess(
                 sizing: .resize(
@@ -506,8 +506,8 @@ struct WIImageProcessTests {
         }
         #expect(backingURL == url)
 
-        let dataOutput = try WICompress.process(data, using: process)
-        let fileOutput = try WICompress.process(
+        let dataOutput = try WICompressor.process(data, using: process)
+        let fileOutput = try WICompressor.process(
             contentsOf: url,
             using: process
         )

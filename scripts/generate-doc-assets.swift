@@ -134,9 +134,9 @@ enum GenerateDocAssets {
             let outputData: Data
             switch sample.compression {
             case .process(let process):
-                outputData = try WICompress.process(inputData, using: process)
+                outputData = try WICompressor.process(inputData, using: process)
             case .target(let target):
-                outputData = try WICompress.compress(inputData, to: target).data
+                outputData = try WICompressor.compress(inputData, to: target).data
             }
             return RenderedSample(
                 sample: sample,

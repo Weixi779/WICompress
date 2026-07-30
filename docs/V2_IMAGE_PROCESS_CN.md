@@ -70,13 +70,13 @@ let process = WIImageProcess(
     )
 )
 
-let data = try WICompress.process(sourceData, using: process)
+let data = try WICompressor.process(sourceData, using: process)
 ```
 
 文件入口使用同一 Process：
 
 ```swift
-let data = try WICompress.process(contentsOf: url, using: process)
+let data = try WICompressor.process(contentsOf: url, using: process)
 ```
 
 文件 terminal 直接建立 file-backed ImageIO source，不在入口处读取完整 `Data`。
@@ -242,8 +242,8 @@ async terminal -> 在非 caller-actor 的执行上下文完成相同工作
 配置本身没有 async 版本。inspect、crop、resize 和 encode 也不分别成为 public
 suspension point。
 
-当前同步 base name 已确认为 `WICompress.process(_:using:)` 与
-`WICompress.process(contentsOf:using:)`。异步 overload 尚未加入；它必须消费同一个
+当前同步 base name 已确认为 `WICompressor.process(_:using:)` 与
+`WICompressor.process(contentsOf:using:)`。异步 overload 尚未加入；它必须消费同一个
 `WIImageProcessResolver -> WIExecutionPlan -> WIImageEncoder` 核心，不能建立第二套
 resolver 或改变执行语义。
 

@@ -20,11 +20,11 @@ or choose PNG/JPEG from alpha-channel presence, strips metadata for privacy, and
 resizes images without depending on `UIImage` or `NSImage`.
 
 ```swift
-let compressedData = try WICompress.process(originalData)
+let compressedData = try WICompressor.process(originalData)
 ```
 
 ```swift
-let uploadData = try WICompress.process(
+let uploadData = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(using: WIImageResize.maximumPixelSize(1600)),
@@ -112,19 +112,19 @@ The example demonstrates:
 ```swift
 import WICompress
 
-let compressedData = try WICompress.process(originalData)
+let compressedData = try WICompressor.process(originalData)
 ```
 
 Compress a file URL:
 
 ```swift
-let compressedData = try WICompress.process(contentsOf: imageURL)
+let compressedData = try WICompressor.process(contentsOf: imageURL)
 ```
 
 Declare an explicit process:
 
 ```swift
-let compressedData = try WICompress.process(
+let compressedData = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(using: WIImageResize.luban),
@@ -141,7 +141,7 @@ let compressedData = try WICompress.process(
 Crop and resize in one operation:
 
 ```swift
-let assetData = try WICompress.process(
+let assetData = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(
@@ -161,7 +161,7 @@ let assetData = try WICompress.process(
 Compress to a hard byte target:
 
 ```swift
-let thumbnail = try WICompress.compress(
+let thumbnail = try WICompressor.compress(
     originalData,
     to: WICompressionTarget(
         maxBytes: 32 * 1024,
@@ -192,7 +192,7 @@ guard let originalData = try await photosPickerItem.loadTransferable(type: Data.
     throw MyError.missingImageData
 }
 
-let compressedData = try WICompress.process(originalData)
+let compressedData = try WICompressor.process(originalData)
 let previewImage = UIImage(data: compressedData)
 ```
 
@@ -280,7 +280,7 @@ All public APIs throw `WICompressError`.
 
 ```swift
 do {
-    let compressedData = try WICompress.process(data)
+    let compressedData = try WICompressor.process(data)
 } catch let error as WICompressError {
     // Decide whether to show an error, retry, or keep the original data.
     print(error)
@@ -326,7 +326,10 @@ in a Photos-level workflow, not the v1 ImageIO core.
 ## Upgrading to 2.0
 
 WICompress 2.0 replaces the 1.x options and policy surface with the Process and
-Target domains shown above. See [CHANGELOG.md](CHANGELOG.md) for release notes.
+Target domains shown above. The package import remains `WICompress`, while the
+static terminal is now `WICompressor`. See
+[the 2.0 migration guide](docs/V2_MIGRATION_CN.md) and
+[CHANGELOG.md](CHANGELOG.md) for details.
 
 ## License
 

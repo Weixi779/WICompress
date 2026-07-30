@@ -1,5 +1,5 @@
 //
-//  WICompressPublicSurfaceTests.swift
+//  WICompressorPublicSurfaceTests.swift
 //  WICompressTests
 //
 //  Created by weixi on 2026/6/22.
@@ -10,8 +10,8 @@ import Foundation
 import Testing
 @testable import WICompress
 
-@Suite("WICompress Public Surface", .tags(.publicAPI))
-struct WICompressPublicSurfaceTests {
+@Suite("WICompressor Public Surface", .tags(.publicAPI))
+struct WICompressorPublicSurfaceTests {
 
     struct InvalidInputCase: CustomTestStringConvertible, Sendable {
         enum Payload: Sendable {
@@ -152,7 +152,7 @@ struct WICompressPublicSurfaceTests {
     @Test("No-op Process returns the original data")
     func noOpProcessReturnsOriginalData() throws {
         let input = try Self.tinyPNGData()
-        let output = try WICompress.process(
+        let output = try WICompressor.process(
             input,
             using: WIImageProcess(
                 sizing: .original,
@@ -171,7 +171,7 @@ struct WICompressPublicSurfaceTests {
     @Test("Preserve target can return original data")
     func preserveTargetReturnsOriginalData() throws {
         let input = try Self.tinyPNGData()
-        let result = try WICompress.compress(
+        let result = try WICompressor.compress(
             input,
             to: WICompressionTarget(
                 maxBytes: input.count,
@@ -192,7 +192,7 @@ struct WICompressPublicSurfaceTests {
     @Test("Preserve target reports oriented display size when returning original data")
     func preserveTargetResultUsesDisplaySizeForOrientedOriginal() throws {
         let input = try Self.resourceData("real_heic_4032x3024_o6_gps_hdr", extension: "heic")
-        let result = try WICompress.compress(
+        let result = try WICompressor.compress(
             input,
             to: WICompressionTarget(
                 maxBytes: input.count,
@@ -222,8 +222,8 @@ struct WICompressPublicSurfaceTests {
             )
         )
 
-        let dataResult = try WICompress.compress(data, to: target)
-        let fileResult = try WICompress.compress(contentsOf: url, to: target)
+        let dataResult = try WICompressor.compress(data, to: target)
+        let fileResult = try WICompressor.compress(contentsOf: url, to: target)
 
         #expect(fileResult.data == dataResult.data)
         #expect(fileResult.format == dataResult.format)
@@ -236,7 +236,7 @@ struct WICompressPublicSurfaceTests {
         let data = try Self.data(for: invalidInputCase)
 
         #expect(throws: invalidInputCase.expectedError) {
-            _ = try WICompress.process(data)
+            _ = try WICompressor.process(data)
         }
     }
 
@@ -245,7 +245,7 @@ struct WICompressPublicSurfaceTests {
         let data = try Self.tinyPNGData()
 
         #expect(throws: WICompressError.invalidTarget) {
-            _ = try WICompress.compress(data, to: invalidTargetCase.target)
+            _ = try WICompressor.compress(data, to: invalidTargetCase.target)
         }
     }
 
@@ -269,7 +269,7 @@ struct WICompressPublicSurfaceTests {
         )
 
         #expect(throws: WICompressError.nonOpaqueJPEGBackground) {
-            _ = try WICompress.compress(data, to: target)
+            _ = try WICompressor.compress(data, to: target)
         }
     }
 
@@ -286,7 +286,7 @@ struct WICompressPublicSurfaceTests {
         )
 
         do {
-            _ = try WICompress.compress(input, to: target)
+            _ = try WICompressor.compress(input, to: target)
             Issue.record("Expected targetUnsatisfiable")
         } catch WICompressError.targetUnsatisfiable(let smallestByteCount) {
             #expect((smallestByteCount ?? 0) > target.maxBytes)
@@ -301,7 +301,7 @@ struct WICompressPublicSurfaceTests {
             .appendingPathComponent("wi-compress-missing-\(UUID().uuidString)")
 
         #expect(throws: WICompressError.fileReadFailed(url)) {
-            _ = try WICompress.process(contentsOf: url)
+            _ = try WICompressor.process(contentsOf: url)
         }
     }
 
@@ -311,7 +311,7 @@ struct WICompressPublicSurfaceTests {
             .appendingPathComponent("wi-compress-missing-\(UUID().uuidString)")
 
         #expect(throws: WICompressError.fileReadFailed(url)) {
-            _ = try WICompress.compress(contentsOf: url, to: WICompressionTarget(maxBytes: 1024))
+            _ = try WICompressor.compress(contentsOf: url, to: WICompressionTarget(maxBytes: 1024))
         }
     }
 

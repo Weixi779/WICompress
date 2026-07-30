@@ -69,5 +69,5 @@ WIImageCore
 - 公开的 `WIImageFormat`、`WIPixelSize`、`WIColorSpace` 和 `WIColor` 保持不变，
   只在产品边界转换一次。
 
-`WICompress` 到 `WICompressor` 的公开入口重命名、async API、Solver 重写和
-Encoder 进一步拆分不属于本阶段。
+`WICompress` 到 `WICompressor` 的公开入口重命名已在后续阶段完成。async API、
+Solver 重写和 Encoder 进一步拆分仍不属于本阶段。

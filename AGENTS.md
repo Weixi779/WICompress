@@ -115,7 +115,7 @@ Data / URL + WICompressionTarget
 
 Key types:
 
-1. **WICompress** - public Process `process(_:using:)` and Target
+1. **WICompressor** - public Process `process(_:using:)` and Target
    `compress(_:to:)` terminals for `Data` and file `URL`.
 2. **WIImageProcess** - immutable forward-processing description with sizing,
    optional aspect-ratio crop, fixed lossy quality, and `WIImageOutput`.
@@ -211,7 +211,7 @@ Tests are organized by `@Suite` and filtered by `@Tag`:
 |---|---|
 | `.luban` | Luban algorithm logic (`WILuban.ratio`, `WILuban.ensureEven`) |
 | `.format` | Image format detection (`WIImageFormat`) |
-| `.compression` | Process and Target behavior (`WICompress` public API) |
+| `.compression` | Process and Target behavior (`WICompressor` public API) |
 | `.imageIOCore` | ImageIO core: execution resolution, encoder, real-image contracts |
 | `.publicAPI` | Public surface: defaults, error mapping, entry points |
 | `.edgeCase` | Boundary values and edge inputs |
@@ -267,7 +267,7 @@ All suites run under `swift test` on macOS; none depend on UIKit:
 
 - `LubanRatioTests` - Luban switch branches and `WILuban.ensureEven` edge cases
 - `WIImageFormatTests` - `UTType`-based format detection (JPEG, PNG, unknown)
-- `WICompressPublicSurfaceTests` - default options, no-op passthrough, error mapping
+- `WICompressorPublicSurfaceTests` - defaults, passthrough, and error mapping
 - `WICompressImageIOCoreTests` - write-path behavior on real fixtures: GPS strip
   vs preserve, orientation baking, PNG alpha, gain-map drop in `.preserve`,
   animated rejection, size-guard correctness

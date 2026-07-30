@@ -45,7 +45,7 @@ final class UIKitPickerViewModel {
         logger.info("Raw data prefix: \(hexString)")
         
         do {
-            let compressedData = try WICompress.process(
+            let compressedData = try WICompressor.process(
                 imageGroup.rawData,
                 using: WIImageProcess(quality: 0.7)
             )

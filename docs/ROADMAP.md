@@ -15,6 +15,9 @@ The two public product lines are tracked separately:
 - [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md) owns the frozen
   target-compression contract.
 
+The 1.x-to-2.0 source migration is tracked in
+[`V2_MIGRATION_CN.md`](V2_MIGRATION_CN.md).
+
 The internal ImageIO execution boundary is tracked in
 [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md). It freezes the package-only target,
 typed source/options, synchronous primitive model, and static-image scope without
@@ -59,6 +62,9 @@ Implementation status:
   `WIWritePlan` adapter have been removed.
 - Completed: the 1.x Options/Policy terminals, legacy resolver, and write-plan
   adapter have been removed rather than maintained as a second architecture.
+- Completed: the package and module remain `WICompress`, while the public
+  uninhabited terminal namespace is now `WICompressor`; no compatibility alias
+  keeps the 1.x facade alive.
 - Next: add the Swift 6.2 asynchronous terminals over the same synchronous
   execution core.
 

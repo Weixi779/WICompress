@@ -19,11 +19,11 @@ JPEG、PNG 或 HEIC，或者按 alpha 通道自动选择 PNG / JPEG；默认剥�
 metadata，并且不依赖 `UIImage` / `NSImage`。
 
 ```swift
-let compressedData = try WICompress.process(originalData)
+let compressedData = try WICompressor.process(originalData)
 ```
 
 ```swift
-let uploadData = try WICompress.process(
+let uploadData = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(using: WIImageResize.maximumPixelSize(1600)),
@@ -92,7 +92,7 @@ target API 分享缩略图示例。前三行优先展示 HEIC，因为这是最�
 示例覆盖：
 
 - `PhotosPicker` 和 `PHPickerViewController` 获取原始图片 `Data`
-- `WICompress.process(_:)` 处理
+- `WICompressor.process(_:)` 处理
 - 格式检测
 - 原图 / 压缩图预览
 - 文件大小和压缩比展示
@@ -102,19 +102,19 @@ target API 分享缩略图示例。前三行优先展示 HEIC，因为这是最�
 ```swift
 import WICompress
 
-let compressedData = try WICompress.process(originalData)
+let compressedData = try WICompressor.process(originalData)
 ```
 
 压缩文件 URL：
 
 ```swift
-let compressedData = try WICompress.process(contentsOf: imageURL)
+let compressedData = try WICompressor.process(contentsOf: imageURL)
 ```
 
 显式配置：
 
 ```swift
-let compressedData = try WICompress.process(
+let compressedData = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(using: WIImageResize.luban),
@@ -131,7 +131,7 @@ let compressedData = try WICompress.process(
 在一次操作中裁剪和调整像素尺寸：
 
 ```swift
-let assetData = try WICompress.process(
+let assetData = try WICompressor.process(
     originalData,
     using: WIImageProcess(
         sizing: .resize(
@@ -151,7 +151,7 @@ let assetData = try WICompress.process(
 压缩到明确的字节目标：
 
 ```swift
-let thumbnail = try WICompress.compress(
+let thumbnail = try WICompressor.compress(
     originalData,
     to: WICompressionTarget(
         maxBytes: 32 * 1024,
@@ -174,7 +174,7 @@ print(thumbnail.pixelSize)
 ## 和 UIKit / AppKit 一起使用
 
 `WICompress` 不接收 `UIImage` 或 `NSImage`。业务层应该保留从相册、文件、
-网络或数据库拿到的原始图片 `Data`，把这份 `Data` 传给 `WICompress`。如果
+网络或数据库拿到的原始图片 `Data`，把这份 `Data` 传给 `WICompressor`。如果
 UI 需要预览，再在边界处把压缩结果解码成 `UIImage` / `NSImage`。
 
 ```swift
@@ -182,7 +182,7 @@ guard let originalData = try await photosPickerItem.loadTransferable(type: Data.
     throw MyError.missingImageData
 }
 
-let compressedData = try WICompress.process(originalData)
+let compressedData = try WICompressor.process(originalData)
 let previewImage = UIImage(data: compressedData)
 ```
 
@@ -264,7 +264,7 @@ public API 使用 `throws`：
 
 ```swift
 do {
-    let compressedData = try WICompress.process(data)
+    let compressedData = try WICompressor.process(data)
 } catch let error as WICompressError {
     print(error)
 }
@@ -309,7 +309,9 @@ image data，不处理 Photos 层的资源配对。
 ## 升级到 2.0
 
 WICompress 2.0 使用上文的 Process 与 Target domain 替换 1.x options /
-policy API。版本说明见 [CHANGELOG.md](CHANGELOG.md)。
+policy API。Package import 仍为 `WICompress`，静态执行入口改为
+`WICompressor`。详情见 [2.0 迁移指南](docs/V2_MIGRATION_CN.md) 和
+[CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可证
 

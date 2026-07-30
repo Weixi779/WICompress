@@ -56,7 +56,7 @@ struct WICompressDataCharacterizationTests {
         let inputData = try Data(contentsOf: fixture.url)
         let inputInfo = try Self.imageInfo(inputData)
 
-        let outputData = try WICompress.process(inputData)
+        let outputData = try WICompressor.process(inputData)
         let outputInfo = try Self.imageInfo(outputData)
 
         let ratio = WILuban.ratio(

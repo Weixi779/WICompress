@@ -12,7 +12,7 @@ domains: deterministic image processing and byte-target compression.
 
 ### Added
 
-- `WICompress.process(_:using:)` and its file URL terminal with
+- `WICompressor.process(_:using:)` and its file URL terminal with
   `WIImageProcess`.
 - Extensible `WIImageResizing`, built-in `WIImageResize` algorithms, and
   aspect-ratio crop with normalized anchors.
@@ -22,12 +22,16 @@ domains: deterministic image processing and byte-target compression.
 
 ### Changed
 
+- The package and module remain `WICompress`; the public static terminal is now
+  the uninhabited `WICompressor` namespace.
 - Target compression now uses `WICompressionSizing` plus the shared
   `WIImageOutput` and execution-plan boundary.
 - The package requires Swift 6.2 and Xcode 26.
 
 ### Removed
 
+- The old public `WICompress` facade; 2.0 provides no compatibility alias or
+  singleton.
 - The 1.x `WICompressOptions` terminal and its resize, format, metadata,
   quality, and color-space policy types.
 - The legacy write-plan resolver and encoder adapter.

@@ -75,7 +75,7 @@ final class WICompressExampleViewModel {
         logger.info("Original format: \(imageGroup.format)")
         
         do {
-            let compressedData = try WICompress.process(
+            let compressedData = try WICompressor.process(
                 imageGroup.rawData,
                 using: WIImageProcess(quality: 0.7)
             )

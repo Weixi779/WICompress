@@ -1,5 +1,5 @@
 //
-//  WICompress.swift
+//  WICompressor.swift
 //  WICompress
 //
 //  Created by weixi on 2026/6/22.
@@ -9,8 +9,8 @@
 import Foundation
 import WIImageCore
 
-/// ImageIO-backed image compression entry point.
-public struct WICompress: Sendable {
+/// ImageIO-backed image processing and compression entry point.
+public enum WICompressor {
 
     /// Processes image data according to one immutable Process description.
     public static func process(

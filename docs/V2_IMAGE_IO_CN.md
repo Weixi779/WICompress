@@ -251,13 +251,14 @@ Data / file URL + Sendable options
 - `WIImageIO.Source` 是 scoped handle，不承诺 `Sendable`。
 - descriptor、format 和 options 使用不可变或值语义，并保持 `Sendable`。
 - 同一个 source/destination 的操作由单一调用上下文有序执行。
-- 不同顶层压缩调用各自创建 source/destination，可以由 WICompress async engine 并发。
+- 不同顶层压缩调用各自创建 source/destination，可以由 `WICompressor` async
+  execution 并发。
 - 不建立全局串行 ImageIO queue。
 - async terminal API 只把 `Data`、URL 与 `Sendable` 配置带入工作任务，不跨 actor
   传递活跃的 source/destination。
 
 同步 API 在当前调用上下文执行。异步 API 的取消、优先级和 executor 选择属于
-WICompress terminal execution，不在 `WIImageIO` 内重复设计。
+`WICompressor` terminal execution，不在 `WIImageIO` 内重复设计。
 
 ## 与 Execution Core 的关系
 
