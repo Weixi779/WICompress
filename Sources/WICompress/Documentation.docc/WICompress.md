@@ -62,10 +62,10 @@ All failures are thrown as ``WICompressError``; the core never imports UIKit or 
 ### Target-Based Compression
 
 - ``WICompressionTarget``
+- ``WIImageOutput``
 - ``WICompressionGeometry``
 - ``WICropMode``
 - ``WIImagePlacement``
-- ``WICompressionOutput``
 - ``WICompressionPreference``
 - ``WICompressionResult``
 

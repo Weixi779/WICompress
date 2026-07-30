@@ -132,16 +132,14 @@ struct WICompressPublicSurfaceTests {
 
         #expect(target.maxBytes == 1024)
         #expect(target.geometry == .original)
-        #expect(target.output == .upload)
-        #expect(target.preference == .balanced)
-        #expect(WICompressionOutput.upload == WICompressionOutput())
         #expect(
-            WICompressionOutput.preserve == WICompressionOutput(
-                format: .preserve,
-                metadata: .preserve,
-                colorSpace: .preserve
+            target.output == WIImageOutput(
+                representation: .pngIfAlphaOtherwiseJPEG,
+                metadata: .strip,
+                colorSpace: .convert(to: .sRGB)
             )
         )
+        #expect(target.preference == .balanced)
     }
 
     @Test("No-op policy returns the original data")
@@ -167,7 +165,11 @@ struct WICompressPublicSurfaceTests {
             input,
             to: WICompressionTarget(
                 maxBytes: input.count,
-                output: .preserve
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .preserve,
+                    colorSpace: .preserve
+                )
             )
         )
 
@@ -184,7 +186,11 @@ struct WICompressPublicSurfaceTests {
             input,
             to: WICompressionTarget(
                 maxBytes: input.count,
-                output: .preserve
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .preserve,
+                    colorSpace: .preserve
+                )
             )
         )
 
@@ -218,7 +224,7 @@ struct WICompressPublicSurfaceTests {
         let target = WICompressionTarget(
             maxBytes: 1024,
             geometry: .fill(size: WISize(width: 601, height: 420)),
-            output: WICompressionOutput(format: .heic)
+            output: WIImageOutput(representation: .heic)
         )
 
         #expect(throws: WICompressError.invalidTarget) {
@@ -235,7 +241,9 @@ struct WICompressPublicSurfaceTests {
                 size: WISize(width: 10, height: 10),
                 background: WIColor(red: 1, green: 1, blue: 1, alpha: 0.5)
             ),
-            output: WICompressionOutput(format: .jpeg(background: .white))
+            output: WIImageOutput(
+                representation: .jpeg(background: .white)
+            )
         )
 
         #expect(throws: WICompressError.nonOpaqueJPEGBackground) {
@@ -261,7 +269,11 @@ struct WICompressPublicSurfaceTests {
         let input = try Self.tinyPNGData()
         let target = WICompressionTarget(
             maxBytes: 1,
-            output: .preserve
+            output: WIImageOutput(
+                representation: .preserve,
+                metadata: .preserve,
+                colorSpace: .preserve
+            )
         )
 
         do {

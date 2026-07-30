@@ -157,8 +157,8 @@ let thumbnail = try WICompress.compress(
     to: WICompressionTarget(
         maxBytes: 32 * 1024,
         geometry: .fill(size: WISize(width: 200, height: 200)),
-        output: WICompressionOutput(
-            format: .jpeg(background: .white),
+        output: WIImageOutput(
+            representation: .jpeg(background: .white),
             metadata: .strip,
             colorSpace: .convert(to: .sRGB)
         )
@@ -351,10 +351,14 @@ attempt count internally.
 public struct WICompressionTarget {
     public var maxBytes: Int
     public var geometry: WICompressionGeometry
-    public var output: WICompressionOutput
+    public var output: WIImageOutput
     public var preference: WICompressionPreference
 }
 ```
+
+The Target default output writes PNG for Alpha sources and JPEG otherwise,
+strips metadata, and converts pixels to sRGB. Passing an explicit
+`WIImageOutput` replaces that product default with the stated requirements.
 
 Geometry expresses visual intent:
 

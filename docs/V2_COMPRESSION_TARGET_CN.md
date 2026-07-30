@@ -1,6 +1,6 @@
 # WICompress 2.0 Target Compression
 
-状态：Target Domain 及相邻执行边界已冻结；等待实施设计。
+状态：Target Domain 及相邻执行边界已冻结；共享 Output 已实施，Sizing 与执行计划迁移待继续。
 
 本文记录 `WICompressionTarget` 在 2.0 中已经接受的职责、输入组合、结果保证与非目标。
 后续实现可以依赖这些结论，不需要重新打开 1.x `geometry`、`preference` 或平台 preset
@@ -99,6 +99,18 @@ PNG、HEIC，以及 preserve/convert color space。JPEG 遇到透明源时默认
 
 Quality 不属于 Output；它由 Target solver 所有，并且不能在搜索期间改变 representation、
 metadata 或 color-space 合同。
+
+## 当前实施状态
+
+- `WICompressionTarget.output` 已统一为共享 `WIImageOutput`，不再维护重复的
+  `WICompressionOutput`。
+- Target 默认 Output 已按冻结合同实现：Alpha 源输出 PNG，否则输出 JPEG；strip
+  metadata；转换到 sRGB。
+- 现有 byte solver、1.x geometry 与 candidate preference 暂时保留，因此当前实现通过
+  internal adapter 把共享 Output 映射到旧 `WIWritePlan`。该 adapter 是迁移边界，不是
+  新 Domain。
+- 下一步是实现 `WICompressionSizing`，删除 public geometry/preference，再让 Target
+  直接产出共享 `WIExecutionPlan`；solver 的 byte-search 算法不在这一步改写。
 
 ## Sizing 组合真值表
 

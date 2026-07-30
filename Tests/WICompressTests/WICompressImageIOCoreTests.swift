@@ -813,6 +813,36 @@ struct WICompressImageIOCoreTests {
         #expect(outputColorSpaceName == CGColorSpace.sRGB as String)
     }
 
+    @Test("Default Target output converts Display P3 to sRGB")
+    func defaultTargetOutputConvertsDisplayP3ToSRGB() throws {
+        let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
+        let inputData = try Data(contentsOf: url)
+        try #require(Self.decodedColorSpaceName(inputData) == CGColorSpace.displayP3 as String)
+
+        let result = try WICompress.compress(
+            inputData,
+            to: WICompressionTarget(maxBytes: inputData.count * 2)
+        )
+
+        #expect(result.format == .jpeg)
+        #expect(result.byteCount <= inputData.count * 2)
+        #expect(try Self.decodedColorSpaceName(result.data) == CGColorSpace.sRGB as String)
+    }
+
+    @Test("Default Target output keeps Alpha sources as PNG")
+    func defaultTargetOutputKeepsAlphaAsPNG() throws {
+        let inputData = try Self.transparentPNG(width: 32, height: 24)
+
+        let result = try WICompress.compress(
+            inputData,
+            to: WICompressionTarget(maxBytes: 1_000_000)
+        )
+        let outputInfo = try Self.imageInfo(result.data)
+
+        #expect(result.format == .png)
+        #expect(outputInfo.hasAlpha == true)
+    }
+
     @Test("Target fill geometry renders a fixed canvas")
     func targetFillGeometryRendersFixedCanvas() throws {
         let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
@@ -822,7 +852,7 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 1_000_000,
                 geometry: .fill(size: WISize(width: 320, height: 320)),
-                output: WICompressionOutput(format: .jpeg(background: .disallow))
+                output: WIImageOutput(representation: .jpeg(background: .disallow))
             )
         )
         let outputInfo = try Self.imageInfo(result.data)
@@ -843,7 +873,7 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 12_000,
                 geometry: .fill(size: WISize(width: 320, height: 320)),
-                output: WICompressionOutput(format: .jpeg(background: .disallow))
+                output: WIImageOutput(representation: .jpeg(background: .disallow))
             )
         )
         let outputInfo = try Self.imageInfo(result.data)
@@ -862,7 +892,7 @@ struct WICompressImageIOCoreTests {
         let target = WICompressionTarget(
             maxBytes: 1,
             geometry: .fill(size: WISize(width: 320, height: 320)),
-            output: WICompressionOutput(format: .jpeg(background: .disallow))
+            output: WIImageOutput(representation: .jpeg(background: .disallow))
         )
 
         do {
@@ -884,7 +914,7 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 10_000,
                 geometry: .fit(maxLongSide: 1200),
-                output: WICompressionOutput(format: .jpeg(background: .disallow))
+                output: WIImageOutput(representation: .jpeg(background: .disallow))
             )
         )
         let outputInfo = try Self.imageInfo(result.data)
@@ -906,7 +936,7 @@ struct WICompressImageIOCoreTests {
         let target = WICompressionTarget(
             maxBytes: 60_000,
             geometry: .fit(maxLongSide: 1200),
-            output: WICompressionOutput(format: .jpeg(background: .disallow))
+            output: WIImageOutput(representation: .jpeg(background: .disallow))
         )
 
         let outputData = try WICompressionSolver.compress(
@@ -930,7 +960,7 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 100_000,
                 geometry: .fit(maxLongSide: 1200),
-                output: WICompressionOutput(format: .png)
+                output: WIImageOutput(representation: .png)
             )
         )
         let outputInfo = try Self.imageInfo(result.data)
@@ -951,7 +981,7 @@ struct WICompressImageIOCoreTests {
         let target = WICompressionTarget(
             maxBytes: 1,
             geometry: .fill(size: WISize(width: 320, height: 320)),
-            output: WICompressionOutput(format: .png)
+            output: WIImageOutput(representation: .png)
         )
 
         do {
@@ -1004,7 +1034,7 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 100_000,
                 geometry: .fill(size: WISize(width: 4, height: 4), crop: .left),
-                output: WICompressionOutput(format: .png)
+                output: WIImageOutput(representation: .png)
             )
         )
         let samplePoints = [
@@ -1045,7 +1075,7 @@ struct WICompressImageIOCoreTests {
                     placement: .fill(.top),
                     background: WIColor(red: 0, green: 0, blue: 0)
                 ),
-                output: WICompressionOutput(format: .png)
+                output: WIImageOutput(representation: .png)
             )
         )
         let samplePairs = [
@@ -1086,7 +1116,7 @@ struct WICompressImageIOCoreTests {
                     placement: .fill(.center),
                     background: WIColor(red: 0, green: 0, blue: 0)
                 ),
-                output: WICompressionOutput(format: .png)
+                output: WIImageOutput(representation: .png)
             )
         )
         let samplePairs = [
@@ -1133,7 +1163,7 @@ struct WICompressImageIOCoreTests {
                     placement: .fit(.center),
                     background: WIColor(red: 0, green: 1, blue: 0)
                 ),
-                output: WICompressionOutput(format: .png)
+                output: WIImageOutput(representation: .png)
             )
         )
         let outputInfo = try Self.imageInfo(result.data)
@@ -1160,7 +1190,7 @@ struct WICompressImageIOCoreTests {
                     placement: .fit(.center),
                     background: WIColor(red: 0, green: 1, blue: 0)
                 ),
-                output: WICompressionOutput(format: .jpeg(background: .white))
+                output: WIImageOutput(representation: .jpeg(background: .white))
             )
         )
         let padding = try Self.pixelColor(result.data, x: 0, y: 0)
@@ -1188,7 +1218,11 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 1_000_000,
                 geometry: .fill(size: WISize(width: 200, height: 200)),
-                output: .preserve
+                output: WIImageOutput(
+                    representation: .preserve,
+                    metadata: .preserve,
+                    colorSpace: .preserve
+                )
             )
         )
         let outputInfo = try Self.imageInfo(result.data)
@@ -1216,7 +1250,7 @@ struct WICompressImageIOCoreTests {
                     placement: .stretch,
                     background: WIColor(red: 0, green: 0, blue: 0)
                 ),
-                output: WICompressionOutput(format: .png)
+                output: WIImageOutput(representation: .png)
             )
         )
         let oracle = try Self.orientationTransformedPNG(

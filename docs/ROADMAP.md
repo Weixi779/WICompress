@@ -47,11 +47,15 @@ Implementation status:
   of `WICompressOptions`.
 - Completed: file-backed Process URL execution, on-demand original-byte reads,
   two-axis-safe thumbnail sampling, and overflow validation before Raster.
+- Completed: Target now uses the shared `WIImageOutput`; its frozen default is
+  Alpha-aware PNG/JPEG, stripped metadata, and conversion to sRGB. The duplicate
+  public `WICompressionOutput` has been removed.
 - In migration: the 1.x Process surface remains available as a compatibility
   guard while the new Process path is reviewed; it will be removed before the
   2.0 cut rather than maintained as a second architecture.
-- Next: replace the Target policy surface with the frozen target contract and
-  move it onto the shared Output / execution-plan boundary.
+- Next: replace Target geometry/preference with the frozen
+  `WICompressionSizing` contract and move the solver directly onto the shared
+  execution-plan boundary. Its current `WIWritePlan` adapter is transitional.
 - Later: add the Swift 6.2 asynchronous terminals over the same synchronous
   execution core.
 

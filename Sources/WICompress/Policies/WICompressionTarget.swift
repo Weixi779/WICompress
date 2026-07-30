@@ -8,37 +8,6 @@
 
 import Foundation
 
-/// Output contract used by target-based compression.
-public struct WICompressionOutput: Sendable, Equatable {
-    /// Destination container policy.
-    public var format: WIFormatPolicy
-    /// Metadata handling policy.
-    public var metadata: WIMetadataPolicy
-    /// Output color-space policy.
-    public var colorSpace: WIOutputColorSpace
-
-    /// Creates an output contract.
-    public init(
-        format: WIFormatPolicy = .pngIfAlphaOtherwiseJPEG,
-        metadata: WIMetadataPolicy = .strip,
-        colorSpace: WIOutputColorSpace = .preserve
-    ) {
-        self.format = format
-        self.metadata = metadata
-        self.colorSpace = colorSpace
-    }
-
-    /// Upload-oriented output defaults.
-    public static let upload = WICompressionOutput()
-
-    /// Preserve source format, metadata, and color-space semantics.
-    public static let preserve = WICompressionOutput(
-        format: .preserve,
-        metadata: .preserve,
-        colorSpace: .preserve
-    )
-}
-
 /// Candidate ranking preference for target-based compression.
 public enum WICompressionPreference: Sendable, Equatable {
     /// Balance output dimensions and fidelity.
@@ -55,8 +24,8 @@ public struct WICompressionTarget: Sendable, Equatable {
     public var maxBytes: Int
     /// Output geometry intent.
     public var geometry: WICompressionGeometry
-    /// Output format, metadata, and color-space contract.
-    public var output: WICompressionOutput
+    /// Immutable representation, metadata, and color-space requirements.
+    public var output: WIImageOutput
     /// Candidate ranking preference.
     public var preference: WICompressionPreference
 
@@ -64,7 +33,11 @@ public struct WICompressionTarget: Sendable, Equatable {
     public init(
         maxBytes: Int,
         geometry: WICompressionGeometry = .original,
-        output: WICompressionOutput = .upload,
+        output: WIImageOutput = WIImageOutput(
+            representation: .pngIfAlphaOtherwiseJPEG,
+            metadata: .strip,
+            colorSpace: .convert(to: .sRGB)
+        ),
         preference: WICompressionPreference = .balanced
     ) {
         self.maxBytes = maxBytes

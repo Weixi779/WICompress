@@ -23,10 +23,10 @@ enum WICompressionTargetResolver {
 
         return WICompressOptions(
             resize: resize,
-            format: target.output.format,
+            format: target.output.representation,
             metadata: target.output.metadata,
             quality: defaultTargetQuality,
-            colorSpace: target.output.colorSpace
+            colorSpace: target.output.colorSpace.legacyPolicy
         )
     }
 
@@ -45,10 +45,10 @@ enum WICompressionTargetResolver {
         }
 
         let destination = try WIWritePlanResolver.resolvedDestination(
-            for: target.output.format,
+            for: target.output.representation,
             info: info
         )
-        let canWriteDestination = target.output.format == .preserve
+        let canWriteDestination = target.output.representation == .preserve
             ? info.isSourceFormatWritable
             : WIImageFormat.canWrite(typeIdentifier: destination.typeIdentifier)
         guard canWriteDestination else {
@@ -60,7 +60,7 @@ enum WICompressionTargetResolver {
             destinationFormat: destination.format
         )
         let colorSpace = try WIWritePlanResolver.resolvedColorSpace(
-            for: target.output.colorSpace,
+            for: target.output.colorSpace.legacyPolicy,
             sourceColorSpace: sourceColorSpace
         )
 
@@ -122,6 +122,17 @@ enum WICompressionTargetResolver {
             )
         case .original, .fit, .fitInside:
             return nil
+        }
+    }
+}
+
+private extension WIImageColorSpace {
+    var legacyPolicy: WIOutputColorSpace {
+        switch self {
+        case .preserve:
+            return .preserve
+        case .convert(let colorSpace):
+            return .convert(to: colorSpace)
         }
     }
 }

@@ -146,8 +146,8 @@ let thumbnail = try WICompress.compress(
     to: WICompressionTarget(
         maxBytes: 32 * 1024,
         geometry: .fill(size: WISize(width: 200, height: 200)),
-        output: WICompressionOutput(
-            format: .jpeg(background: .white),
+        output: WIImageOutput(
+            representation: .jpeg(background: .white),
             metadata: .strip,
             colorSpace: .convert(to: .sRGB)
         )
@@ -324,10 +324,13 @@ PNG 是无损格式，quality 对 PNG 不会被理解为有损压缩。
 public struct WICompressionTarget {
     public var maxBytes: Int
     public var geometry: WICompressionGeometry
-    public var output: WICompressionOutput
+    public var output: WIImageOutput
     public var preference: WICompressionPreference
 }
 ```
+
+Target 默认输出会在源图含 Alpha 时写 PNG，否则写 JPEG；同时移除 metadata 并将像素
+转换到 sRGB。显式传入 `WIImageOutput` 时，以调用方声明的要求为准。
 
 geometry 表达视觉意图：
 

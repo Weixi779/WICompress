@@ -96,7 +96,9 @@ public struct WICompress: Sendable {
         let imageSource = try WIImageSource(data: data)
         try WICompressionTargetValidator.validate(target, info: imageSource.info)
 
-        let sourceColorSpace = try imageSource.colorSpaceInfoIfNeeded(for: target.output.colorSpace)
+        let sourceColorSpace = try imageSource.processColorSpaceInfoIfNeeded(
+            for: target.output.colorSpace
+        )
         if canReturnOriginal(data, target: target, imageSource: imageSource, sourceColorSpace: sourceColorSpace) {
             return compressionResult(for: data, info: imageSource.info)
         }

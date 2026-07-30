@@ -147,9 +147,11 @@ Key types:
 10. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
 11. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
 12. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
-   (`geometry` / `output` / `preference`) returning `WICompressionResult`.
+   (`geometry` / shared `WIImageOutput` / `preference`) returning
+   `WICompressionResult`.
    `WICompressionTargetValidator` checks legality, `WICompressionTargetResolver`
-   builds the write plan, and `WICompressionSolver` runs the byte-budget search.
+   temporarily adapts the shared output to `WIWritePlan`, and
+   `WICompressionSolver` runs the byte-budget search.
    Pure math lives in `Algorithm/`: `WICompressionSizeEstimation` (shrink +
    quality profile), `WICompressionLayout` (canvas placement), and
    `WICompressionRanking` (preference-weighted candidate selection).

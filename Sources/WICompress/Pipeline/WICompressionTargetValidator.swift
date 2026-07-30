@@ -26,12 +26,12 @@ enum WICompressionTargetValidator {
         try validate(target)
 
         if target.geometry.isHardGeometry,
-           target.output.format.requiresEvenPixelSize(info: info),
+           target.output.representation.requiresEvenPixelSize(info: info),
            target.geometry.resolvedHardPixelSize?.hasOddSide == true {
             throw WICompressError.invalidTarget
         }
 
-        if target.output.format.resolvesToJPEG(info: info),
+        if target.output.representation.resolvesToJPEG(info: info),
            case .exactCanvas(_, _, let background) = target.geometry {
             try validateOpaqueBackground(background)
         }
@@ -103,7 +103,7 @@ private extension WIPixelSize {
     }
 }
 
-private extension WIFormatPolicy {
+private extension WIImageRepresentation {
     func requiresEvenPixelSize(info: WIImageInfo) -> Bool {
         switch self {
         case .heic:

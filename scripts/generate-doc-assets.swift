@@ -91,8 +91,8 @@ enum GenerateDocAssets {
                     WICompressionTarget(
                         maxBytes: 32 * 1024,
                         geometry: .fill(size: WISize(width: 200, height: 200)),
-                        output: WICompressionOutput(
-                            format: .jpeg(background: .white),
+                        output: WIImageOutput(
+                            representation: .jpeg(background: .white),
                             metadata: .strip,
                             colorSpace: .convert(to: .sRGB)
                         )

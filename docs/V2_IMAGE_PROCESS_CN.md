@@ -263,8 +263,9 @@ resolver 或改变执行语义。
 - file terminal 保持 file-backed source；只有 return-original passthrough 才按需
   读取完整原始 `Data`。
 - 1.x `compress(_:options:)`、旧 Policy 名称与 Target path 暂时保留为迁移护栏。
-- 尚未实现 async terminal，也尚未把 `WICompressionTarget` 迁移到共享
-  `WIImageOutput` / `WIExecutionPlan`。
+- `WICompressionTarget` 已共享 `WIImageOutput`；Target 仍通过迁移 adapter 使用旧
+  `WIWritePlan`，尚未汇合到 `WIExecutionPlan`。
+- 尚未实现 async terminal。
 
 ## 已接受
 
