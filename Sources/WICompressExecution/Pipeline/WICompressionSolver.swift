@@ -20,29 +20,6 @@ enum WICompressionSolver {
     static func compress(
         _ imageSource: WIImageSource,
         to target: WICompressionTarget,
-        maxEncodeAttempts: Int = defaultMaxEncodeAttempts
-    ) throws(WICompressError) -> Data {
-        try WICompressionTargetValidator.validate(target)
-        let sizing = try WICompressionTargetResolver.sizing(
-            for: target,
-            imageSource: imageSource
-        )
-        let output = try WICompressionTargetResolver.output(
-            for: target,
-            imageSource: imageSource
-        )
-        return try compress(
-            imageSource,
-            to: target,
-            sizing: sizing,
-            output: output,
-            maxEncodeAttempts: maxEncodeAttempts
-        )
-    }
-
-    static func compress(
-        _ imageSource: WIImageSource,
-        to target: WICompressionTarget,
         sizing: WIResolvedCompressionSizing,
         output: WIResolvedImageOutput,
         maxEncodeAttempts: Int = defaultMaxEncodeAttempts
@@ -67,7 +44,7 @@ enum WICompressionSolver {
                 )
             }
 
-            return try WIImageEncoder.encode(
+            return try WIImageExecutor.execute(
                 imageSource,
                 plan: initialPlan
             )
@@ -380,14 +357,14 @@ enum WICompressionSolver {
         var qualityPlan = plan
         qualityPlan.quality = quality
         if let renderedImage {
-            return try WIImageEncoder.encodeRendered(
+            return try WIImageExecutor.encodeRendered(
                 renderedImage,
                 imageSource: imageSource,
                 plan: qualityPlan
             )
         }
 
-        return try WIImageEncoder.encode(
+        return try WIImageExecutor.execute(
             imageSource,
             plan: qualityPlan
         )
@@ -401,7 +378,7 @@ enum WICompressionSolver {
             return nil
         }
 
-        return try WIImageEncoder.render(
+        return try WIImageExecutor.render(
             imageSource,
             plan: plan
         )

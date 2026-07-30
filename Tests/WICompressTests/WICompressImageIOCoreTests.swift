@@ -655,24 +655,24 @@ struct WICompressImageIOCoreTests {
         #expect(outputInfo.profileName == inputInfo.profileName)
     }
 
-    @Test("Color-space inspection is lazy for preserve and resolves Display P3 when requested")
-    func colorSpaceInspectionIsLazyForPreserve() throws {
+    @Test("Output color-space resolution preserves source and converts Display P3 when requested")
+    func outputColorSpaceResolutionUsesSourceFacts() throws {
         let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
         let inputData = try Data(contentsOf: url)
         let inputSource = try WIImageSource(data: inputData)
 
-        #expect(
-            try inputSource.processColorSpaceInfoIfNeeded(
-                for: .preserve
-            ) == nil
+        let preservedOutput = try WIImageOutputResolver.resolve(
+            WIImageOutput(colorSpace: .preserve),
+            imageSource: inputSource
+        )
+        let convertedOutput = try WIImageOutputResolver.resolve(
+            WIImageOutput(colorSpace: .convert(to: .sRGB)),
+            imageSource: inputSource
         )
 
-        let colorSpaceInfo = try #require(
-            try inputSource.processColorSpaceInfoIfNeeded(
-                for: .convert(to: .sRGB)
-            )
-        )
-        #expect(colorSpaceInfo.colorSpace == .displayP3)
+        #expect(preservedOutput.colorSpace.requiresConversion == false)
+        #expect(try inputSource.sourceColorSpace() == .displayP3)
+        #expect(convertedOutput.colorSpace.target == .sRGB)
     }
 
     @Test("Display P3 can be converted to sRGB")
@@ -790,9 +790,19 @@ struct WICompressImageIOCoreTests {
             output: WIImageOutput(representation: .jpeg(background: .disallow))
         )
 
+        let sizing = try WICompressionTargetResolver.sizing(
+            for: target,
+            imageSource: imageSource
+        )
+        let output = try WICompressionTargetResolver.output(
+            for: target,
+            imageSource: imageSource
+        )
         let outputData = try WICompressionSolver.compress(
             imageSource,
             to: target,
+            sizing: sizing,
+            output: output,
             maxEncodeAttempts: 12
         )
         let outputInfo = try Self.imageInfo(outputData)

@@ -10,10 +10,6 @@ import Foundation
 import WIImageDomain
 import WIImageIO
 
-struct WISourceColorSpaceInfo: Sendable, Equatable {
-    let colorSpace: WIColorSpace?
-}
-
 final class WIImageSource {
     enum Backing {
         case data(Data)
@@ -83,13 +79,7 @@ final class WIImageSource {
         }
     }
 
-    func processColorSpaceInfoIfNeeded(
-        for decision: WIImageColorSpace
-    ) throws(WICompressError) -> WISourceColorSpaceInfo? {
-        guard case .convert = decision else {
-            return nil
-        }
-
+    func sourceColorSpace() throws(WICompressError) -> WIColorSpace? {
         let colorSpace: WIColorSpace?
         do {
             colorSpace = try imageIOSource.colorSpace()
@@ -97,9 +87,7 @@ final class WIImageSource {
             throw Self.map(error)
         }
 
-        return WISourceColorSpaceInfo(
-            colorSpace: colorSpace
-        )
+        return colorSpace
     }
 
     private static func map(_ error: WIImageIO.Error) -> WICompressError {

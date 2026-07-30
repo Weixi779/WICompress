@@ -28,7 +28,7 @@ render 和 encode 仍然耦合在 WICompress pipeline 中。
    但目前只能共同依赖一组同时知道 Domain plan 和 ImageIO 字典的实现。
 2. `kCGImageSource...`、`kCGImageDestination...` 与 `[CFString: Any]` 会散落到新的
    resolver、solver 或其他调用点。
-3. 当前 `WIImageEncoder` 同时负责 ImageIO destination、thumbnail decode、
+3. 重构前的 `WIImageEncoder` 同时负责 ImageIO destination、thumbnail decode、
    Core Graphics render 和 plan path 分派；2.0 需要把 ImageIO 与 Raster 各自的不变量
    交给不同模块。
 

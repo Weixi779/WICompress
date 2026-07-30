@@ -469,13 +469,8 @@ struct WIImageProcessTests {
             )
         ).data
         let outputSource = try WIImageSource(data: output)
-        let colorSpace = try #require(
-            try outputSource.processColorSpaceInfoIfNeeded(
-                for: .convert(to: .sRGB)
-            )
-        )
 
-        #expect(colorSpace.colorSpace == .sRGB)
+        #expect(try outputSource.sourceColorSpace() == .sRGB)
     }
 
     @Test("Data and file Process terminals have equivalent behavior")

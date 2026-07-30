@@ -39,7 +39,7 @@ package enum WICompressionExecution {
             process,
             imageSource: imageSource
         )
-        let outputData = try WIImageEncoder.encode(
+        let outputData = try WIImageExecutor.execute(
             imageSource,
             plan: executionPlan
         )

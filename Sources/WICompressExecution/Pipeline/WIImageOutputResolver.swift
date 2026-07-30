@@ -37,12 +37,9 @@ enum WIImageOutputResolver {
             for: output.representation,
             descriptor: imageSource.descriptor
         )
-        let sourceColorSpace = try imageSource.processColorSpaceInfoIfNeeded(
-            for: output.colorSpace
-        )
         let colorSpace = try resolvedColorSpace(
             output.colorSpace,
-            sourceColorSpace: sourceColorSpace
+            imageSource: imageSource
         )
         let isWritable = output.representation == .preserve
             ? imageSource.descriptor.isSourceFormatWritable
@@ -112,15 +109,16 @@ enum WIImageOutputResolver {
 
     private static func resolvedColorSpace(
         _ decision: WIImageColorSpace,
-        sourceColorSpace: WISourceColorSpaceInfo?
+        imageSource: WIImageSource
     ) throws(WICompressError) -> WIResolvedOutputColorSpace {
         switch decision {
         case .preserve:
             return WIResolvedOutputColorSpace(target: nil)
         case .convert(let target):
             _ = try makeCGColorSpace(target)
+            let sourceColorSpace = try imageSource.sourceColorSpace()
             return WIResolvedOutputColorSpace(
-                target: sourceColorSpace?.colorSpace == target
+                target: sourceColorSpace == target
                     ? nil
                     : target
             )

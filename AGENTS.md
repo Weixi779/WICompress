@@ -94,7 +94,7 @@ Data / URL + WIImageProcess
   -> WIImageProcessResolver
        crop -> WIImageResizing -> resolved geometry
        output + quality -> WIExecutionPlan
-  -> WIImageEncoder
+  -> WIImageExecutor
        no crop shrink -> two-axis-safe ImageIO thumbnail
        axis upscaling -> full source
        crop -> oriented source + WIImageRaster
@@ -138,7 +138,7 @@ Key types:
    resizing algorithm, crop intent, or public Policy.
 7. **WIImageProcessResolver** - resolves Process input into a shared
    `WIExecutionPlan`.
-8. **WIImageEncoder** - executes resolved plans through WIImageIO and WIImageRaster.
+8. **WIImageExecutor** - executes resolved plans through WIImageIO and WIImageRaster.
 9. **WIImageFormat** - public ImageIO-produced result fact
    (JPEG/PNG/HEIF/unknown); callers do not initialize it from arbitrary data.
 10. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).

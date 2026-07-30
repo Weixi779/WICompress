@@ -43,11 +43,11 @@ Implementation status:
 - Completed: package-only `WIImageRaster` target with one resolved-plan entry;
   bitmap rendering, orientation normalization, crop/resize, two-layer
   backgrounds, alpha flattening, and color conversion no longer live in
-  `WIImageEncoder`.
+  `WIImageExecutor`.
 - Completed: `WIImageDomain` is the single owner of public Process, Target,
   pixel-size, and color values used directly by ImageIO, Raster, and Execution.
   Mirrored Core values and product-boundary field conversions have been removed.
-- Completed: `WICompressExecution` owns Source, resolvers, plans, encoder, and
+- Completed: `WICompressExecution` owns Source, resolvers, plans, executor, and
   solver; the public `WICompress` target is now an umbrella facade.
 - Completed: `WIImageFormat` is an ImageIO-produced public result fact. It has no
   public Data detection initializer; source inspection produces it once.

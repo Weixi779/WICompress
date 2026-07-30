@@ -245,7 +245,7 @@ suspension point。
 
 当前同步 base name 已确认为 `WICompressor.process(_:using:)` 与
 `WICompressor.process(contentsOf:using:)`。异步 overload 尚未加入；它必须消费同一个
-`WIImageProcessResolver -> WIExecutionPlan -> WIImageEncoder` 核心，不能建立第二套
+`WIImageProcessResolver -> WIExecutionPlan -> WIImageExecutor` 核心，不能建立第二套
 resolver 或改变执行语义。
 
 ## 当前实施状态

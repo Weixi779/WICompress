@@ -1,5 +1,5 @@
 //
-//  WIImageEncoder.swift
+//  WIImageExecutor.swift
 //  WICompressExecution
 //
 //  Created by weixi on 2026/6/22.
@@ -12,8 +12,8 @@ import WIImageDomain
 import WIImageIO
 import WIImageRaster
 
-enum WIImageEncoder {
-    static func encode(
+enum WIImageExecutor {
+    static func execute(
         _ imageSource: WIImageSource,
         plan: WIExecutionPlan
     ) throws(WICompressError) -> Data {
