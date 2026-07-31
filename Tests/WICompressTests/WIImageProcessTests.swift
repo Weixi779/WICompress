@@ -444,7 +444,7 @@ struct WIImageProcessTests {
         ).data
         let outputSource = try WIImageSource(data: output)
 
-        #expect(outputSource.descriptor.hasGPS)
+        #expect(outputSource.descriptor.metadata.contains(.gps))
         #expect(outputSource.descriptor.orientation == .up)
         #expect(outputSource.descriptor.format == .jpeg)
     }

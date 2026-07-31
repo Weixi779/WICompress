@@ -23,9 +23,10 @@ enum WIImageExecutor {
         case .copyFromSource:
             do {
                 return try imageSource.imageIOSource.copy(
-                    as: plan.destinationTypeIdentifier,
+                    as: plan.destinationType,
                     options: CopyOptions(
-                        compressionQuality: plan.quality
+                        compressionQuality: plan.quality,
+                        metadata: plan.metadata
                     )
                 )
             } catch {
@@ -64,15 +65,14 @@ enum WIImageExecutor {
         plan: WIExecutionPlan
     ) throws(WICompressError) -> Data {
         do {
-            return try Transcoder.encode(
+            return try Encoder.encode(
                 image,
-                as: plan.destinationTypeIdentifier,
+                as: plan.destinationType,
                 options: EncodeOptions(
-                    compressionQuality: plan.quality
+                    compressionQuality: plan.quality,
+                    metadata: plan.metadata
                 ),
-                preservingMetadataFrom: plan.metadata == .preserve
-                    ? imageSource.imageIOSource
-                    : nil
+                metadataFrom: imageSource.imageIOSource
             )
         } catch {
             throw map(error, destinationFormat: plan.destinationFormat)
@@ -254,6 +254,8 @@ enum WIImageExecutor {
             return .thumbnailCreationFailed
         case .animatedSourceUnsupported(let frameCount):
             return .animatedSourceUnsupported(frameCount: frameCount)
+        case .metadataCopyUnsupported:
+            return .executionPlanUnavailable
         case .destinationCreationFailed:
             return .destinationCreationFailed(destinationFormat)
         case .destinationFinalizationFailed:

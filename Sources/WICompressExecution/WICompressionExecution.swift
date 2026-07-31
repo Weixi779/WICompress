@@ -114,7 +114,7 @@ package enum WICompressionExecution {
         let imageSource = try WIImageSource(data: data)
         guard imageSource.descriptor.format != .unknown else {
             throw WICompressError.unsupportedSourceFormat(
-                imageSource.descriptor.typeIdentifier
+                imageSource.descriptor.type?.identifier
             )
         }
 

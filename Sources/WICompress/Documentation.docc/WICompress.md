@@ -64,7 +64,7 @@ All failures are thrown as ``WICompressError``; the core never imports UIKit or 
 - ``WIImageOutput``
 - ``WIImageRepresentation``
 - ``WIJPEGBackground``
-- ``WIImageMetadata``
+- ``WIImageMetadataOptions``
 - ``WIImageColorSpace``
 
 ### Color Handling

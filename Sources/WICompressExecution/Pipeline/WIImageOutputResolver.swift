@@ -21,11 +21,14 @@ struct WIResolvedOutputColorSpace: Sendable, Equatable {
 }
 
 struct WIResolvedImageOutput: Sendable, Equatable {
-    let destinationFormat: WIImageFormat
-    let destinationTypeIdentifier: String
+    let destinationType: UTType
     let jpegBackground: WIJPEGBackground?
     let colorSpace: WIResolvedOutputColorSpace
     let isWritable: Bool
+
+    var destinationFormat: WIImageFormat {
+        .detected(from: destinationType)
+    }
 }
 
 enum WIImageOutputResolver {
@@ -41,15 +44,10 @@ enum WIImageOutputResolver {
             output.colorSpace,
             imageSource: imageSource
         )
-        let isWritable = output.representation == .preserve
-            ? imageSource.descriptor.isSourceFormatWritable
-            : Capabilities.canEncode(
-                typeIdentifier: destination.typeIdentifier
-            )
+        let isWritable = Capabilities.canEncode(destination.type)
 
         return WIResolvedImageOutput(
-            destinationFormat: destination.format,
-            destinationTypeIdentifier: destination.typeIdentifier,
+            destinationType: destination.type,
             jpegBackground: destination.jpegBackground,
             colorSpace: colorSpace,
             isWritable: isWritable
@@ -60,34 +58,33 @@ enum WIImageOutputResolver {
         for representation: WIImageRepresentation,
         descriptor: WIImageIO.Descriptor
     ) throws(WICompressError) -> (
-        format: WIImageFormat,
-        typeIdentifier: String,
+        type: UTType,
         jpegBackground: WIJPEGBackground?
     ) {
         switch representation {
         case .preserve:
-            guard let typeIdentifier = descriptor.typeIdentifier else {
+            guard let type = descriptor.type else {
                 throw .unsupportedSourceFormat(nil)
             }
 
-            return (descriptor.format, typeIdentifier, nil)
+            return (type, nil)
         case .jpeg(let background):
             try validateJPEGBackground(background)
             if background == .disallow, descriptor.hasAlpha == true {
                 throw .transparentSourceRequiresBackground(descriptor.format)
             }
 
-            return (.jpeg, UTType.jpeg.identifier, background)
+            return (.jpeg, background)
         case .pngIfAlphaOtherwiseJPEG:
             if descriptor.hasAlpha == true {
-                return (.png, UTType.png.identifier, nil)
+                return (.png, nil)
             }
 
-            return (.jpeg, UTType.jpeg.identifier, .disallow)
+            return (.jpeg, .disallow)
         case .png:
-            return (.png, UTType.png.identifier, nil)
+            return (.png, nil)
         case .heic:
-            return (.heif, UTType.heic.identifier, nil)
+            return (.heic, nil)
         }
     }
 

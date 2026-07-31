@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UniformTypeIdentifiers
 import WIImageDomain
 import WIImageIO
 
@@ -17,7 +18,7 @@ enum WIImageProcessResolver {
     ) throws(WICompressError) -> WIExecutionPlan {
         let descriptor = imageSource.descriptor
         guard descriptor.format != .unknown else {
-            throw .unsupportedSourceFormat(descriptor.typeIdentifier)
+            throw .unsupportedSourceFormat(descriptor.type?.identifier)
         }
 
         try validateQuality(process.quality)
@@ -57,6 +58,9 @@ enum WIImageProcessResolver {
         if canCopyFromSource(
             process: process,
             geometry: geometry,
+            imageSource: imageSource,
+            quality: quality,
+            destinationType: resolvedOutput.destinationType,
             outputColorSpace: resolvedOutput.colorSpace
         ) {
             operation = .copyFromSource
@@ -122,25 +126,38 @@ enum WIImageProcessResolver {
             return false
         }
 
-        switch process.output.metadata {
-        case .preserve:
-            return true
-        case .strip:
-            return !descriptor.hasMetadata
-                && descriptor.orientation == .up
-        }
+        return (
+            !descriptor.hasUnmodeledMetadata
+                || process.output.metadata.preservesUnmodeledMetadata
+        )
+            && descriptor.metadata.isSubset(of: process.output.metadata)
+            && (
+                process.output.metadata != .strip
+                    || descriptor.orientation == .up
+            )
     }
 
     private static func canCopyFromSource(
         process: WIImageProcess,
         geometry: WIResolvedProcessGeometry,
+        imageSource: WIImageSource,
+        quality: Double?,
+        destinationType: UTType,
         outputColorSpace: WIResolvedOutputColorSpace
     ) -> Bool {
         process.crop == nil
             && geometry.changesPixelSize == false
             && process.output.representation == .preserve
-            && process.output.metadata == .preserve
             && outputColorSpace.requiresConversion == false
+            && (
+                process.output.metadata != .strip
+                    || imageSource.descriptor.orientation == .up
+            )
+            && imageSource.imageIOSource.canCopy(
+                as: destinationType,
+                keeping: process.output.metadata,
+                compressionQuality: quality
+            )
     }
 
     private static func plan(
@@ -151,8 +168,7 @@ enum WIImageProcessResolver {
     ) -> WIExecutionPlan {
         WIExecutionPlan(
             operation: operation,
-            destinationFormat: resolvedOutput.destinationFormat,
-            destinationTypeIdentifier: resolvedOutput.destinationTypeIdentifier,
+            destinationType: resolvedOutput.destinationType,
             metadata: process.output.metadata,
             quality: quality,
             jpegBackground: resolvedOutput.jpegBackground,

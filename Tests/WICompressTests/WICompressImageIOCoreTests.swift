@@ -401,6 +401,98 @@ struct WICompressImageIOCoreTests {
         #expect(outputInfo.displayHeight == inputInfo.displayHeight)
     }
 
+    @Test("GPS can be removed through the lossless ImageIO copy path")
+    func excludesGPSWithoutRasterizing() throws {
+        let url = try Self.resource(
+            "real_heic_4032x3024_o6_gps_hdr",
+            extension: "heic"
+        )
+        let inputData = try Data(contentsOf: url)
+        let inputInfo = try Self.imageInfo(inputData)
+        let process = WIImageProcess(
+            sizing: .original,
+            quality: nil,
+            output: WIImageOutput(
+                representation: .preserve,
+                metadata: .preserve.subtracting(.gps),
+                colorSpace: .preserve
+            )
+        )
+        let imageSource = try WIImageSource(data: inputData)
+        #expect(imageSource.descriptor.hasUnmodeledMetadata)
+        let plan = try WIImageProcessResolver.resolve(
+            process,
+            imageSource: imageSource
+        )
+
+        guard case .copyFromSource = plan.operation else {
+            Issue.record("GPS-only filtering should use ImageIO source copy")
+            return
+        }
+
+        let outputData = try WICompressor.process(
+            inputData,
+            using: process
+        ).data
+        let outputInfo = try Self.imageInfo(outputData)
+
+        #expect(try imageFormat(of: outputData) == imageFormat(of: inputData))
+        #expect(outputInfo.hasGPS == false)
+        #expect(outputInfo.orientation == inputInfo.orientation)
+        #expect(outputInfo.displayWidth == inputInfo.displayWidth)
+        #expect(outputInfo.displayHeight == inputInfo.displayHeight)
+    }
+
+    @Test("Strip rewrites sources containing unmodeled metadata")
+    func stripRewritesUnmodeledMetadata() throws {
+        let inputData = try Self.solidImageData(
+            typeIdentifier: "public.png",
+            width: 40,
+            height: 20,
+            properties: [
+                kCGImagePropertyPNGDictionary: [
+                    kCGImagePropertyPNGAuthor: "WICompress"
+                ]
+            ] as CFDictionary
+        )
+        let process = WIImageProcess(
+            sizing: .original,
+            quality: nil,
+            output: WIImageOutput(
+                representation: .preserve,
+                metadata: .strip,
+                colorSpace: .preserve
+            )
+        )
+        let imageSource = try WIImageSource(data: inputData)
+        let plan = try WIImageProcessResolver.resolve(
+            process,
+            imageSource: imageSource
+        )
+
+        guard case .render = plan.operation else {
+            Issue.record("Unmodeled metadata must not use passthrough")
+            return
+        }
+
+        let outputData = try WICompressor.process(
+            inputData,
+            using: process
+        ).data
+        let outputSource = try #require(
+            CGImageSourceCreateWithData(outputData as CFData, nil)
+        )
+        let outputProperties = try #require(
+            CGImageSourceCopyPropertiesAtIndex(outputSource, 0, nil)
+                as? [CFString: Any]
+        )
+        let png = outputProperties[
+            kCGImagePropertyPNGDictionary
+        ] as? [CFString: Any]
+
+        #expect(png?[kCGImagePropertyPNGAuthor] == nil)
+    }
+
     @Test("PNG alpha survives redraw compression")
     func pngAlphaSurvivesRedraw() throws {
         let url = try Self.resource("real_png_1086x1630_alpha", extension: "png")

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UniformTypeIdentifiers
 
 package enum Error: Swift.Error, Sendable, Equatable {
     case invalidImageData
@@ -18,6 +19,7 @@ package enum Error: Swift.Error, Sendable, Equatable {
     case imageCreationFailed
     case thumbnailCreationFailed
     case animatedSourceUnsupported(frameCount: Int)
-    case destinationCreationFailed(String)
-    case destinationFinalizationFailed(String)
+    case metadataCopyUnsupported
+    case destinationCreationFailed(UTType)
+    case destinationFinalizationFailed(UTType)
 }

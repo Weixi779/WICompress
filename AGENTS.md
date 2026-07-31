@@ -129,11 +129,13 @@ Key types:
    optional aspect-ratio crop, fixed lossy quality, and `WIImageOutput`.
 3. **WIImageResizing** / **WIImageResize** - complete pixel-size decision slot
    and built-in Luban, boundary, scale, and exact-size implementations.
-4. **WIImageOutput** - shared representation, metadata, and color-space
-   requirements used by both Process and Target.
+4. **WIImageOutput** - shared representation, composable
+   `WIImageMetadataOptions`, and color-space requirements used by both Process
+   and Target.
 5. **WIImageSource** - execution source wrapper over `WIImageIO.Source`; it
    consumes the ImageIO `Descriptor` directly instead of copying inspected facts
-   (format, pixel size, orientation, frame count, alpha, gain map, writability).
+   (exact `UTType`, format, pixel size, orientation, frame count, alpha,
+   metadata categories, and gain map).
 6. **WIExecutionPlan** - resolved Process execution facts; it contains no
    resizing algorithm, crop intent, or public Policy.
 7. **WIImageProcessResolver** - resolves Process input into a shared
@@ -155,7 +157,8 @@ Key types:
 
 ## Key Implementation Details
 
-- **Resolved operations**: `copyFromSource` preserves metadata/orientation tags;
+- **Resolved operations**: `copyFromSource` preserves metadata/orientation tags
+  and can remove location metadata without decoding pixels;
   `render` bakes orientation, crop, sizing, color conversion, and backgrounds
   into pixels; `returnOriginal` is used only when every observable requirement
   already holds.

@@ -27,13 +27,15 @@ struct WIImageSourceTests {
             height: 20,
             typeIdentifier: UTType.jpeg.identifier,
             orientation: 6,
-            hasGPS: true
+            hasGPS: true,
+            hasTIFFOrientation: true
         )
         let source = try Source(data: data)
         let descriptor = source.descriptor
 
         #expect(source.byteCount == data.count)
         #expect(descriptor.byteCount == data.count)
+        #expect(descriptor.type == .jpeg)
         #expect(descriptor.format == .jpeg)
         #expect(descriptor.pixelSize.width == 40)
         #expect(descriptor.pixelSize.height == 20)
@@ -43,10 +45,9 @@ struct WIImageSourceTests {
         #expect(descriptor.orientation == .right)
         #expect(descriptor.frameCount == 1)
         #expect(descriptor.hasAlpha != true)
-        #expect(descriptor.hasMetadata)
-        #expect(descriptor.hasGPS)
-        #expect(descriptor.isSourceFormatDecodable)
-        #expect(descriptor.isSourceFormatWritable)
+        #expect(descriptor.metadata.contains(.gps))
+        #expect(Capabilities.canDecode(.jpeg))
+        #expect(Capabilities.canEncode(.jpeg))
     }
 
     @Test("File source inspects without changing encoded byte count")
@@ -106,7 +107,7 @@ struct WIImageSourceTests {
             try source.thumbnail(options: ThumbnailOptions())
         }
         #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
-            try source.copy(as: UTType.png.identifier)
+            try source.copy(as: .png)
         }
     }
 
@@ -117,7 +118,8 @@ struct WIImageSourceTests {
             height: 20,
             typeIdentifier: UTType.jpeg.identifier,
             orientation: 6,
-            hasGPS: true
+            hasGPS: true,
+            hasTIFFOrientation: true
         )
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
@@ -136,10 +138,10 @@ struct WIImageSourceTests {
             options: ThumbnailOptions(maximumPixelSize: 10)
         )
         let dataCopy = try Source(
-            data: dataSource.copy(as: UTType.jpeg.identifier)
+            data: dataSource.copy(as: .jpeg)
         ).descriptor
         let fileCopy = try Source(
-            data: fileSource.copy(as: UTType.jpeg.identifier)
+            data: fileSource.copy(as: .jpeg)
         ).descriptor
 
         #expect(dataSource.descriptor == fileSource.descriptor)
@@ -151,7 +153,7 @@ struct WIImageSourceTests {
         #expect(dataCopy.pixelSize == fileCopy.pixelSize)
         #expect(dataCopy.orientedPixelSize == fileCopy.orientedPixelSize)
         #expect(dataCopy.orientation == fileCopy.orientation)
-        #expect(dataCopy.hasGPS == fileCopy.hasGPS)
+        #expect(dataCopy.metadata == fileCopy.metadata)
     }
 
     @Test("Image decode returns source pixel dimensions")
@@ -198,12 +200,57 @@ struct WIImageSourceTests {
         )
 
         let copiedData = try Source(data: data).copy(
-            as: UTType.jpeg.identifier
+            as: .jpeg
         )
         let properties = try Self.properties(in: copiedData)
 
         #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
         #expect(properties[kCGImagePropertyGPSDictionary] != nil)
+    }
+
+    @Test("Source copy can remove GPS metadata without decoding pixels")
+    func sourceCopyExcludingGPS() throws {
+        let data = try Self.encodedImage(
+            width: 40,
+            height: 20,
+            typeIdentifier: UTType.jpeg.identifier,
+            orientation: 6,
+            hasGPS: true
+        )
+        let source = try Source(data: data)
+        let metadata = WIImageMetadataOptions.preserve.subtracting(.gps)
+
+        let copiedData = try source.copy(
+            as: .jpeg,
+            options: CopyOptions(metadata: metadata)
+        )
+        let properties = try Self.properties(in: copiedData)
+
+        #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
+        #expect(properties[kCGImagePropertyGPSDictionary] == nil)
+    }
+
+    @Test("Inspection distinguishes metadata outside the public categories")
+    func unmodeledMetadataInspection() throws {
+        let data = try Self.encodedImage(
+            width: 40,
+            height: 20,
+            typeIdentifier: UTType.png.identifier,
+            pngAuthor: "WICompress"
+        )
+        let source = try Source(data: data)
+
+        #expect(source.descriptor.hasUnmodeledMetadata)
+        #expect(!source.canCopy(
+            as: .png,
+            keeping: .strip,
+            compressionQuality: nil
+        ))
+        #expect(source.canCopy(
+            as: .png,
+            keeping: .preserve,
+            compressionQuality: nil
+        ))
     }
 
     @Test("Pixel encode strips metadata or preserves selected source metadata")
@@ -213,19 +260,22 @@ struct WIImageSourceTests {
             height: 20,
             typeIdentifier: UTType.jpeg.identifier,
             orientation: 6,
-            hasGPS: true
+            hasGPS: true,
+            hasTIFFOrientation: true
         )
         let source = try Source(data: data)
         let image = try source.thumbnail(options: ThumbnailOptions())
 
-        let strippedData = try Transcoder.encode(
+        let strippedData = try Encoder.encode(
             image,
-            as: UTType.jpeg.identifier
+            as: .jpeg,
+            metadataFrom: source
         )
-        let preservedData = try Transcoder.encode(
+        let preservedData = try Encoder.encode(
             image,
-            as: UTType.jpeg.identifier,
-            preservingMetadataFrom: source
+            as: .jpeg,
+            options: EncodeOptions(metadata: .preserve),
+            metadataFrom: source
         )
         let strippedProperties = try Self.properties(in: strippedData)
         let preservedProperties = try Self.properties(in: preservedData)
@@ -233,6 +283,82 @@ struct WIImageSourceTests {
         #expect(strippedProperties[kCGImagePropertyGPSDictionary] == nil)
         #expect(preservedProperties[kCGImagePropertyGPSDictionary] != nil)
         #expect(preservedProperties.intValue(for: kCGImagePropertyOrientation) == 1)
+        let tiff = preservedProperties[
+            kCGImagePropertyTIFFDictionary
+        ] as? [CFString: Any]
+        #expect(tiff?.intValue(for: kCGImagePropertyTIFFOrientation) != 6)
+    }
+
+    @Test("Exif and MakerNote remain independent metadata categories")
+    func exifAndMakerNoteSelection() {
+        let makerNote = Data([0x41, 0x70, 0x70, 0x6C, 0x65])
+        let properties: [CFString: Any] = [
+            kCGImagePropertyExifDictionary: [
+                kCGImagePropertyExifExposureTime: 1.0 / 60.0,
+                kCGImagePropertyExifMakerNote: makerNote
+            ],
+            kCGImagePropertyMakerAppleDictionary: [
+                "17": 1
+            ]
+        ]
+
+        let options = Source.metadataOptions(in: properties)
+        let exifOnly = Source.metadataProperties(
+            in: properties,
+            keeping: .exif
+        )
+        let makerNotesOnly = Source.metadataProperties(
+            in: properties,
+            keeping: .makerNotes
+        )
+        let exifOnlyDictionary = exifOnly[
+            kCGImagePropertyExifDictionary
+        ] as? [AnyHashable: Any]
+        let makerNotesOnlyDictionary = makerNotesOnly[
+            kCGImagePropertyExifDictionary
+        ] as? [AnyHashable: Any]
+
+        #expect(options.contains(.exif))
+        #expect(options.contains(.makerNotes))
+        #expect(
+            exifOnlyDictionary?[kCGImagePropertyExifExposureTime] != nil
+        )
+        #expect(
+            exifOnlyDictionary?[kCGImagePropertyExifMakerNote] == nil
+        )
+        #expect(
+            exifOnly[kCGImagePropertyMakerAppleDictionary] == nil
+        )
+        #expect(
+            makerNotesOnlyDictionary?[kCGImagePropertyExifExposureTime] == nil
+        )
+        #expect(
+            makerNotesOnlyDictionary?[kCGImagePropertyExifMakerNote] as? Data
+                == makerNote
+        )
+        #expect(
+            makerNotesOnly[kCGImagePropertyMakerAppleDictionary] != nil
+        )
+    }
+
+    @Test("Inspection ignores metadata fields excluded from output")
+    func metadataInspectionUsesFilteredProjection() {
+        let makerNote = Data([0x41, 0x70, 0x70, 0x6C, 0x65])
+        let properties: [CFString: Any] = [
+            kCGImagePropertyExifDictionary: [
+                kCGImagePropertyExifMakerNote: makerNote
+            ],
+            kCGImagePropertyTIFFDictionary: [
+                kCGImagePropertyTIFFOrientation: 6
+            ],
+            kCGImagePropertyIPTCDictionary: [
+                kCGImagePropertyIPTCImageOrientation: "L"
+            ]
+        ]
+
+        let options = Source.metadataOptions(in: properties)
+
+        #expect(options == .makerNotes)
     }
 
     @Test("Unsupported destinations fail before encoding")
@@ -243,10 +369,10 @@ struct WIImageSourceTests {
             typeIdentifier: UTType.png.identifier
         )
         let source = try Source(data: data)
-        let typeIdentifier = "com.wicompress.unsupported"
+        let type = UTType(exportedAs: "com.wicompress.unsupported")
 
-        #expect(throws: WIImageIO.Error.destinationCreationFailed(typeIdentifier)) {
-            try source.copy(as: typeIdentifier)
+        #expect(throws: WIImageIO.Error.destinationCreationFailed(type)) {
+            try source.copy(as: type)
         }
     }
 
@@ -274,6 +400,8 @@ struct WIImageSourceTests {
         typeIdentifier: String,
         orientation: Int = 1,
         hasGPS: Bool = false,
+        hasTIFFOrientation: Bool = false,
+        pngAuthor: String? = nil,
         alpha: UInt8 = 255,
         frameCount: Int = 1
     ) throws -> Data {
@@ -297,6 +425,16 @@ struct WIImageSourceTests {
                 kCGImagePropertyGPSLatitude: 31.2,
                 kCGImagePropertyGPSLongitudeRef: "E",
                 kCGImagePropertyGPSLongitude: 121.5
+            ]
+        }
+        if hasTIFFOrientation {
+            properties[kCGImagePropertyTIFFDictionary] = [
+                kCGImagePropertyTIFFOrientation: orientation
+            ]
+        }
+        if let pngAuthor {
+            properties[kCGImagePropertyPNGDictionary] = [
+                kCGImagePropertyPNGAuthor: pngAuthor
             ]
         }
 

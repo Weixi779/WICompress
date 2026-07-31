@@ -25,11 +25,8 @@ public enum WIImageFormat: Sendable, Equatable {
         self == .heif
     }
 
-    package static func detected(from typeIdentifier: String?) -> Self {
-        guard
-            let typeIdentifier,
-            let type = UTType(typeIdentifier)
-        else {
+    package static func detected(from type: UTType?) -> Self {
+        guard let type else {
             return .unknown
         }
 

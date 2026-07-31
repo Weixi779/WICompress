@@ -103,6 +103,8 @@ final class WIImageSource {
             return .thumbnailCreationFailed
         case .animatedSourceUnsupported(let frameCount):
             return .animatedSourceUnsupported(frameCount: frameCount)
+        case .metadataCopyUnsupported:
+            return .executionPlanUnavailable
         case .destinationCreationFailed(let typeIdentifier):
             return .destinationCreationFailed(
                 .detected(from: typeIdentifier)

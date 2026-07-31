@@ -44,11 +44,13 @@ Domain 内，作为 `WIImageResize.luban` 的实现细节。
 ## 不属于 Domain 的事实
 
 - `WIImageFormat` 由 `WIImageIO` inspection 产生。它是公开结果事实，但没有公开的
-  Data detection API 或自定义 initializer。
+  Data detection API 或自定义 initializer；内部精确容器统一使用 `UTType`。
+- `WIImageMetadataOptions` 属于共享 Output Domain；ImageIO Descriptor 直接使用它
+  表达源图实际存在的受支持 metadata 类别。
 - `Source`、Descriptor、thumbnail、encode 和 runtime capability 属于 `WIImageIO`。
 - bitmap context、orientation render、Alpha surface 和颜色转换属于
   `WIImageRaster`。
-- Resolver、Execution Plan、Encoder、Target Solver 和公开结果
+- Resolver、Execution Plan、Executor、Target Solver 和公开结果
   `WIResult` 属于 `WICompressExecution`。
 - `WICompressor` 属于公开 umbrella `WICompress`。
 

@@ -1,7 +1,6 @@
 # WICompress 2.0 ImageIO Core
 
-状态：Phase 2 ImageIO 与 Phase 3 Raster 集成已完成；公共 Process/Target Domain
-仍按后续阶段推进。
+状态：ImageIO、Raster、Process 与 Target 同步执行链路已完成；异步 terminal 尚未实施。
 
 本文记录 WICompress 2.0 对 Apple ImageIO 的内部二次封装方案。它只定义执行基础设施，
 不定义 `WIImageProcess` 或 `WICompressionTarget` 的公共产品语义。
@@ -139,19 +138,20 @@ package final class Source {
 `WIImageIO.Descriptor` 是可跨并发域传递的 source facts，至少覆盖：
 
 ```text
-format
+exact UTType
+coarse result format
 pixel size
 oriented pixel size
 orientation
 frame count
 has alpha
-metadata presence
+supported metadata categories
 gain-map presence
-source writability
 ```
 
 descriptor 不包含调用方 Policy、UI point、scale、Luban 结果或目标输出要求。需要创建
 bitmap 才能确认的颜色信息可以按需读取，不要求 source 初始化时完整 decode。
+容器是否可读写是当前运行环境的 capability，不复制进每个 descriptor。
 
 ### Resource Facts 与 Limits
 
@@ -225,6 +225,14 @@ Pixel encode 用于已经由 `WIImageRaster` 完成 resize、crop、Alpha flatte
 render 的位图。
 Source copy 用于需要 ImageIO 从原 source 复制像素和允许 metadata 保留的路径。两者不能
 为了 API 对称合并成一个含糊的万能函数。
+
+内部边界统一使用 `UTType` 表达精确容器，只有最终 `WIResult` 把它归类为公开的
+`WIImageFormat`。`Encoder` 和 source copy 都接收 `WIImageMetadataOptions`，并在
+ImageIO 边界把类别选择映射为 properties。`.preserve.subtracting(.gps)` 在不要求
+像素或 quality 变化时使用 `CGImageDestinationCopyImageSource` 无损移除 GPS，不进入
+Raster；它不承诺清除厂商 MakerNote 或自定义 XMP 中的潜在位置字段。`.strip` 与普通
+metadata 子集遇到未建模 metadata 时必须进入 pixel encode，不能误走 passthrough；
+当前不把独立的 XMP graph 暴露到公共 Domain。
 
 Destination 的 create、add 和 finalize 是一次同步、有序生命周期：
 
@@ -361,6 +369,7 @@ dictionary，也不再持有 bitmap render/orientation normalization helper。�
 - thumbnail 最大像素限制、orientation transform 和不隐式 upscale。
 - pixel encode 的 format、quality、Alpha 与 finalization failure。
 - source copy 的 metadata/orientation 行为。
+- GPS-only metadata 过滤不解码像素，并保持 source orientation。
 - WICompress 两条产品线经过同一个 ImageIO execution path。
 - 需要像素变化的路径经过同一个 `WIImageRaster.image` 入口。
 - sync 与 async terminal 对相同输入、配置和错误具有一致结果。
@@ -377,6 +386,8 @@ dictionary，也不再持有 bitmap render/orientation normalization helper。�
 - arbitrary random-access、加密 source 和固定资源阈值不进入首版。
 - `image()` 与 `thumbnail(options:)` 命名。
 - typed descriptor、options 与 runtime capability。
+- exact container 使用 `UTType`，公开结果使用 `WIImageFormat` 粗分类。
+- metadata 使用可组合的 `WIImageMetadataOptions`，不暴露 raw dictionary。
 - 同步 primitive、上层并发调度、无全局串行 queue。
 - raw ImageIO dictionary 与 CF source/destination 不越过模块边界。
 - 静态图片首版；GIF 和其他动图不在当前规划。

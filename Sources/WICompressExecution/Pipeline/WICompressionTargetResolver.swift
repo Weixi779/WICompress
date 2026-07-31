@@ -18,7 +18,7 @@ enum WICompressionTargetResolver {
         let descriptor = imageSource.descriptor
         guard descriptor.format != .unknown else {
             throw .unsupportedSourceFormat(
-                descriptor.typeIdentifier
+                descriptor.type?.identifier
             )
         }
 
@@ -54,19 +54,23 @@ enum WICompressionTargetResolver {
             return false
         }
 
-        switch target.output.metadata {
-        case .preserve:
-            return true
-        case .strip:
-            return !imageSource.descriptor.hasMetadata
-                && imageSource.descriptor.orientation == .up
-        }
+        return (
+            !imageSource.descriptor.hasUnmodeledMetadata
+                || target.output.metadata.preservesUnmodeledMetadata
+        )
+            && imageSource.descriptor.metadata.isSubset(
+                of: target.output.metadata
+            ) && (
+            target.output.metadata != .strip
+                || imageSource.descriptor.orientation == .up
+        )
     }
 
     static func executionPlan(
         for target: WICompressionTarget,
         sizing: WIResolvedCompressionSizing,
         output: WIResolvedImageOutput,
+        imageSource: WIImageSource,
         pixelSize: WIPixelSize,
         quality: Double?
     ) throws(WICompressError) -> WIExecutionPlan {
@@ -82,7 +86,9 @@ enum WICompressionTargetResolver {
             target: target,
             sizing: sizing,
             output: output,
-            pixelSize: pixelSize
+            imageSource: imageSource,
+            pixelSize: pixelSize,
+            quality: resolvedQuality
         ) {
             operation = .copyFromSource
         } else {
@@ -112,8 +118,7 @@ enum WICompressionTargetResolver {
 
         return WIExecutionPlan(
             operation: operation,
-            destinationFormat: output.destinationFormat,
-            destinationTypeIdentifier: output.destinationTypeIdentifier,
+            destinationType: output.destinationType,
             metadata: target.output.metadata,
             quality: resolvedQuality,
             jpegBackground: output.jpegBackground,
@@ -125,12 +130,22 @@ enum WICompressionTargetResolver {
         target: WICompressionTarget,
         sizing: WIResolvedCompressionSizing,
         output: WIResolvedImageOutput,
-        pixelSize: WIPixelSize
+        imageSource: WIImageSource,
+        pixelSize: WIPixelSize,
+        quality: Double?
     ) -> Bool {
         !sizing.hasCrop
             && pixelSize == sizing.sourcePixelSize
             && target.output.representation == .preserve
-            && target.output.metadata == .preserve
             && !output.colorSpace.requiresConversion
+            && (
+                target.output.metadata != .strip
+                    || imageSource.descriptor.orientation == .up
+            )
+            && imageSource.imageIOSource.canCopy(
+                as: output.destinationType,
+                keeping: target.output.metadata,
+                compressionQuality: quality
+            )
     }
 }

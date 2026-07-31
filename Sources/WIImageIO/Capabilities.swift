@@ -8,29 +8,30 @@
 
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 
 package enum Capabilities {
-    package static func canDecode(typeIdentifier: String) -> Bool {
-        readableTypeIdentifiers.contains(typeIdentifier)
+    package static func canDecode(_ type: UTType) -> Bool {
+        readableTypes.contains(type)
     }
 
-    package static func canEncode(typeIdentifier: String) -> Bool {
-        writableTypeIdentifiers.contains(typeIdentifier)
+    package static func canEncode(_ type: UTType) -> Bool {
+        writableTypes.contains(type)
     }
 
-    private static let readableTypeIdentifiers: Set<String> = {
+    private static let readableTypes: Set<UTType> = {
         guard let identifiers = CGImageSourceCopyTypeIdentifiers() as? [String] else {
             return []
         }
 
-        return Set(identifiers)
+        return Set(identifiers.compactMap(UTType.init))
     }()
 
-    private static let writableTypeIdentifiers: Set<String> = {
+    private static let writableTypes: Set<UTType> = {
         guard let identifiers = CGImageDestinationCopyTypeIdentifiers() as? [String] else {
             return []
         }
 
-        return Set(identifiers)
+        return Set(identifiers.compactMap(UTType.init))
     }()
 }

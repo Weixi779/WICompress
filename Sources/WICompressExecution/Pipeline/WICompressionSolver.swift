@@ -28,6 +28,7 @@ enum WICompressionSolver {
             for: target,
             sizing: sizing,
             output: output,
+            imageSource: imageSource,
             pixelSize: sizing.basePixelSize,
             quality: defaultTargetQuality
         )
@@ -84,6 +85,7 @@ enum WICompressionSolver {
                 for: target,
                 sizing: sizing,
                 output: output,
+                imageSource: imageSource,
                 pixelSize: pixelSize,
                 quality: highQuality
             )
@@ -184,6 +186,7 @@ enum WICompressionSolver {
                 for: target,
                 sizing: sizing,
                 output: output,
+                imageSource: imageSource,
                 pixelSize: pixelSize,
                 quality: nil
             )

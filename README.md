@@ -44,6 +44,9 @@ let uploadData = try WICompressor.process(
   the encoded data, format, pixel size, and byte count from one `WIResult`.
 - **Upload-ready defaults**: Luban resize, metadata stripping, and JPEG/HEIC
   lossy quality are configured for common app uploads.
+- **Selective metadata**: preserve Exif, IPTC, TIFF, maker notes, or standard
+  GPS independently; `.preserve.subtracting(.gps)` keeps the remaining
+  metadata while removing GPS properties exposed by ImageIO.
 - **Target contracts**: use `maxBytes` with geometry intent when an SDK or
   backend requires a hard byte ceiling.
 - **Composable processing**: choose crop, resizing, quality, and output as
@@ -222,8 +225,14 @@ can implement `WIImageResizing` when sizing follows product-specific rules.
 
 Crop is an optional aspect ratio plus a normalized `WICropAnchor`; it is
 resolved before resizing. Output independently declares representation
-(`preserve`, JPEG, PNG, HEIC, or alpha-aware PNG/JPEG), metadata
-(`strip` / `preserve`), and color space (`preserve` / `convert`).
+(`preserve`, JPEG, PNG, HEIC, or alpha-aware PNG/JPEG), metadata categories,
+and color space (`preserve` / `convert`). Metadata defaults to `.strip`;
+`.preserve` retains every supported category, and standard `OptionSet`
+operations can select a subset:
+
+```swift
+let metadata = WIImageMetadataOptions.preserve.subtracting(.gps)
+```
 
 Quality is a fixed `0...1` value for lossy output, or `nil` to omit an explicit
 ImageIO quality value. PNG remains lossless. Transparent sources converted to

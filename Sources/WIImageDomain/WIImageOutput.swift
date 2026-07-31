@@ -19,12 +19,12 @@ public enum WIImageColorSpace: Sendable, Equatable {
 /// Immutable representation, metadata, and color-space requirements.
 public struct WIImageOutput: Sendable, Equatable {
     public let representation: WIImageRepresentation
-    public let metadata: WIImageMetadata
+    public let metadata: WIImageMetadataOptions
     public let colorSpace: WIImageColorSpace
 
     public init(
         representation: WIImageRepresentation = .preserve,
-        metadata: WIImageMetadata = .strip,
+        metadata: WIImageMetadataOptions = .strip,
         colorSpace: WIImageColorSpace = .preserve
     ) {
         self.representation = representation

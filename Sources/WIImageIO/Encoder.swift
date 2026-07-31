@@ -1,5 +1,5 @@
 //
-//  Transcoder.swift
+//  Encoder.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/7/30.
@@ -9,25 +9,28 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 
-package enum Transcoder {
+package enum Encoder {
     package static func encode(
         _ image: CGImage,
-        `as` typeIdentifier: String,
+        `as` type: UTType,
         options: EncodeOptions = .init(),
-        preservingMetadataFrom source: Source? = nil
+        metadataFrom source: Source? = nil
     ) throws(Error) -> Data {
         let outputData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             outputData,
-            typeIdentifier as CFString,
+            type.identifier as CFString,
             1,
             nil
         ) else {
-            throw .destinationCreationFailed(typeIdentifier)
+            throw .destinationCreationFailed(type)
         }
 
-        var properties = source?.preservedMetadataProperties() ?? [:]
+        var properties = source?.metadataProperties(
+            keeping: options.metadata
+        ) ?? [:]
         if let compressionQuality = options.compressionQuality {
             properties[kCGImageDestinationLossyCompressionQuality] = compressionQuality
         }
@@ -37,7 +40,7 @@ package enum Transcoder {
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)
 
         guard CGImageDestinationFinalize(destination) else {
-            throw .destinationFinalizationFailed(typeIdentifier)
+            throw .destinationFinalizationFailed(type)
         }
 
         return outputData as Data

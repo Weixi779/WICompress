@@ -9,6 +9,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 import WIImageDomain
 
 package final class Source {
@@ -110,19 +111,41 @@ package final class Source {
     }
 
     package func copy(
-        `as` typeIdentifier: String,
+        `as` type: UTType,
         options: CopyOptions = .init()
     ) throws(Error) -> Data {
         try validateStaticImage()
 
+        let removedMetadata = descriptor.metadata.subtracting(
+            options.metadata
+        )
+        guard
+            !descriptor.hasUnmodeledMetadata
+                || options.metadata.preservesUnmodeledMetadata
+        else {
+            throw .metadataCopyUnsupported
+        }
+        guard removedMetadata.isEmpty else {
+            guard
+                removedMetadata == .gps,
+                options.maximumPixelSize == nil,
+                options.compressionQuality == nil,
+                descriptor.type == type
+            else {
+                throw .metadataCopyUnsupported
+            }
+
+            return try copyExcludingGPS(as: type)
+        }
+
         let outputData = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             outputData,
-            typeIdentifier as CFString,
+            type.identifier as CFString,
             1,
             nil
         ) else {
-            throw .destinationCreationFailed(typeIdentifier)
+            throw .destinationCreationFailed(type)
         }
 
         var properties: [CFString: Any] = [:]
@@ -141,10 +164,32 @@ package final class Source {
         )
 
         guard CGImageDestinationFinalize(destination) else {
-            throw .destinationFinalizationFailed(typeIdentifier)
+            throw .destinationFinalizationFailed(type)
         }
 
         return outputData as Data
+    }
+
+    package func canCopy(
+        `as` type: UTType,
+        keeping metadata: WIImageMetadataOptions,
+        compressionQuality: Double?
+    ) -> Bool {
+        guard
+            !descriptor.hasUnmodeledMetadata
+                || metadata.preservesUnmodeledMetadata
+        else {
+            return false
+        }
+
+        let removedMetadata = descriptor.metadata.subtracting(metadata)
+        if removedMetadata.isEmpty {
+            return true
+        }
+
+        return removedMetadata == .gps
+            && compressionQuality == nil
+            && descriptor.type == type
     }
 
     private func validateStaticImage() throws(Error) {
@@ -153,7 +198,9 @@ package final class Source {
         }
     }
 
-    func preservedMetadataProperties() -> [CFString: Any] {
+    func metadataProperties(
+        keeping options: WIImageMetadataOptions
+    ) -> [CFString: Any] {
         guard let properties = CGImageSourceCopyPropertiesAtIndex(
             cgImageSource,
             0,
@@ -162,11 +209,48 @@ package final class Source {
             return [:]
         }
 
-        return Self.metadataKeys.reduce(into: [:]) { result, key in
-            if let value = properties[key] {
-                result[key] = value
-            }
+        return Self.metadataProperties(
+            in: properties,
+            keeping: options
+        )
+    }
+
+    private func copyExcludingGPS(
+        as type: UTType
+    ) throws(Error) -> Data {
+        guard let metadata = CGImageSourceCopyMetadataAtIndex(
+            cgImageSource,
+            0,
+            nil
+        ) else {
+            throw .sourcePropertiesUnavailable
         }
+
+        let outputData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            outputData,
+            type.identifier as CFString,
+            1,
+            nil
+        ) else {
+            throw .destinationCreationFailed(type)
+        }
+
+        let options: [CFString: Any] = [
+            kCGImageDestinationMetadata: metadata,
+            kCGImageDestinationMergeMetadata: true,
+            kCGImageMetadataShouldExcludeGPS: true
+        ]
+        guard CGImageDestinationCopyImageSource(
+            destination,
+            cgImageSource,
+            options as CFDictionary,
+            nil
+        ) else {
+            throw .destinationFinalizationFailed(type)
+        }
+
+        return outputData as Data
     }
 
     private static func fileByteCount(for url: URL) throws(Error) -> Int {
@@ -226,26 +310,22 @@ package final class Source {
         ) else {
             throw .sourcePropertiesUnavailable
         }
-        let orientedPixelSize = try makePixelSize(
-            width: orientation.swapsDimensions ? pixelHeight : pixelWidth,
-            height: orientation.swapsDimensions ? pixelWidth : pixelHeight
-        )
-        let typeIdentifier = CGImageSourceGetType(source) as String?
+        let type = (CGImageSourceGetType(source) as String?)
+            .flatMap(UTType.init)
 
         return Descriptor(
-            format: WIImageFormat.detected(from: typeIdentifier),
-            typeIdentifier: typeIdentifier,
+            type: type,
             byteCount: byteCount,
             pixelSize: pixelSize,
-            orientedPixelSize: orientedPixelSize,
             orientation: orientation,
             frameCount: frameCount,
             hasAlpha: properties.boolValue(for: kCGImagePropertyHasAlpha),
-            hasMetadata: hasStrippableMetadata(in: properties),
-            hasGPS: properties.dictionaryExists(for: kCGImagePropertyGPSDictionary),
-            hasGainMap: hasGainMap(in: source),
-            isSourceFormatDecodable: typeIdentifier.map(Capabilities.canDecode(typeIdentifier:)) ?? false,
-            isSourceFormatWritable: typeIdentifier.map(Capabilities.canEncode(typeIdentifier:)) ?? false
+            metadata: metadataOptions(in: properties),
+            hasUnmodeledMetadata: hasUnmodeledMetadata(
+                in: source,
+                properties: properties
+            ),
+            hasGainMap: hasGainMap(in: source)
         )
     }
 
@@ -268,26 +348,191 @@ package final class Source {
         }
     }
 
-    private static func hasStrippableMetadata(in properties: [CFString: Any]) -> Bool {
-        // Color profiles and pixel geometry are display semantics, not privacy metadata.
-        return metadataKeys.contains { properties.dictionaryExists(for: $0) }
+    static func metadataOptions(
+        in properties: [CFString: Any]
+    ) -> WIImageMetadataOptions {
+        var options: WIImageMetadataOptions = []
+        for option in WIImageMetadataOptions.all.singleOptions {
+            if !metadataProperties(
+                in: properties,
+                keeping: option
+            ).isEmpty {
+                options.insert(option)
+            }
+        }
+        return options
     }
 
-    private static var metadataKeys: [CFString] {
-        [
-            kCGImagePropertyTIFFDictionary,
-            kCGImagePropertyExifDictionary,
-            kCGImagePropertyExifAuxDictionary,
-            kCGImagePropertyIPTCDictionary,
-            kCGImagePropertyGPSDictionary,
-            kCGImagePropertyMakerAppleDictionary,
-            kCGImagePropertyMakerCanonDictionary,
-            kCGImagePropertyMakerNikonDictionary,
-            kCGImagePropertyMakerMinoltaDictionary,
-            kCGImagePropertyMakerFujiDictionary,
-            kCGImagePropertyMakerOlympusDictionary,
-            kCGImagePropertyMakerPentaxDictionary
+    static func metadataProperties(
+        in properties: [CFString: Any],
+        keeping options: WIImageMetadataOptions
+    ) -> [CFString: Any] {
+        var metadata: [CFString: Any] = metadataKeys(
+            for: options
+        ).reduce(into: [:]) { result, key in
+            if
+                properties.dictionaryExists(for: key),
+                let value = properties[key]
+            {
+                result[key] = value
+            }
+        }
+
+        if options.contains(.makerNotes) {
+            if
+                !options.contains(.exif),
+                let makerNote = exifMakerNote(in: properties)
+            {
+                metadata[kCGImagePropertyExifDictionary] = [
+                    kCGImagePropertyExifMakerNote: makerNote
+                ]
+            }
+        } else {
+            remove(
+                kCGImagePropertyExifMakerNote,
+                from: kCGImagePropertyExifDictionary,
+                in: &metadata
+            )
+        }
+
+        removeDisplayOrientation(from: &metadata)
+        return metadata
+    }
+
+    private static func metadataKeys(
+        for options: WIImageMetadataOptions
+    ) -> [CFString] {
+        var keys: [CFString] = []
+        if options.contains(.exif) {
+            keys.append(kCGImagePropertyExifDictionary)
+            keys.append(kCGImagePropertyExifAuxDictionary)
+        }
+        if options.contains(.gps) {
+            keys.append(kCGImagePropertyGPSDictionary)
+        }
+        if options.contains(.iptc) {
+            keys.append(kCGImagePropertyIPTCDictionary)
+        }
+        if options.contains(.tiff) {
+            keys.append(kCGImagePropertyTIFFDictionary)
+        }
+        if options.contains(.makerNotes) {
+            keys.append(kCGImagePropertyMakerAppleDictionary)
+            keys.append(kCGImagePropertyMakerCanonDictionary)
+            keys.append(kCGImagePropertyMakerNikonDictionary)
+            keys.append(kCGImagePropertyMakerMinoltaDictionary)
+            keys.append(kCGImagePropertyMakerFujiDictionary)
+            keys.append(kCGImagePropertyMakerOlympusDictionary)
+            keys.append(kCGImagePropertyMakerPentaxDictionary)
+        }
+        return keys
+    }
+
+    private static func exifMakerNote(
+        in properties: [CFString: Any]
+    ) -> Any? {
+        guard
+            let exif = properties[kCGImagePropertyExifDictionary]
+                as? [AnyHashable: Any]
+        else {
+            return nil
+        }
+
+        return exif[kCGImagePropertyExifMakerNote]
+    }
+
+    private static func hasUnmodeledMetadata(
+        in source: CGImageSource,
+        properties: [CFString: Any]
+    ) -> Bool {
+        if properties.dictionaryExists(for: kCGImageProperty8BIMDictionary)
+            || hasPNGTextMetadata(in: properties) {
+            return true
+        }
+
+        guard
+            let metadata = CGImageSourceCopyMetadataAtIndex(source, 0, nil),
+            let tags = CGImageMetadataCopyTags(metadata) as? [CGImageMetadataTag]
+        else {
+            return false
+        }
+
+        return tags.contains { tag in
+            guard let namespace = CGImageMetadataTagCopyNamespace(tag) as String? else {
+                return false
+            }
+            return !recognizedMetadataNamespaces.contains(namespace)
+        }
+    }
+
+    private static func hasPNGTextMetadata(
+        in properties: [CFString: Any]
+    ) -> Bool {
+        guard
+            let png = properties[kCGImagePropertyPNGDictionary]
+                as? [AnyHashable: Any]
+        else {
+            return false
+        }
+
+        let textKeys: [CFString] = [
+            kCGImagePropertyPNGAuthor,
+            kCGImagePropertyPNGComment,
+            kCGImagePropertyPNGCopyright,
+            kCGImagePropertyPNGCreationTime,
+            kCGImagePropertyPNGDescription,
+            kCGImagePropertyPNGDisclaimer,
+            kCGImagePropertyPNGModificationTime,
+            kCGImagePropertyPNGSoftware,
+            kCGImagePropertyPNGSource,
+            kCGImagePropertyPNGTitle,
+            kCGImagePropertyPNGWarning
         ]
+        return textKeys.contains { png[$0] != nil }
+    }
+
+    // ImageIO synthesizes technical tags in its private namespace from ordinary
+    // image properties, so their presence does not imply independent metadata.
+    private static let recognizedMetadataNamespaces: Set<String> = [
+        kCGImageMetadataNamespaceExif as String,
+        kCGImageMetadataNamespaceExifAux as String,
+        kCGImageMetadataNamespaceExifEX as String,
+        kCGImageMetadataNamespaceIPTCCore as String,
+        kCGImageMetadataNamespaceIPTCExtension as String,
+        kCGImageMetadataNamespaceTIFF as String,
+        "http://ns.apple.com/ImageIO/1.0/"
+    ]
+
+    private static func removeDisplayOrientation(
+        from metadata: inout [CFString: Any]
+    ) {
+        remove(
+            kCGImagePropertyTIFFOrientation,
+            from: kCGImagePropertyTIFFDictionary,
+            in: &metadata
+        )
+        remove(
+            kCGImagePropertyIPTCImageOrientation,
+            from: kCGImagePropertyIPTCDictionary,
+            in: &metadata
+        )
+    }
+
+    private static func remove(
+        _ property: CFString,
+        from dictionaryKey: CFString,
+        in metadata: inout [CFString: Any]
+    ) {
+        guard var dictionary = metadata[dictionaryKey] as? [AnyHashable: Any] else {
+            return
+        }
+
+        dictionary.removeValue(forKey: property)
+        if dictionary.isEmpty {
+            metadata.removeValue(forKey: dictionaryKey)
+        } else {
+            metadata[dictionaryKey] = dictionary
+        }
     }
 
     private static func hasGainMap(in source: CGImageSource) -> Bool {
@@ -300,6 +545,12 @@ package final class Source {
         }
 
         return false
+    }
+}
+
+private extension WIImageMetadataOptions {
+    var singleOptions: [Self] {
+        [.exif, .gps, .iptc, .tiff, .makerNotes].filter(contains)
     }
 }
 

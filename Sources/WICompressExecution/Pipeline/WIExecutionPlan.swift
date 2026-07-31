@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UniformTypeIdentifiers
 import WIImageDomain
 import WIImageIO
 
@@ -18,12 +19,15 @@ struct WIExecutionPlan: Sendable, Equatable {
     }
 
     let operation: Operation
-    let destinationFormat: WIImageFormat
-    let destinationTypeIdentifier: String
-    let metadata: WIImageMetadata
+    let destinationType: UTType
+    let metadata: WIImageMetadataOptions
     var quality: Double?
     let jpegBackground: WIJPEGBackground?
     let outputColorSpace: WIResolvedOutputColorSpace
+
+    var destinationFormat: WIImageFormat {
+        .detected(from: destinationType)
+    }
 }
 
 struct WIResolvedRender: Sendable, Equatable {

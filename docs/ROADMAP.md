@@ -86,43 +86,19 @@ conflicting evidence.
 
 ## Metadata Control
 
-The current metadata policy is intentionally coarse: strip ordinary privacy-heavy
-metadata or preserve it. Future versions may need a more expressive policy that
-states which metadata families are allowed to survive.
-
-Likely direction:
-
-- Keep color profile handling out of metadata policy. Color profiles are display
-  semantics and should be owned by output color-space control.
-- Add a GPS-only stripping mode as a focused privacy improvement.
-- Consider an allow/deny style policy for metadata families such as GPS, Exif,
-  TIFF, IPTC, maker notes, and orientation.
-- Keep orientation special: redraw paths bake it into pixels and reset the tag to
-  `1`; preserving a stale orientation tag would be incorrect.
-
-Open API sketch:
+The 2.0 metadata model is complete. `WIImageMetadataOptions` is an `OptionSet`
+covering Exif, location, IPTC, TIFF, and maker-note categories:
 
 ```swift
-public enum WIMetadataPolicy: Sendable, Equatable {
-    case strip
-    case preserve
-    case stripLocation
-    case custom(WIMetadataRules)
-}
-
-public struct WIMetadataRules: Sendable, Equatable {
-    public var gps: WIMetadataRule
-    public var exif: WIMetadataRule
-    public var tiff: WIMetadataRule
-    public var iptc: WIMetadataRule
-    public var makerNotes: WIMetadataRule
-}
-
-public enum WIMetadataRule: Sendable, Equatable {
-    case preserve
-    case strip
-}
+let uploadMetadata = WIImageMetadataOptions.preserve
+    .subtracting(.gps)
 ```
+
+`.strip` and `.preserve` remain readable aliases for the empty and complete
+sets. Color profiles remain output color-space semantics, and orientation
+remains display geometry: redraw paths bake it into pixels and write
+orientation `1`. GPS-only removal can use ImageIO's lossless source-copy
+path when no pixel or quality change is requested.
 
 ## Photos Adapter
 

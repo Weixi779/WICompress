@@ -112,12 +112,30 @@ Resolver 不使用 warning 或静默换格式满足合同。
 
 ### Metadata
 
-Metadata 只保留两个公共语义：
+Metadata 使用一个可组合的 `WIImageMetadataOptions: OptionSet`：
 
-- strip：默认上传/压缩行为。
-- preserve：在所选 render/encode 路径允许的范围内 best effort。
+- `.exif`
+- `.gps`
+- `.iptc`
+- `.tiff`
+- `.makerNotes`
 
-2.0 不建立逐字段 metadata Policy。
+`.strip` 是空集合，仍是默认上传/压缩行为；`.preserve` 是当前支持类别的完整集合。
+调用方通过标准集合运算表达选择，不引入逐字段 rule 对象或 metadata resolver：
+
+```swift
+let metadata = WIImageMetadataOptions.preserve.subtracting(.gps)
+```
+
+`.makerNotes` 同时覆盖 ImageIO 的顶层厂商字典与 Exif 字典内嵌 MakerNote；它与
+`.exif` 独立选择，排除 `.makerNotes` 时不会因保留 Exif 而把内嵌内容带回输出。
+`.gps` 只承诺 ImageIO 暴露的标准 GPS properties，不把厂商 MakerNote 或自定义 XMP
+中的潜在位置字段伪装成同一能力。需要隐私清理时应使用 `.strip`；当前不把 XMP graph
+公开为 OptionSet case。
+
+颜色 profile 不属于 metadata，它是显示语义，继续由 Output Color Space 所有。
+orientation 也不属于可删除的 metadata 类别：source-copy 保持方向语义，render 路径把
+方向烘焙进像素并写为 `1`。
 
 ### Color Space
 
