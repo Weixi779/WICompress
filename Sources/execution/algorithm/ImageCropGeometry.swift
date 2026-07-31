@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WICompressDomain
 import WIImageDomain
 
 struct CropGeometry: Sendable, Equatable {

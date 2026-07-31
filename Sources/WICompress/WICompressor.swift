@@ -7,6 +7,7 @@
 //
 
 @_exported public import WIImageDomain
+@_exported public import WICompressDomain
 @_exported public import WICompressExecution
 
 import Foundation

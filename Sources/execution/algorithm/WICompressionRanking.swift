@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WICompressDomain
 import WIImageDomain
 
 /// A feasible encoded result collected during the target byte-budget search.

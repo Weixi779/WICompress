@@ -8,6 +8,7 @@
 
 import CoreGraphics
 import Foundation
+import WICompressDomain
 import WIImageDomain
 import WIImageIO
 

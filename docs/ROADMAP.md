@@ -44,9 +44,11 @@ Implementation status:
   bitmap rendering, orientation normalization, crop/resize, two-layer
   backgrounds, alpha flattening, and color conversion no longer live in
   `WIImageExecutor`.
-- Completed: `WIImageDomain` is the single owner of public Process, Target,
-  pixel-size, and color values used directly by ImageIO, Raster, and Execution.
-  Mirrored Core values and product-boundary field conversions have been removed.
+- Completed: `WIImageDomain` owns shared pixel-size, color, format, metadata,
+  orientation, and geometry facts. `WICompressDomain` owns Process, Target,
+  Output, crop, resizing, and Luban request semantics. ImageIO, Raster, and
+  Execution consume the shared facts without mirrored Core values or
+  product-boundary field conversions.
 - Completed: request-scoped `ImagePipeline` owns source and ImageIO/Raster
   execution. Process and Target validation, decision ownership, Target feedback
   search, working-image reuse, and result checks now live directly in the

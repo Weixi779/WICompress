@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WICompressDomain
 import WIImageDomain
 
 /// Pure dimension and quality-profile math for the target byte-budget search.

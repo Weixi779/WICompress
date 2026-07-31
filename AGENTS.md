@@ -45,13 +45,14 @@ mapped to their Swift target names explicitly in `Package.swift`:
 
 ```text
 Sources/domain     -> WIImageDomain
+Sources/compress-domain -> WICompressDomain
 Sources/imageio    -> WIImageIO
 Sources/raster     -> WIImageRaster
 Sources/execution  -> WICompressExecution
 ```
 
 Nested organizational directories are also lowercase. For example,
-`Sources/domain/public`, `Sources/domain/internal`,
+`Sources/domain/public`, `Sources/compress-domain/public`,
 `Sources/execution/algorithm`, and `Sources/execution/pipeline`. Target names
 remain the module identity; physical directory names do not repeat the `WI`
 brand unless the directory is the public umbrella.
@@ -81,25 +82,25 @@ stale snippets.
 
 ## Architecture
 
-The package is split into four supporting targets and one public umbrella
+The package is split into five supporting targets and one public umbrella
 product target:
 
 ```text
-             WIImageDomain
-               ↑       ↑
-       WIImageIO       WIImageRaster
-               ↑       ↑
-           WICompressExecution
-                   ↑
-               WICompress
+                    WIImageDomain
+                  ↑       ↑       ↑
+         WIImageIO  WIImageRaster  WICompressDomain
+                  ↖      ↑      ↗
+                WICompressExecution
+                         ↑
+                     WICompress
 ```
 
-`WIImageDomain` owns the public Process, Target, Output, pixel-size, color,
-format, and error values used directly by package execution. Package-only
-`Rect`, `Orientation`, and trusted value construction live beside those values;
-there are no mirrored Core models. `WIImageIO` owns format detection and all
-package-only ImageIO primitives. `WICompressExecution` owns the request-scoped
-`ImagePipeline`, pure Process/Target calculations, and `WIResult`.
+`WIImageDomain` owns shared image facts: pixel size, color, format, metadata,
+orientation, geometry, and the currently shared public error. `WICompressDomain`
+owns Process, Target, Output, crop, resizing, and Luban request semantics. There
+are no mirrored Core models. `WIImageIO` owns format detection and all package-only
+ImageIO primitives. `WICompressExecution` owns the request-scoped `ImagePipeline`,
+pure Process/Target calculations, and `WIResult`.
 `WICompress` re-exports the public contracts and contains only
 `WICompressor`, whose terminals call the package-only `ImagePipeline` directly.
 
@@ -148,13 +149,14 @@ Key types:
    `WIImageMetadataOptions`, and color-space requirements used by both Process
    and Target.
 5. **ImagePipeline** - request-scoped owner of the encoded input,
-   `WIImageIO.Source`, `Descriptor`, original-byte lifecycle, and
+   `WIImageIO.Descriptor`, original-byte lifecycle, and
    Process/Target decisions, Target candidate search, and ImageIO/Raster
    execution. Its package terminals are called directly by `WICompressor`;
    there is no second terminal forwarding type.
 6. **WIImageFormat** - public Domain value (JPEG/PNG/HEIF/unknown); ImageIO owns
    detection from encoded sources and platform type identifiers.
-7. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
+7. **WILuban** - internal `WICompressDomain` ratio math
+   (`ratio(width:height:)`, `ensureEven`).
 8. **WICompressError** - public Domain failure model (`LocalizedError`); the only
    error thrown by public construction, resizing, and terminal APIs.
 9. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
@@ -288,6 +290,8 @@ xcodebuild build \
 
 All suites run under `swift test` on macOS; none depend on UIKit:
 
+- `WIImageDomainTests` - shared pixel, orientation, and metadata facts
+- `WICompressDomainTests` - request normalization and construction invariants
 - `LubanRatioTests` - Luban switch branches and `WILuban.ensureEven` edge cases
 - `WIImageFormatTests` - `UTType`-based format detection (JPEG, PNG, unknown)
 - `WICompressorPublicSurfaceTests` - defaults, passthrough, and error mapping

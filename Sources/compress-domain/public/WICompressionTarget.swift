@@ -1,12 +1,13 @@
 //
 //  WICompressionTarget.swift
-//  WIImageDomain
+//  WICompressDomain
 //
 //  Created by weixi on 2026/6/28.
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
 import Foundation
+import WIImageDomain
 
 /// Result constraints for target-based compression.
 public struct WICompressionTarget: Sendable, Equatable {

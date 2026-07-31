@@ -9,6 +9,7 @@
 import CoreGraphics
 import Foundation
 import UniformTypeIdentifiers
+import WICompressDomain
 import WIImageDomain
 import WIImageIO
 import WIImageRaster

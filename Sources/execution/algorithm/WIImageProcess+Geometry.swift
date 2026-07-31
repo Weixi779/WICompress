@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WICompressDomain
 import WIImageDomain
 
 struct ProcessGeometry: Sendable, Equatable {

@@ -11,6 +11,7 @@ import CoreGraphics
 import ImageIO
 import Testing
 import WICompress
+@testable import WICompressDomain
 @testable import WICompressExecution
 @testable import WIImageDomain
 @testable import WIImageIO

@@ -27,6 +27,11 @@ let package = Package(
             path: "Sources/domain"
         ),
         .target(
+            name: "WICompressDomain",
+            dependencies: ["WIImageDomain"],
+            path: "Sources/compress-domain"
+        ),
+        .target(
             name: "WIImageIO",
             dependencies: ["WIImageDomain"],
             path: "Sources/imageio"
@@ -38,18 +43,32 @@ let package = Package(
         ),
         .target(
             name: "WICompressExecution",
-            dependencies: ["WIImageDomain", "WIImageIO", "WIImageRaster"],
+            dependencies: [
+                "WIImageDomain",
+                "WICompressDomain",
+                "WIImageIO",
+                "WIImageRaster"
+            ],
             path: "Sources/execution"
         ),
         .target(
             name: "WICompress",
-            dependencies: ["WIImageDomain", "WICompressExecution"],
+            dependencies: [
+                "WIImageDomain",
+                "WICompressDomain",
+                "WICompressExecution"
+            ],
             path: "Sources/WICompress"
         ),
         .testTarget(
             name: "WIImageDomainTests",
             dependencies: ["WIImageDomain"],
             path: "Tests/WIImageDomainTests"
+        ),
+        .testTarget(
+            name: "WICompressDomainTests",
+            dependencies: ["WIImageDomain", "WICompressDomain"],
+            path: "Tests/WICompressDomainTests"
         ),
         .testTarget(
             name: "WIImageIOTests",
@@ -63,7 +82,13 @@ let package = Package(
         ),
         .testTarget(
             name: "WICompressTests",
-            dependencies: ["WICompress", "WICompressExecution", "WIImageDomain", "WIImageIO"],
+            dependencies: [
+                "WICompress",
+                "WICompressDomain",
+                "WICompressExecution",
+                "WIImageDomain",
+                "WIImageIO"
+            ],
             path: "Tests/WICompressTests",
             resources: [.copy("Resources")]
         ),

@@ -10,6 +10,7 @@ import Foundation
 import ImageIO
 import Testing
 import WICompress
+@testable import WICompressDomain
 @testable import WIImageDomain
 
 @Suite("WICompress Data Characterization", .tags(.imageIOCore, .compression))

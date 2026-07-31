@@ -1,12 +1,13 @@
 //
 //  WIImageCrop.swift
-//  WIImageDomain
+//  WICompressDomain
 //
 //  Created by weixi on 2026/7/30.
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
 import Foundation
+import WIImageDomain
 
 /// A normalized point used to bias an aspect-ratio crop.
 public struct WICropAnchor: Sendable, Hashable {
