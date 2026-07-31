@@ -6,8 +6,11 @@
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
+@_exported public import WIImageDomain
+@_exported public import WIImageIO
+@_exported public import WICompressExecution
+
 import Foundation
-import WICompressExecution
 
 /// ImageIO-backed image processing and compression entry point.
 public enum WICompressor {
