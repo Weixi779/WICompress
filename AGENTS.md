@@ -39,6 +39,22 @@ an iOS Simulator, and build-only jobs for tvOS/watchOS/visionOS simulators.
 
 Use capitalized names for Swift/package roots (`Sources`, `Tests`, `Example`)
 and lowercase names for auxiliary repository directories (`docs`, `scripts`).
+The public umbrella source keeps its branded `Sources/WICompress` directory.
+Internal source directories use short lowercase responsibility names and are
+mapped to their Swift target names explicitly in `Package.swift`:
+
+```text
+Sources/domain     -> WIImageDomain
+Sources/imageio    -> WIImageIO
+Sources/raster     -> WIImageRaster
+Sources/execution  -> WICompressExecution
+```
+
+Nested organizational directories are also lowercase. For example,
+`Sources/domain/public`, `Sources/domain/internal`,
+`Sources/execution/algorithm`, and `Sources/execution/pipeline`. Target names
+remain the module identity; physical directory names do not repeat the `WI`
+brand unless the directory is the public umbrella.
 
 ## CodeGraph
 

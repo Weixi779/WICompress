@@ -24,22 +24,22 @@ let package = Package(
         .target(
             name: "WIImageDomain",
             dependencies: [],
-            path: "Sources/WIImageDomain"
+            path: "Sources/domain"
         ),
         .target(
             name: "WIImageIO",
             dependencies: ["WIImageDomain"],
-            path: "Sources/WIImageIO"
+            path: "Sources/imageio"
         ),
         .target(
             name: "WIImageRaster",
             dependencies: ["WIImageDomain"],
-            path: "Sources/WIImageRaster"
+            path: "Sources/raster"
         ),
         .target(
             name: "WICompressExecution",
             dependencies: ["WIImageDomain", "WIImageIO", "WIImageRaster"],
-            path: "Sources/WICompressExecution"
+            path: "Sources/execution"
         ),
         .target(
             name: "WICompress",
