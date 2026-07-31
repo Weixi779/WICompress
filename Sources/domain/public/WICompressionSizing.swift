@@ -17,13 +17,15 @@ public struct WICompressionSizing: Sendable, Hashable {
     /// Normalized top-left-origin anchor used by the aspect-ratio crop.
     public let anchor: WICropAnchor
 
+    public static let original = WICompressionSizing()
+
     public init(
         maximumPixelSize: Int? = nil,
         aspectRatio: WIAspectRatio? = nil,
         anchor: WICropAnchor = .center
     ) {
-        self.maximumPixelSize = maximumPixelSize
+        self.maximumPixelSize = maximumPixelSize.map { max($0, 1) }
         self.aspectRatio = aspectRatio
-        self.anchor = anchor
+        self.anchor = aspectRatio == nil ? .center : anchor
     }
 }

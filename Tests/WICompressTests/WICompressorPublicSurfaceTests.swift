@@ -25,11 +25,6 @@ struct WICompressorPublicSurfaceTests {
         let testDescription: String
     }
 
-    struct InvalidTargetCase: CustomTestStringConvertible, Sendable {
-        let target: WICompressionTarget
-        let testDescription: String
-    }
-
     static let invalidInputCases: [InvalidInputCase] = [
         InvalidInputCase(
             payload: .empty,
@@ -45,74 +40,6 @@ struct WICompressorPublicSurfaceTests {
             payload: .truncatedJPEGPrefix(8),
             expectedError: .invalidImageData,
             testDescription: "truncated JPEG prefix"
-        ),
-    ]
-
-    static let invalidTargetCases: [InvalidTargetCase] = [
-        InvalidTargetCase(
-            target: WICompressionTarget(maxBytes: 0),
-            testDescription: "zero byte target"
-        ),
-        InvalidTargetCase(
-            target: WICompressionTarget(
-                maxBytes: 1024,
-                sizing: WICompressionSizing(maximumPixelSize: 0)
-            ),
-            testDescription: "zero maximum pixel size"
-        ),
-        InvalidTargetCase(
-            target: WICompressionTarget(
-                maxBytes: 1024,
-                sizing: WICompressionSizing(maximumPixelSize: -1)
-            ),
-            testDescription: "negative maximum pixel size"
-        ),
-        InvalidTargetCase(
-            target: WICompressionTarget(
-                maxBytes: 1024,
-                sizing: WICompressionSizing(
-                    aspectRatio: WIAspectRatio(width: 0, height: 1)
-                )
-            ),
-            testDescription: "zero aspect-ratio width"
-        ),
-        InvalidTargetCase(
-            target: WICompressionTarget(
-                maxBytes: 1024,
-                sizing: WICompressionSizing(
-                    aspectRatio: WIAspectRatio(width: 1, height: .nan)
-                )
-            ),
-            testDescription: "non-finite aspect-ratio height"
-        ),
-        InvalidTargetCase(
-            target: WICompressionTarget(
-                maxBytes: 1024,
-                sizing: WICompressionSizing(
-                    aspectRatio: WIAspectRatio(width: 1, height: 1),
-                    anchor: WICropAnchor(x: -0.1, y: 0.5)
-                )
-            ),
-            testDescription: "anchor before the left edge"
-        ),
-        InvalidTargetCase(
-            target: WICompressionTarget(
-                maxBytes: 1024,
-                sizing: WICompressionSizing(
-                    aspectRatio: WIAspectRatio(width: 1, height: 1),
-                    anchor: WICropAnchor(x: 0.5, y: 1.1)
-                )
-            ),
-            testDescription: "anchor after the bottom edge"
-        ),
-        InvalidTargetCase(
-            target: WICompressionTarget(
-                maxBytes: 1024,
-                sizing: WICompressionSizing(
-                    anchor: WICropAnchor(x: 0, y: 0)
-                )
-            ),
-            testDescription: "anchor without an aspect ratio"
         ),
     ]
 
@@ -135,8 +62,8 @@ struct WICompressorPublicSurfaceTests {
     }
 
     @Test("Default target values match target-compression defaults")
-    func defaultTarget() {
-        let target = WICompressionTarget(maxBytes: 1024)
+    func defaultTarget() throws {
+        let target = try WICompressionTarget(maxBytes: 1024)
 
         #expect(target.maxBytes == 1024)
         #expect(target.sizing == WICompressionSizing())
@@ -217,11 +144,11 @@ struct WICompressorPublicSurfaceTests {
     func dataAndFileTargetTerminalsAreEquivalent() throws {
         let url = try Self.resourceURL("real_jpeg_2098x1350_landscape", extension: "jpg")
         let data = try Data(contentsOf: url)
-        let target = WICompressionTarget(
+        let target = try WICompressionTarget(
             maxBytes: 64 * 1024,
             sizing: WICompressionSizing(
                 maximumPixelSize: 320,
-                aspectRatio: WIAspectRatio(width: 1, height: 1)
+                aspectRatio: .square
             )
         )
 
@@ -243,47 +170,24 @@ struct WICompressorPublicSurfaceTests {
         }
     }
 
-    @Test("Invalid target values throw invalidTarget", arguments: invalidTargetCases)
-    func invalidTargetValuesThrowInvalidTarget(_ invalidTargetCase: InvalidTargetCase) throws {
-        let data = try Self.tinyPNGData()
-
+    @Test("Invalid targets fail during construction")
+    func invalidTargetsFailDuringConstruction() {
         #expect(throws: WICompressError.invalidTarget) {
-            _ = try WICompressor.compress(data, to: invalidTargetCase.target)
+            _ = try WICompressionTarget(maxBytes: 0)
         }
     }
 
-    @Test("Target validation precedes file source creation")
-    func targetValidationPrecedesFileSourceCreation() {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("wi-compress-missing-\(UUID().uuidString)")
-
-        #expect(throws: WICompressError.invalidTarget) {
-            _ = try WICompressor.compress(
-                contentsOf: url,
-                to: WICompressionTarget(maxBytes: 0)
-            )
-        }
-    }
-
-    @Test("Process validation precedes file source creation")
-    func processValidationPrecedesFileSourceCreation() {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("wi-process-missing-\(UUID().uuidString)")
-
+    @Test("Invalid crop ratios fail during construction")
+    func invalidCropFailsDuringConstruction() {
         #expect(throws: WICompressError.invalidCrop) {
-            _ = try WICompressor.process(
-                contentsOf: url,
-                using: WIImageProcess(
-                    crop: .aspectRatio(width: 0, height: 1)
-                )
-            )
+            _ = try WIAspectRatio(width: 0, height: 1)
         }
     }
 
     @Test("Target JPEG requires an opaque custom background")
     func targetJPEGRequiresOpaqueCustomBackground() throws {
         let data = try Self.tinyPNGData()
-        let target = WICompressionTarget(
+        let target = try WICompressionTarget(
             maxBytes: 1024,
             output: WIImageOutput(
                 representation: .jpeg(
@@ -307,7 +211,7 @@ struct WICompressorPublicSurfaceTests {
     @Test("Target compression fails rather than returning bytes over the target")
     func targetCompressionFailsWhenOutputExceedsMaxBytes() throws {
         let input = try Self.tinyPNGData()
-        let target = WICompressionTarget(
+        let target = try WICompressionTarget(
             maxBytes: 1,
             output: WIImageOutput(
                 representation: .preserve,

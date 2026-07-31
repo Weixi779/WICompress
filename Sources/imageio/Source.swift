@@ -333,19 +333,16 @@ package final class Source {
         width: Int,
         height: Int
     ) throws(Error) -> WIPixelSize {
-        do {
-            return try WIPixelSize(
-                validatingWidth: width,
-                height: height
-            )
-        } catch {
-            switch error {
-            case .invalidDimensions:
-                throw .invalidPixelSize(width: width, height: height)
-            case .pixelCountOverflow:
-                throw .pixelCountOverflow(width: width, height: height)
-            }
+        guard width > 0, height > 0 else {
+            throw .invalidPixelSize(width: width, height: height)
         }
+
+        let (_, overflow) = width.multipliedReportingOverflow(by: height)
+        guard !overflow else {
+            throw .pixelCountOverflow(width: width, height: height)
+        }
+
+        return WIPixelSize(validWidth: width, height: height)
     }
 
     static func metadataOptions(

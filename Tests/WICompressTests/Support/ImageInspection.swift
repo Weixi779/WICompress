@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WIImageDomain
 @testable import WIImageIO
 
 func imageFormat(of data: Data) throws -> WIImageFormat {

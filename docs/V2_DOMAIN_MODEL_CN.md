@@ -47,6 +47,10 @@ WICompressionTarget ───┘       ├──> ImageIO
 Process 与 Target 是同一 Pipeline 内的两种算法；内部状态和编排以
 [`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 为准。
 
+公共值、公共结果词汇与公共失败合同属于 `WIImageDomain`。其中
+`WIImageFormat` 只描述容器家族，ImageIO 负责检测；`WICompressError` 统一表达模型
+构造、resizing 扩展点和 terminal 失败，底层 ImageIO/Raster error 不直接泄漏。
+
 ## Domain 所有权
 
 | Domain | 拥有的事实或决定 | 不拥有 |

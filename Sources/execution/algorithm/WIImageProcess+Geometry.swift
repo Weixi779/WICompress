@@ -36,7 +36,9 @@ extension WIImageProcess {
         case .original:
             targetPixelSize = cropGeometry.pixelSize
         case .resize(let resizing):
-            targetPixelSize = resizing.targetSize(for: cropGeometry.pixelSize)
+            targetPixelSize = try resizing.targetSize(
+                for: cropGeometry.pixelSize
+            )
         }
 
         try validateExecutablePixelSize(targetPixelSize)
@@ -52,26 +54,26 @@ extension WIImageProcess {
         _ size: WIPixelSize
     ) throws(WICompressError) {
         guard size.width > 0, size.height > 0 else {
-            throw .invalidResizingResult
+            throw .invalidResizing
         }
 
         let (minimumRowBytes, rowOverflow) = size.width
             .multipliedReportingOverflow(by: 4)
         guard !rowOverflow else {
-            throw .invalidResizingResult
+            throw .invalidResizing
         }
 
         let (alignmentInput, alignmentOverflow) = minimumRowBytes
             .addingReportingOverflow(63)
         guard !alignmentOverflow else {
-            throw .invalidResizingResult
+            throw .invalidResizing
         }
 
         let alignedRowBytes = (alignmentInput / 64) * 64
         let (_, totalOverflow) = alignedRowBytes
             .multipliedReportingOverflow(by: size.height)
         guard !totalOverflow else {
-            throw .invalidResizingResult
+            throw .invalidResizing
         }
     }
 }

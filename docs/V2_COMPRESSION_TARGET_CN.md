@@ -42,7 +42,7 @@ ImageIO/Raster 执行能力。
 Target 只包含三组外部事实：
 
 ```swift
-WICompressionTarget(
+try WICompressionTarget(
     maxBytes: ...,
     sizing: ...,
     output: ...
@@ -52,6 +52,7 @@ WICompressionTarget(
 ### maxBytes
 
 - `maxBytes` 必须大于零。
+- 非正 `maxBytes` 在 Target 构造时抛出 `.invalidTarget`，不会进入 Pipeline。
 - 它是 Target 最核心的硬约束。
 - 成功结果必须满足 `data.count <= maxBytes`。
 - 不能以 warning、diagnostic 或“最接近结果”代替该保证。
@@ -72,6 +73,7 @@ WICompressionSizing(
 #### maximumPixelSize
 
 - 表示 base candidate 的最大像素边界，不是最终精确尺寸。
+- 非正输入归一到一个像素，保持常用数值 API non-throwing。
 - 保持比例，只缩小，不放大。
 - Target 搜索算法为满足 `maxBytes` 可以继续产生更小的候选。
 
@@ -81,7 +83,7 @@ WICompressionSizing(
 - 它是输出形状约束，不是 soft preference。
 - 源图比例不满足时，使用该比例的最大内接矩形裁剪。
 - 裁切携带 normalized anchor，默认是 `.center`。
-- anchor 使用左上原点的图片坐标，`x/y` 必须位于 `0...1`。
+- anchor 使用左上原点的图片坐标，`x/y` 自动 clamp 到 `0...1`，NaN 回退到中心。
 - 不公开九宫格 alignment enum、fit、fill 或任意 crop mode。
 
 ### output
@@ -113,7 +115,8 @@ metadata 或 color-space 合同。
 - `WICompressionSizing` 的四种输入组合、normalized anchor 和一次性 crop/base-size
   解析已实现。
 - Public `geometry`、candidate `preference`、canvas placement 及其旧 resolver 已删除。
-- 请求级 `ImagePipeline` 直接持有 target validation、passthrough、反馈搜索、
+- `WICompressionTarget` 的 throwing initializer 建立 hard byte invariant；请求级
+  `ImagePipeline` 直接持有 passthrough、反馈搜索、
   working image 复用、候选选择与 hard byte check，不再产生 `WIExecutionPlan`。
 - Data 与 file URL 使用同一 file-backed pipeline；原始字节只在 passthrough 时按需读取。
 - Byte-search 算法保持原有平衡选择行为，本次只收紧 Domain 与执行边界。

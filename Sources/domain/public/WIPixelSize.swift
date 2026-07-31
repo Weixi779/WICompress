@@ -10,36 +10,19 @@ import Foundation
 
 /// A two-dimensional size measured in pixels.
 public struct WIPixelSize: Sendable, Hashable {
-    package enum ValidationError: Swift.Error, Sendable, Equatable {
-        case invalidDimensions(width: Int, height: Int)
-        case pixelCountOverflow(width: Int, height: Int)
-    }
-
     public let width: Int
     public let height: Int
 
-    package var pixelCount: Int {
-        width * height
+    public init(width: Int, height: Int) {
+        self.width = max(width, 1)
+        self.height = max(height, 1)
     }
 
-    public init(width: Int, height: Int) {
+    package init(validWidth width: Int, height: Int) {
+        precondition(width > 0 && height > 0)
+        precondition(!width.multipliedReportingOverflow(by: height).overflow)
+
         self.width = width
         self.height = height
-    }
-
-    package init(
-        validatingWidth width: Int,
-        height: Int
-    ) throws(ValidationError) {
-        guard width > 0, height > 0 else {
-            throw .invalidDimensions(width: width, height: height)
-        }
-
-        let (_, overflow) = width.multipliedReportingOverflow(by: height)
-        guard !overflow else {
-            throw .pixelCountOverflow(width: width, height: height)
-        }
-
-        self.init(width: width, height: height)
     }
 }

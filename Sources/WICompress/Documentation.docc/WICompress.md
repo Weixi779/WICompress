@@ -35,7 +35,7 @@ let thumbnail = try WICompressor.compress(
         maxBytes: 32 * 1024,
         sizing: WICompressionSizing(
             maximumPixelSize: 200,
-            aspectRatio: WIAspectRatio(width: 1, height: 1)
+            aspectRatio: .square
         )
     )
 )

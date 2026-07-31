@@ -20,13 +20,17 @@ public struct WICompressionTarget: Sendable, Equatable {
     /// Creates a target compression request.
     public init(
         maxBytes: Int,
-        sizing: WICompressionSizing = WICompressionSizing(),
+        sizing: WICompressionSizing = .original,
         output: WIImageOutput = WIImageOutput(
             representation: .pngIfAlphaOtherwiseJPEG,
             metadata: .strip,
             colorSpace: .convert(to: .sRGB)
         )
-    ) {
+    ) throws(WICompressError) {
+        guard maxBytes > 0 else {
+            throw .invalidTarget
+        }
+
         self.maxBytes = maxBytes
         self.sizing = sizing
         self.output = output

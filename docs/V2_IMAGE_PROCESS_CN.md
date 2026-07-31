@@ -65,7 +65,7 @@ let process = WIImageProcess(
             within: WIPixelSize(width: 2_048, height: 2_048)
         )
     ),
-    crop: .aspectRatio(width: 1, height: 1, anchor: .center),
+    crop: WIImageCrop(aspectRatio: .square),
     quality: 0.7,
     output: WIImageOutput(
         representation: .pngIfAlphaOtherwiseJPEG,
@@ -92,6 +92,10 @@ encode 路径继续由 URL source 驱动。
 调用方也可以直接实现 `WIImageResizing`。这些便利实现不会扩展
 `WIImageSizing` 的核心 case。
 
+anchor 与 quality 是可安全规范化的偏好：anchor clamp 到 `0...1`，quality clamp 到
+`0...1`；NaN 分别回退到中心和默认 `0.6`。ratio 与 scale 没有可信的自动修复语义，
+对应构造使用 typed throws。
+
 ## Sizing 与 Resizing 插槽
 
 Sizing 只有两个状态：
@@ -106,13 +110,18 @@ resize(using: WIImageResizing)
 
 ```swift
 public protocol WIImageResizing: Sendable {
-    func targetSize(for sourceSize: WIPixelSize) -> WIPixelSize
+    func targetSize(
+        for sourceSize: WIPixelSize
+    ) throws(WICompressError) -> WIPixelSize
 }
 ```
 
 协议只接收一个已经考虑 orientation 和可选 crop 的完整 `WIPixelSize`，只返回一个完整
 目标 `WIPixelSize`。它不接收 ImageIO source、encoded bytes、quality、format、View
 point 或 Target solver context。
+
+算法失败直接抛 `WICompressError.invalidResizing`；不使用 `(0, 0)` 或其他非法尺寸作为
+错误哨兵。
 
 调用方因此可以：
 
@@ -266,10 +275,10 @@ suspension point。
 - 已实现 public `WIPixelSize`、`WIImageResizing`、内置 `WIImageResize`、
   `WIImageSizing`、aspect-ratio crop/anchor、`WIImageOutput` 和
   `WIImageProcess`。
-- 已实现纯 `crop -> resizing` geometry resolver；无效 quality、crop 和 resizing
-  结果明确失败。
-- 已实现同步 Data/file terminal；Process 的校验、output 解释、执行分支选择和结果
-  生成由请求级 `ImagePipeline` 直接持有，不经过 `WIExecutionPlan`、旧
+- 已实现纯 `crop -> resizing` geometry calculation；quality 在 Domain 中归一化，
+  ratio 构造和 resizing 执行失败直接抛 Domain error。
+- 已实现同步 Data/file terminal；Process 的 output 解释、执行分支选择和结果生成由
+  请求级 `ImagePipeline` 直接持有，不经过 `WIExecutionPlan`、旧
   `WICompressOptions` 或 Resolver。
 - 无 crop 的缩小复用 ImageIO thumbnail；thumbnail max pixel 由目标宽、高两个轴
   共同反推，不能先把任一目标轴所需的源样本降掉再放大。需要放大任一轴时使用完整
@@ -280,8 +289,8 @@ suspension point。
 - 1.x `compress(_:options:)`、旧 Policy 名称和 legacy write-plan resolver
   已删除；2.0 不维护第二套 Process 架构。
 - `WICompressionTarget` 已共享 `WIImageOutput`；两条产品线共用同一个
-  `ImagePipeline` 和底层执行能力。Target 的 validation、passthrough、反馈搜索和 hard
-  byte check 也已迁入 Pipeline；架构级 Plan/Resolver/Solver 已删除。
+  `ImagePipeline` 和底层执行能力。Target 构造时建立 hard byte invariant；passthrough、
+  反馈搜索和 hard byte check 位于 Pipeline；架构级 Plan/Resolver/Solver 已删除。
 - 尚未实现 async terminal。
 
 ## 已接受

@@ -65,8 +65,8 @@ WICompress
 
 - `WIImageIO` 是 package 内部 target，不声明独立 library product。
 - Source、Descriptor、options 与 codec primitives 使用 `package` 访问级别。
-- `WIImageFormat` 是唯一公开的 ImageIO 结果事实，由 Source inspection 产生；它不提供
-  public Data initializer 或公开 detection terminal。
+- `WIImageFormat` 是公共 Domain 模型；`WIImageIO` 只拥有从 Source/`UTType` 得到该值
+  的 detection 实现，不提供公开 detection terminal。
 - 依赖 Foundation、CoreGraphics、ImageIO 与 UniformTypeIdentifiers。
 - 不依赖 WICompress 的 Process、Target、solver、Luban 或平台 UI 框架。
 - 不使用公共单例、全局 mutable registry、内部 queue 或 actor。
@@ -327,7 +327,8 @@ ImageIO 层使用 typed throws 表达基础设施失败，至少能够区分：
 |---|---|
 | `WIImageSource` 中的 source creation 和 properties 读取 | `WIImageIO.Source` / `Descriptor` |
 | URL 入口中的 eager `Data(contentsOf:)` | File-backed `WIImageIO.Source`，仅在需要原始 Data 时读取 |
-| `WIImageFormat` 的 type detection 与 runtime writability | `WIImageIO` Format / Capabilities |
+| `WIImageFormat` 公共值 | `WIImageDomain` |
+| format type detection 与 runtime writability | `WIImageIO` Format / Capabilities |
 | `WIImageEncoder` 中的 thumbnail options | `WIImageIO` Thumbnail |
 | `WIImageEncoder` 中的 destination create/add/finalize | `WIImageIO` Encode / Copy |
 | bitmap/canvas/color render | `WIImageRaster` |

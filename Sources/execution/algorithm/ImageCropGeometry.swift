@@ -120,7 +120,10 @@ enum ImageCropGeometry {
                 width: Double(cropWidth),
                 height: Double(cropHeight)
             ),
-            pixelSize: WIPixelSize(width: cropWidth, height: cropHeight)
+            pixelSize: WIPixelSize(
+                validWidth: cropWidth,
+                height: cropHeight
+            )
         )
     }
 }

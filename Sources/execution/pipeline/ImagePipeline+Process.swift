@@ -14,21 +14,19 @@ extension ImagePipeline {
         _ data: Data,
         using process: WIImageProcess
     ) throws(WICompressError) -> WIResult {
-        try validate(process)
         let pipeline = try ImagePipeline(data: data)
-        return try pipeline.processValidated(process)
+        return try pipeline.process(process)
     }
 
     package static func process(
         contentsOf url: URL,
         using process: WIImageProcess
     ) throws(WICompressError) -> WIResult {
-        try validate(process)
         let pipeline = try ImagePipeline(contentsOf: url)
-        return try pipeline.processValidated(process)
+        return try pipeline.process(process)
     }
 
-    private func processValidated(
+    private func process(
         _ process: WIImageProcess
     ) throws(WICompressError) -> WIResult {
         guard descriptor.format != .unknown else {
@@ -78,18 +76,6 @@ extension ImagePipeline {
         }
 
         return try result(for: data)
-    }
-
-    private static func validate(
-        _ process: WIImageProcess
-    ) throws(WICompressError) {
-        if let quality = process.quality {
-            guard quality.isFinite, (0...1).contains(quality) else {
-                throw .invalidProcessQuality
-            }
-        }
-
-        _ = try ImageCropGeometry.aspectRatio(of: process.crop)
     }
 
     private func canReturnOriginal(

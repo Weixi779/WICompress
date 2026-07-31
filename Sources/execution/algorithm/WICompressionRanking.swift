@@ -8,7 +8,6 @@
 
 import Foundation
 import WIImageDomain
-import WIImageIO
 
 /// A feasible encoded result collected during the target byte-budget search.
 struct WISolvedCompressionCandidate: Sendable, Equatable {

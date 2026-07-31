@@ -43,7 +43,7 @@ let package = Package(
         ),
         .target(
             name: "WICompress",
-            dependencies: ["WIImageDomain", "WIImageIO", "WICompressExecution"],
+            dependencies: ["WIImageDomain", "WICompressExecution"],
             path: "Sources/WICompress"
         ),
         .testTarget(

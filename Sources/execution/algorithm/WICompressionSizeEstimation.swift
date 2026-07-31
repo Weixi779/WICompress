@@ -8,7 +8,6 @@
 
 import Foundation
 import WIImageDomain
-import WIImageIO
 
 /// Pure dimension and quality-profile math for the target byte-budget search.
 ///
@@ -52,7 +51,10 @@ enum WICompressionSizeEstimation {
 
         let scale = Double(max(maxLongSide, 1)) / Double(sourceLongSide)
         return WIPixelSize(
-            width: max(Int((Double(source.width) * scale).rounded(.toNearestOrAwayFromZero)), 1),
+            validWidth: max(
+                Int((Double(source.width) * scale).rounded(.toNearestOrAwayFromZero)),
+                1
+            ),
             height: max(Int((Double(source.height) * scale).rounded(.toNearestOrAwayFromZero)), 1)
         )
     }

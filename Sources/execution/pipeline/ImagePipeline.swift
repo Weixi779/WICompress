@@ -401,17 +401,17 @@ package final class ImagePipeline {
              .imageCreationFailed:
             return .imageInfoUnavailable
         case .thumbnailCreationFailed:
-            return .thumbnailCreationFailed
+            return .imageDecodeFailed
         case .animatedSourceUnsupported(let frameCount):
             return .animatedSourceUnsupported(frameCount: frameCount)
         case .metadataCopyUnsupported:
-            return .executionUnavailable
+            return .imageEncodeFailed(.unknown)
         case .destinationCreationFailed(let typeIdentifier):
-            return .destinationCreationFailed(
+            return .imageEncodeFailed(
                 .detected(from: typeIdentifier)
             )
         case .destinationFinalizationFailed(let typeIdentifier):
-            return .encodeFailed(.detected(from: typeIdentifier))
+            return .imageEncodeFailed(.detected(from: typeIdentifier))
         case .fileReadFailed(let url),
              .fileSizeUnavailable(let url):
             return .fileReadFailed(url)
@@ -435,15 +435,15 @@ package final class ImagePipeline {
         case .imageCreationFailed:
             return .imageDecodeFailed
         case .thumbnailCreationFailed:
-            return .thumbnailCreationFailed
+            return .imageDecodeFailed
         case .animatedSourceUnsupported(let frameCount):
             return .animatedSourceUnsupported(frameCount: frameCount)
         case .metadataCopyUnsupported:
-            return .executionUnavailable
+            return .imageEncodeFailed(destinationFormat)
         case .destinationCreationFailed:
-            return .destinationCreationFailed(destinationFormat)
+            return .imageEncodeFailed(destinationFormat)
         case .destinationFinalizationFailed:
-            return .encodeFailed(destinationFormat)
+            return .imageEncodeFailed(destinationFormat)
         }
     }
 
@@ -454,7 +454,7 @@ package final class ImagePipeline {
         case .invalidSourceRect,
              .invalidDestinationRect,
              .sourceRectOutOfBounds:
-            return .executionUnavailable
+            return .imageRenderingFailed
         case .unsupportedColorSpace:
             return .unsupportedColorSpace
         case .invalidICCProfile:
@@ -466,7 +466,7 @@ package final class ImagePipeline {
              .colorConversionFailed,
              .contextCreationFailed,
              .imageCreationFailed:
-            return .colorConversionFailed
+            return .imageRenderingFailed
         }
     }
 }

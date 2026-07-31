@@ -14,8 +14,8 @@ public struct WICropAnchor: Sendable, Hashable {
     public let y: Double
 
     public init(x: Double, y: Double) {
-        self.x = x
-        self.y = y
+        self.x = x.clamped(to: 0...1, fallback: 0.5)
+        self.y = y.clamped(to: 0...1, fallback: 0.5)
     }
 
     public static let center = WICropAnchor(x: 0.5, y: 0.5)
@@ -26,7 +26,31 @@ public struct WIAspectRatio: Sendable, Hashable {
     public let width: Double
     public let height: Double
 
-    public init(width: Double, height: Double) {
+    public static let square = WIAspectRatio(
+        validWidth: 1,
+        height: 1
+    )
+
+    public init(
+        width: Double,
+        height: Double
+    ) throws(WICompressError) {
+        guard
+            width.isFinite,
+            height.isFinite,
+            width > 0,
+            height > 0,
+            (width / height).isFinite,
+            width / height > 0
+        else {
+            throw .invalidCrop
+        }
+
+        self.width = width
+        self.height = height
+    }
+
+    private init(validWidth width: Double, height: Double) {
         self.width = width
         self.height = height
     }
@@ -49,9 +73,9 @@ public struct WIImageCrop: Sendable, Hashable {
         width: Double,
         height: Double,
         anchor: WICropAnchor = .center
-    ) -> WIImageCrop {
+    ) throws(WICompressError) -> WIImageCrop {
         WIImageCrop(
-            aspectRatio: WIAspectRatio(width: width, height: height),
+            aspectRatio: try WIAspectRatio(width: width, height: height),
             anchor: anchor
         )
     }

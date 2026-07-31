@@ -10,7 +10,9 @@ import Foundation
 
 /// Resolves a complete source pixel size to a complete target pixel size.
 public protocol WIImageResizing: Sendable {
-    func targetSize(for sourceSize: WIPixelSize) -> WIPixelSize
+    func targetSize(
+        for sourceSize: WIPixelSize
+    ) throws(WICompressError) -> WIPixelSize
 }
 
 /// Built-in resizing algorithms.
@@ -34,7 +36,7 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
 
     /// Caps the longest side without upscaling.
     public static func maximumPixelSize(_ value: Int) -> WIImageResize {
-        WIImageResize(operation: .maximumPixelSize(value))
+        WIImageResize(operation: .maximumPixelSize(max(value, 1)))
     }
 
     /// Scales proportionally within a two-dimensional pixel boundary.
@@ -51,8 +53,14 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
     }
 
     /// Applies an explicit proportional scale factor.
-    public static func scaled(by factor: Double) -> WIImageResize {
-        WIImageResize(operation: .scaled(factor))
+    public static func scaled(
+        by factor: Double
+    ) throws(WICompressError) -> WIImageResize {
+        guard factor.isFinite, factor > 0 else {
+            throw .invalidResizing
+        }
+
+        return WIImageResize(operation: .scaled(factor))
     }
 
     /// Returns an explicit target pixel size.
@@ -60,7 +68,9 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
         WIImageResize(operation: .exact(size))
     }
 
-    public func targetSize(for sourceSize: WIPixelSize) -> WIPixelSize {
+    public func targetSize(
+        for sourceSize: WIPixelSize
+    ) throws(WICompressError) -> WIPixelSize {
         switch operation {
         case .luban:
             let ratio = WILuban.ratio(
@@ -73,7 +83,7 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
 
             let longSide = max(sourceSize.width, sourceSize.height)
             let maximumPixelSize = max(longSide / ratio, 1)
-            return constrainedSize(
+            return try constrainedSize(
                 sourceSize,
                 within: WIPixelSize(
                     width: maximumPixelSize,
@@ -82,19 +92,19 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
                 allowsUpscaling: false
             )
         case .maximumPixelSize(let value):
-            return constrainedSize(
+            return try constrainedSize(
                 sourceSize,
                 within: WIPixelSize(width: value, height: value),
                 allowsUpscaling: false
             )
         case .constrained(let maximumSize, let allowsUpscaling):
-            return constrainedSize(
+            return try constrainedSize(
                 sourceSize,
                 within: maximumSize,
                 allowsUpscaling: allowsUpscaling
             )
         case .scaled(let factor):
-            return scaledSize(sourceSize, by: factor)
+            return try scaledSize(sourceSize, by: factor)
         case .exact(let size):
             return size
         }
@@ -104,16 +114,7 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
         _ sourceSize: WIPixelSize,
         within maximumSize: WIPixelSize,
         allowsUpscaling: Bool
-    ) -> WIPixelSize {
-        guard
-            sourceSize.width > 0,
-            sourceSize.height > 0,
-            maximumSize.width > 0,
-            maximumSize.height > 0
-        else {
-            return WIPixelSize(width: 0, height: 0)
-        }
-
+    ) throws(WICompressError) -> WIPixelSize {
         var factor = min(
             Double(maximumSize.width) / Double(sourceSize.width),
             Double(maximumSize.height) / Double(sourceSize.height)
@@ -122,17 +123,13 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
             factor = min(factor, 1)
         }
 
-        return scaledSize(sourceSize, by: factor)
+        return try scaledSize(sourceSize, by: factor)
     }
 
     private func scaledSize(
         _ sourceSize: WIPixelSize,
         by factor: Double
-    ) -> WIPixelSize {
-        guard factor.isFinite, factor > 0 else {
-            return WIPixelSize(width: 0, height: 0)
-        }
-
+    ) throws(WICompressError) -> WIPixelSize {
         guard
             let width = Int(
                 exactly: (Double(sourceSize.width) * factor)
@@ -143,7 +140,7 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
                     .rounded(.toNearestOrAwayFromZero)
             )
         else {
-            return WIPixelSize(width: 0, height: 0)
+            throw .invalidResizing
         }
 
         return WIPixelSize(

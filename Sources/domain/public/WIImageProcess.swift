@@ -31,7 +31,7 @@ public struct WIImageProcess: Sendable {
     ) {
         self.sizing = sizing
         self.crop = crop
-        self.quality = quality
+        self.quality = quality?.clamped(to: 0...1, fallback: 0.6)
         self.output = output
     }
 

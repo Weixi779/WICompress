@@ -53,8 +53,9 @@ Implementation status:
   pipeline without architecture-level Resolver, ExecutionPlan, Executor, or
   Solver types. `WICompressor` calls the package-only Pipeline terminals
   directly; the public `WICompress` target remains an umbrella facade.
-- Completed: `WIImageFormat` is an ImageIO-produced public result fact. It has no
-  public Data detection initializer; source inspection produces it once.
+- Completed: `WIImageFormat` and `WICompressError` are public Domain values.
+  ImageIO owns format detection; package-only ImageIO/Raster failures are mapped
+  to the shared Domain error at the Pipeline boundary.
 - Completed: synchronous `WIImageProcess` vertical slice with public
   `WIPixelSize`, resizing slot and built-ins, aspect-ratio crop, shared Output
   values, pure geometry calculation, and direct pipeline execution.

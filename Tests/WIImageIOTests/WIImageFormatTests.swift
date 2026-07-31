@@ -11,6 +11,7 @@ import Foundation
 import ImageIO
 import Testing
 import UniformTypeIdentifiers
+import WIImageDomain
 @testable import WIImageIO
 
 @Suite("WIImageFormat Detection")

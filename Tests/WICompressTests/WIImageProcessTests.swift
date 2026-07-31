@@ -25,6 +25,14 @@ struct WIImageProcessTests {
         }
     }
 
+    private struct FailingResizing: WIImageResizing {
+        func targetSize(
+            for sourceSize: WIPixelSize
+        ) throws(WICompressError) -> WIPixelSize {
+            throw .invalidResizing
+        }
+    }
+
     @Test(
         "Built-in resizing returns complete proportional sizes",
         arguments: [
@@ -56,11 +64,6 @@ struct WIImageProcessTests {
                 WIPixelSize(width: 2_000, height: 1_000)
             ),
             (
-                WIImageResize.scaled(by: 0.5),
-                WIPixelSize(width: 1_000, height: 500),
-                WIPixelSize(width: 500, height: 250)
-            ),
-            (
                 WIImageResize.exact(WIPixelSize(width: 600, height: 600)),
                 WIPixelSize(width: 1_000, height: 500),
                 WIPixelSize(width: 600, height: 600)
@@ -71,8 +74,19 @@ struct WIImageProcessTests {
         _ resizing: WIImageResize,
         source: WIPixelSize,
         expected: WIPixelSize
-    ) {
-        #expect(resizing.targetSize(for: source) == expected)
+    ) throws {
+        #expect(try resizing.targetSize(for: source) == expected)
+    }
+
+    @Test("Explicit scale returns a proportional size")
+    func explicitScale() throws {
+        let resizing = try WIImageResize.scaled(by: 0.5)
+
+        #expect(
+            try resizing.targetSize(
+                for: WIPixelSize(width: 1_000, height: 500)
+            ) == WIPixelSize(width: 500, height: 250)
+        )
     }
 
     @Test(
@@ -91,9 +105,9 @@ struct WIImageProcessTests {
     func lubanTargetSize(
         source: WIPixelSize,
         expected: WIPixelSize
-    ) {
+    ) throws {
         #expect(
-            WIImageResize.luban.targetSize(for: source) == expected
+            try WIImageResize.luban.targetSize(for: source) == expected
         )
     }
 
@@ -101,24 +115,15 @@ struct WIImageProcessTests {
         "Aspect-ratio crop resolves in oriented top-left coordinates",
         arguments: [
             (
-                WIImageCrop.aspectRatio(width: 1, height: 1),
+                WIImageCrop(aspectRatio: .square),
                 Rect(x: 500, y: 0, width: 3_000, height: 3_000)
             ),
             (
-                WIImageCrop.aspectRatio(
-                    width: 1,
-                    height: 1,
+                WIImageCrop(
+                    aspectRatio: .square,
                     anchor: WICropAnchor(x: 0, y: 0.5)
                 ),
                 Rect(x: 0, y: 0, width: 3_000, height: 3_000)
-            ),
-            (
-                WIImageCrop.aspectRatio(
-                    width: 16,
-                    height: 9,
-                    anchor: WICropAnchor(x: 0.5, y: 1)
-                ),
-                Rect(x: 0, y: 750, width: 4_000, height: 2_250)
             ),
         ]
     )
@@ -143,6 +148,25 @@ struct WIImageProcessTests {
         )
     }
 
+    @Test("Landscape ratio crop resolves at the requested anchor")
+    func landscapeRatioCrop() throws {
+        let crop = try WIImageCrop.aspectRatio(
+            width: 16,
+            height: 9,
+            anchor: WICropAnchor(x: 0.5, y: 1)
+        )
+        let geometry = try WIImageProcess(
+            sizing: .original,
+            crop: crop,
+            quality: nil
+        ).geometry(for: WIPixelSize(width: 4_000, height: 3_000))
+
+        #expect(
+            geometry.sourceRect
+                == Rect(x: 0, y: 750, width: 4_000, height: 2_250)
+        )
+    }
+
     @Test("Resizing receives the cropped pixel size")
     func resizingReceivesCroppedPixelSize() throws {
         struct HalfSize: WIImageResizing {
@@ -156,7 +180,7 @@ struct WIImageProcessTests {
 
         let geometry = try WIImageProcess(
                 sizing: .resize(using: HalfSize()),
-                crop: .aspectRatio(width: 1, height: 1),
+                crop: WIImageCrop(aspectRatio: .square),
                 quality: nil
             )
             .geometry(for: WIPixelSize(width: 4_000, height: 3_000))
@@ -171,36 +195,18 @@ struct WIImageProcessTests {
         )
     }
 
-    @Test("Invalid Process inputs fail instead of being clamped")
-    func invalidInputsFail() throws {
+    @Test("Custom resizing failures propagate as Domain errors")
+    func customResizingFailurePropagates() throws {
         let data = try Self.resourceData(
             "real_jpeg_2098x1350_landscape",
             extension: "jpg"
         )
 
-        #expect(throws: WICompressError.invalidProcessQuality) {
-            try WICompressor.process(
-                data,
-                using: WIImageProcess(quality: 1.1)
-            )
-        }
-        #expect(throws: WICompressError.invalidCrop) {
+        #expect(throws: WICompressError.invalidResizing) {
             try WICompressor.process(
                 data,
                 using: WIImageProcess(
-                    crop: .aspectRatio(width: 0, height: 1)
-                )
-            )
-        }
-        #expect(throws: WICompressError.invalidResizingResult) {
-            try WICompressor.process(
-                data,
-                using: WIImageProcess(
-                    sizing: .resize(
-                        using: FixedResizing(
-                            size: WIPixelSize(width: 0, height: 100)
-                        )
-                    )
+                    sizing: .resize(using: FailingResizing())
                 )
             )
         }
@@ -214,7 +220,7 @@ struct WIImageProcessTests {
         ]
     )
     func unexecutableResizingResultFails(_ size: WIPixelSize) {
-        #expect(throws: WICompressError.invalidResizingResult) {
+        #expect(throws: WICompressError.invalidResizing) {
             try WIImageProcess(
                     sizing: .resize(
                         using: FixedResizing(size: size)
@@ -264,7 +270,7 @@ struct WIImageProcessTests {
                         WIPixelSize(width: 512, height: 512)
                     )
                 ),
-                crop: .aspectRatio(width: 1, height: 1),
+                crop: WIImageCrop(aspectRatio: .square),
                 quality: nil,
                 output: WIImageOutput(representation: .png)
             )
@@ -406,7 +412,7 @@ struct WIImageProcessTests {
             data,
             using: WIImageProcess(
                 sizing: .original,
-                crop: .aspectRatio(width: 3, height: 4),
+                crop: try .aspectRatio(width: 3, height: 4),
                 quality: nil,
                 output: WIImageOutput(metadata: .preserve)
             )

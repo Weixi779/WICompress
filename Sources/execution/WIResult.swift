@@ -8,7 +8,6 @@
 
 import Foundation
 import WIImageDomain
-import WIImageIO
 
 /// Encoded result produced by WICompress.
 public struct WIResult: Sendable {

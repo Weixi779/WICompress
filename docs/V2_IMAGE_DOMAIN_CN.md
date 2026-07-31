@@ -37,33 +37,38 @@ library product；调用方仍然只需 `import WICompress`。
 - `WIImageCrop` / `WIAspectRatio` / `WICropAnchor`
 - `WIImageOutput` / representation / metadata / color-space decisions
 - `WICompressionTarget` / `WICompressionSizing`
+- `WIImageFormat`
+- `WICompressError`
 
 它还拥有 package-only 的 `Rect`、`Orientation` 和尺寸执行校验。Luban 纯尺寸算法留在
 Domain 内，作为 `WIImageResize.luban` 的实现细节。
 
 ## 不属于 Domain 的事实
 
-- `WIImageFormat` 由 `WIImageIO` inspection 产生。它是公开结果事实，但没有公开的
-  Data detection API 或自定义 initializer；内部精确容器统一使用 `UTType`。
+- encoded data 与 `UTType` 的格式检测属于 `WIImageIO`；检测结果使用 Domain 的
+  `WIImageFormat` 表达。
 - `WIImageMetadataOptions` 属于共享 Output Domain；ImageIO Descriptor 直接使用它
   表达源图实际存在的受支持 metadata 类别。
 - `Source`、Descriptor、thumbnail、encode 和 runtime capability 属于 `WIImageIO`。
 - bitmap context、orientation render、Alpha surface 和颜色转换属于
   `WIImageRaster`。
-- 请求级 `ImagePipeline`、Target 反馈搜索、错误与公开结果 `WIResult` 属于
+- 请求级 `ImagePipeline`、Target 反馈搜索与公开结果 `WIResult` 属于
   `WICompressExecution`。
 - `WICompressor` 属于公开 umbrella `WICompress`。
 
 ## WIPixelSize 合同
 
-`WIPixelSize` 是唯一的像素尺寸类型。公开 initializer 接受调用方意图；ImageIO、
-Raster 和 Pipeline 在进入执行边界时调用 package 校验，保证：
+`WIPixelSize` 是唯一的像素尺寸类型。公开 initializer 将非正 width/height 归一到一个
+像素，避免常用尺寸 API 被 throwing construction 污染。ImageIO inspection 不使用这项
+容错：它先严格拒绝非正尺寸与 pixel-count overflow，再建立可信的 Source fact。
 
-- width 与 height 均为正数；
-- `width * height` 不发生整数溢出。
+`WIImageResizing.targetSize(for:)` 使用 `throws(WICompressError)`；自定义算法失败直接抛
+`.invalidResizing`，不再通过 `(0, 0)` 哨兵值把错误延迟到 Pipeline。Raster 执行前仍会
+拒绝 row-byte 或 bitmap-byte overflow；这里不引入“已验证 PixelSize”影子类型。
 
-非法自定义 resizing 结果仍映射为 `WICompressError.invalidResizingResult`。这里不再
-引入一个“已验证 PixelSize”影子类型；验证状态属于执行流程，不构成第二个数据领域。
+可以确定最近合法含义的偏好直接规范化：anchor clamp 到 `0...1`，quality clamp 到
+`0...1`，NaN 分别回退到中心和默认 quality。无法可靠推断意图的 ratio、scale 与
+Target hard byte contract 在构造时直接抛 `WICompressError`。
 
 ## 迁移结果
 

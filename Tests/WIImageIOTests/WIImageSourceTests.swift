@@ -39,7 +39,9 @@ struct WIImageSourceTests {
         #expect(descriptor.format == .jpeg)
         #expect(descriptor.pixelSize.width == 40)
         #expect(descriptor.pixelSize.height == 20)
-        #expect(descriptor.pixelSize.pixelCount == 800)
+        #expect(
+            descriptor.pixelSize.width * descriptor.pixelSize.height == 800
+        )
         #expect(descriptor.orientedPixelSize.width == 20)
         #expect(descriptor.orientedPixelSize.height == 40)
         #expect(descriptor.orientation == .right)

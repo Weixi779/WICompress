@@ -859,7 +859,7 @@ struct WICompressImageIOCoreTests {
                 maxBytes: 10_000,
                 sizing: WICompressionSizing(
                     maximumPixelSize: 1200,
-                    aspectRatio: WIAspectRatio(width: 1, height: 1)
+                    aspectRatio: .square
                 ),
                 output: WIImageOutput(
                     representation: .jpeg(background: .disallow)
@@ -878,7 +878,7 @@ struct WICompressImageIOCoreTests {
         let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
         let inputData = try Data(contentsOf: url)
         let pipeline = try ImagePipeline(data: inputData)
-        let target = WICompressionTarget(
+        let target = try WICompressionTarget(
             maxBytes: 60_000,
             sizing: WICompressionSizing(maximumPixelSize: 1200),
             output: WIImageOutput(representation: .jpeg(background: .disallow))
@@ -921,7 +921,7 @@ struct WICompressImageIOCoreTests {
     func pngTargetFailsAtMinimumPixelSize() throws {
         let url = try Self.resource("real_png_814x386_wide", extension: "png")
         let inputData = try Data(contentsOf: url)
-        let target = WICompressionTarget(
+        let target = try WICompressionTarget(
             maxBytes: 1,
             output: WIImageOutput(representation: .png)
         )
@@ -969,7 +969,7 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 100_000,
                 sizing: WICompressionSizing(
-                    aspectRatio: WIAspectRatio(width: 1, height: 1),
+                    aspectRatio: .square,
                     anchor: WICropAnchor(x: 0, y: 0.5)
                 ),
                 output: WIImageOutput(representation: .png)
@@ -1009,7 +1009,7 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 100_000,
                 sizing: WICompressionSizing(
-                    aspectRatio: WIAspectRatio(width: 1, height: 1),
+                    aspectRatio: .square,
                     anchor: WICropAnchor(x: 0.5, y: 0)
                 ),
                 output: WIImageOutput(representation: .png)
@@ -1049,7 +1049,7 @@ struct WICompressImageIOCoreTests {
             to: WICompressionTarget(
                 maxBytes: 100_000,
                 sizing: WICompressionSizing(
-                    aspectRatio: WIAspectRatio(width: 1, height: 1)
+                    aspectRatio: .square
                 ),
                 output: WIImageOutput(representation: .png)
             )
@@ -1100,7 +1100,7 @@ struct WICompressImageIOCoreTests {
                 maxBytes: 1_000_000,
                 sizing: WICompressionSizing(
                     maximumPixelSize: 200,
-                    aspectRatio: WIAspectRatio(width: 1, height: 1)
+                    aspectRatio: .square
                 ),
                 output: WIImageOutput(
                     representation: .preserve,

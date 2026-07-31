@@ -310,8 +310,7 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 ### Accept
 
 - `ImagePipeline` 是一次 terminal 调用唯一的状态与编排所有者。
-- Data、file URL 与外部意图直接进入 Pipeline；source-independent validation 可以先于
-  source creation。
+- Data、file URL 与已经建立自身不变量的外部意图直接进入 Pipeline。
 - Inspect 是函数；每次请求至多 inspect 原始输入一次，并由 Pipeline 持有输出的
   `Descriptor`。
 - Process 与 Target 是同一个 Pipeline 内的两种算法。
@@ -319,8 +318,8 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 - Target 候选始终从原始输入派生，encoded candidate 不回灌为下一轮输入。
 - geometry 相同而只有 quality 变化时可以复用 working `CGImage`。
 - 外部扩展只产生 concrete Domain facts，不扩展 Pipeline。
-- Target 的 source-independent validation、passthrough、反馈搜索与最终 hard byte
-  check 已由 Pipeline 直接持有，不再经过架构级中间类型。
+- Target 的 passthrough、反馈搜索与最终 hard byte check 已由 Pipeline 直接持有，不再
+  经过架构级中间类型；source-independent hard constraints 在 Domain 构造时完成。
 
 ### Reject
 
@@ -336,9 +335,10 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 
 - `WICompressor` 的 Process 与 Target terminal 均直接调用 package-only
   `ImagePipeline`；不存在第二个 package terminal 转发类型。
-- 两条产品线都先验证 source-independent intent，再创建并 inspect ImageIO source。
+- Process 数值偏好在 Domain 中完成规范化；Target、ratio 与 scale 的硬不变量在构造时
+  建立，Pipeline 不再重复验证这些事实。
 - Process 的 crop、resizing、output 分支选择与结果生成已经迁入 Pipeline。
-- Target 的 target validation、固定 crop/base size 解析、passthrough、候选搜索、
+- Target 的固定 crop/base size 解析、passthrough、候选搜索、
   working image 复用、候选选择与 hard byte check 已经迁入 Pipeline。
 - 架构级 Process/Target Resolver、`WIExecutionPlan`、`WIImageExecutor` 与
   `WICompressionSolver` 已删除。

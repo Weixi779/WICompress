@@ -18,60 +18,19 @@ extension ImagePipeline {
         _ data: Data,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WIResult {
-        try validate(target)
         let pipeline = try ImagePipeline(data: data)
-        return try pipeline.compressValidated(target)
+        return try pipeline.compress(target)
     }
 
     package static func compress(
         contentsOf url: URL,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WIResult {
-        try validate(target)
         let pipeline = try ImagePipeline(contentsOf: url)
-        return try pipeline.compressValidated(target)
+        return try pipeline.compress(target)
     }
 
     func compress(
-        _ target: WICompressionTarget,
-        maxEncodeAttempts: Int = defaultMaxEncodeAttempts
-    ) throws(WICompressError) -> WIResult {
-        try Self.validate(target)
-        return try compressValidated(
-            target,
-            maxEncodeAttempts: maxEncodeAttempts
-        )
-    }
-
-    private static func validate(
-        _ target: WICompressionTarget
-    ) throws(WICompressError) {
-        guard target.maxBytes > 0 else {
-            throw .invalidTarget
-        }
-
-        if let maximumPixelSize = target.sizing.maximumPixelSize,
-           maximumPixelSize <= 0 {
-            throw .invalidTarget
-        }
-
-        if let aspectRatio = target.sizing.aspectRatio {
-            do {
-                _ = try ImageCropGeometry.aspectRatio(
-                    of: WIImageCrop(
-                        aspectRatio: aspectRatio,
-                        anchor: target.sizing.anchor
-                    )
-                )
-            } catch {
-                throw .invalidTarget
-            }
-        } else if target.sizing.anchor != .center {
-            throw .invalidTarget
-        }
-    }
-
-    private func compressValidated(
         _ target: WICompressionTarget,
         maxEncodeAttempts: Int = defaultMaxEncodeAttempts
     ) throws(WICompressError) -> WIResult {
@@ -206,7 +165,7 @@ extension ImagePipeline {
                 quality: highQuality
             )
             let outputPixelSize = renderedImage.map {
-                WIPixelSize(width: $0.width, height: $0.height)
+                WIPixelSize(validWidth: $0.width, height: $0.height)
             } ?? pixelSize
             let outcome: FixedSizeOutcome
             do {
@@ -538,19 +497,9 @@ extension ImagePipeline {
         sizing: TargetGeometry,
         pixelSize: WIPixelSize
     ) throws(WICompressError) -> RenderGeometry {
-        let canvasSize: WIPixelSize
-        do {
-            canvasSize = try WIPixelSize(
-                validatingWidth: pixelSize.width,
-                height: pixelSize.height
-            )
-        } catch {
-            throw .invalidTarget
-        }
-
         return RenderGeometry(
             sourceRect: sizing.sourceRect,
-            canvasSize: canvasSize,
+            canvasSize: pixelSize,
             destinationRect: Rect(
                 x: 0,
                 y: 0,

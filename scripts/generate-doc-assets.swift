@@ -95,11 +95,11 @@ enum GenerateDocAssets {
                 filename: "real_jpeg_2098x1350_landscape.jpg",
                 note: "A WICompressionTarget solves bytes and geometry together for a 32 KB square thumbnail",
                 compression: .target(
-                    WICompressionTarget(
+                    try WICompressionTarget(
                         maxBytes: 32 * 1024,
                         sizing: WICompressionSizing(
                             maximumPixelSize: 200,
-                            aspectRatio: WIAspectRatio(width: 1, height: 1)
+                            aspectRatio: .square
                         ),
                         output: WIImageOutput(
                             representation: .jpeg(background: .white),

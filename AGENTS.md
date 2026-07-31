@@ -94,13 +94,13 @@ product target:
                WICompress
 ```
 
-`WIImageDomain` owns the public Process, Target, Output, pixel-size, and color
-values used directly by package execution. Package-only validation, `Rect`, and
-`Orientation` live beside those values; there are no mirrored Core models.
-`WIImageIO` owns the public result fact `WIImageFormat` and all package-only
-ImageIO primitives. `WICompressExecution` owns the request-scoped
-`ImagePipeline`, pure Process/Target calculations, `WICompressError`, and
-`WIResult`. `WICompress` re-exports the public contracts and contains only
+`WIImageDomain` owns the public Process, Target, Output, pixel-size, color,
+format, and error values used directly by package execution. Package-only
+`Rect`, `Orientation`, and trusted value construction live beside those values;
+there are no mirrored Core models. `WIImageIO` owns format detection and all
+package-only ImageIO primitives. `WICompressExecution` owns the request-scoped
+`ImagePipeline`, pure Process/Target calculations, and `WIResult`.
+`WICompress` re-exports the public contracts and contains only
 `WICompressor`, whose terminals call the package-only `ImagePipeline` directly.
 
 Process is the deterministic `Data`/`URL` in, `WIResult` out path:
@@ -108,7 +108,6 @@ Process is the deterministic `Data`/`URL` in, `WIResult` out path:
 ```text
 Data / URL + WIImageProcess
   -> ImagePipeline
-       validate source-independent Process facts before source creation
        inspect source
        crop -> WIImageResizing -> concrete geometry
        resolve output and choose return-original / source-copy / render
@@ -128,7 +127,6 @@ sizing/output) and returns a `WIResult`:
 ```text
 Data / URL + WICompressionTarget
   -> ImagePipeline
-       validate source-independent target facts before source creation
        inspect source and resolve fixed crop/base size/output
        passthrough when the original already satisfies every requirement
        otherwise run feedback search: shrink (outer) + quality (inner)
@@ -154,13 +152,15 @@ Key types:
    Process/Target decisions, Target candidate search, and ImageIO/Raster
    execution. Its package terminals are called directly by `WICompressor`;
    there is no second terminal forwarding type.
-6. **WIImageFormat** - public ImageIO-produced result fact
-   (JPEG/PNG/HEIF/unknown); callers do not initialize it from arbitrary data.
+6. **WIImageFormat** - public Domain value (JPEG/PNG/HEIF/unknown); ImageIO owns
+   detection from encoded sources and platform type identifiers.
 7. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
-8. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
+8. **WICompressError** - public Domain failure model (`LocalizedError`); the only
+   error thrown by public construction, resizing, and terminal APIs.
 9. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
    (`maxBytes` / `WICompressionSizing` / shared `WIImageOutput`) returning
-   `WIResult`. `ImagePipeline` validates the target, owns passthrough and the
+   `WIResult`. A throwing Target initializer establishes its hard byte invariant;
+   `ImagePipeline` owns passthrough and the
    byte-budget feedback search, and performs the final hard-limit check.
    Pure math lives in `Algorithm/`: Process/Target geometry (fixed crop + base
    candidate), `WICompressionSizeEstimation` (shrink + quality

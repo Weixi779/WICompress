@@ -27,7 +27,10 @@ package struct Descriptor: Sendable, Equatable {
 
     package var orientedPixelSize: WIPixelSize {
         orientation.swapsDimensions
-            ? WIPixelSize(width: pixelSize.height, height: pixelSize.width)
+            ? WIPixelSize(
+                validWidth: pixelSize.height,
+                height: pixelSize.width
+            )
             : pixelSize
     }
 }
