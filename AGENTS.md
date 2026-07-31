@@ -83,26 +83,23 @@ values used directly by package execution. Package-only validation, `Rect`, and
 `Orientation` live beside those values; there are no mirrored Core models.
 `WIImageIO` owns the public result fact `WIImageFormat` and all package-only
 ImageIO primitives. `WICompressExecution` owns the request-scoped
-`ImagePipeline`, transitional resolvers/plans/solver, `WICompressError`, and
-`WIResult`. `WICompress` re-exports the public contracts and contains only the
-terminal facade.
+`ImagePipeline`, transitional Target resolver/plan/solver, `WICompressError`,
+and `WIResult`. `WICompress` re-exports the public contracts and contains only
+the terminal facade.
 
 Process is the deterministic `Data`/`URL` in, `WIResult` out path:
 
 ```text
 Data / URL + WIImageProcess
   -> ImagePipeline
-  -> WIImageProcessResolver
-       crop -> WIImageResizing -> resolved geometry
-       output + quality -> WIExecutionPlan
-  -> ImagePipeline.execute
+       validate quality and source facts
+       crop -> WIImageResizing -> concrete geometry
+       resolve output and choose return-original / source-copy / render
        no crop shrink -> two-axis-safe ImageIO thumbnail
        axis upscaling -> full source
        crop -> oriented source + WIImageRaster
        encode -> WIImageIO
-  -> Data
-  -> ImageIO inspection
-  -> WIResult
+       encoded Data -> result inspection -> WIResult
 ```
 
 The Process file terminal keeps a file-backed ImageIO source. It reads the
@@ -135,17 +132,15 @@ Key types:
    and Target.
 5. **ImagePipeline** - request-scoped owner of the encoded input,
    `WIImageIO.Source`, `Descriptor`, original-byte lifecycle, and
-   ImageIO/Raster execution. Phase 1 has moved source and executor ownership
-   here; Process and Target decision types remain transitional.
-6. **WIExecutionPlan** - resolved Process execution facts; it contains no
-   resizing algorithm, crop intent, or public Policy.
-7. **WIImageProcessResolver** - resolves Process input into a shared
-   `WIExecutionPlan`.
-8. **WIImageFormat** - public ImageIO-produced result fact
+   Process decisions plus ImageIO/Raster execution. Target decision types
+   remain transitional until the next pipeline phase.
+6. **WIExecutionPlan** - transitional Target candidate execution facts; Process
+   no longer creates or consumes it.
+7. **WIImageFormat** - public ImageIO-produced result fact
    (JPEG/PNG/HEIF/unknown); callers do not initialize it from arbitrary data.
-9. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
-10. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
-11. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
+8. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
+9. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
+10. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
    (`maxBytes` / `WICompressionSizing` / shared `WIImageOutput`) returning
    `WIResult`.
    `WICompressionTargetValidator` checks legality, `WICompressionTargetResolver`

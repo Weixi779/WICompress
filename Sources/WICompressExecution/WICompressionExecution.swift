@@ -34,16 +34,7 @@ package enum WICompressionExecution {
         _ pipeline: ImagePipeline,
         using process: WIImageProcess
     ) throws(WICompressError) -> WIResult {
-        let executionPlan = try WIImageProcessResolver.resolve(
-            process,
-            pipeline: pipeline
-        )
-        if executionPlan.operation == .returnOriginal {
-            return try pipeline.originalResult()
-        }
-
-        let outputData = try pipeline.execute(executionPlan)
-        return try pipeline.result(for: outputData)
+        try pipeline.process(process)
     }
 
     /// Compresses image data to satisfy a target contract.

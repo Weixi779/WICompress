@@ -246,7 +246,8 @@ quality，执行层不能用“原图更小”绕过该合同。
 
 ## 同步与异步
 
-同步与异步 terminal 使用同一 Domain、resolver、Raster 和 ImageIO primitive：
+同步与异步 terminal 使用同一 Domain、`ImagePipeline`、Raster 和 ImageIO
+primitive：
 
 ```text
 sync terminal  -> 在当前调用上下文完整执行
@@ -258,8 +259,7 @@ suspension point。
 
 当前同步 base name 已确认为 `WICompressor.process(_:using:)` 与
 `WICompressor.process(contentsOf:using:)`。异步 overload 尚未加入；它必须消费同一个
-`ImagePipeline` 同步核心，不能建立第二套 resolver 或改变执行语义。当前
-`WIImageProcessResolver -> WIExecutionPlan` 仍是待迁移的过渡决策路径。
+`ImagePipeline` 同步核心，不能建立第二套决策路径或改变执行语义。
 
 ## 当前实施状态
 
@@ -268,8 +268,9 @@ suspension point。
   `WIImageProcess`。
 - 已实现纯 `crop -> resizing` geometry resolver；无效 quality、crop 和 resizing
   结果明确失败。
-- 已实现同步 Data/file terminal 和独立 `WIExecutionPlan`；新 Process 不经过
-  `WICompressOptions` 或 `WIWritePlanResolver`。
+- 已实现同步 Data/file terminal；Process 的校验、output 解释、执行分支选择和结果
+  生成由请求级 `ImagePipeline` 直接持有，不经过 `WIExecutionPlan`、旧
+  `WICompressOptions` 或 Resolver。
 - 无 crop 的缩小复用 ImageIO thumbnail；thumbnail max pixel 由目标宽、高两个轴
   共同反推，不能先把任一目标轴所需的源样本降掉再放大。需要放大任一轴时使用完整
   source。crop 使用完整 oriented source，并在 Raster 中把
@@ -278,13 +279,14 @@ suspension point。
   读取完整原始 `Data`。
 - 1.x `compress(_:options:)`、旧 Policy 名称和 legacy write-plan resolver
   已删除；2.0 不维护第二套 Process 架构。
-- `WICompressionTarget` 已共享 `WIImageOutput` 和 `WIExecutionPlan`；两条产品线
-  在 resolved execution boundary 汇合，但仍保留各自 resolver。
+- `WICompressionTarget` 已共享 `WIImageOutput`；两条产品线共用同一个
+  `ImagePipeline` 和底层执行能力。Target 的 Plan/Resolver 仍是待迁移实现，不再是
+  Process 架构。
 - 尚未实现 async terminal。
 
 ## 已接受
 
-- Process 与 Target 是两条产品线，只在 internal execution plan 汇合。
+- Process 与 Target 是两条产品线，由同一个 internal `ImagePipeline` 编排。
 - Process 返回 `WIResult`，执行一次，不以 byte count 作为反向求解目标。
 - Sizing 只有 original 或一个 `WIImageResizing` 插槽。
 - `WIImageResizing` 的合同是完整 `PixelSize -> PixelSize`。

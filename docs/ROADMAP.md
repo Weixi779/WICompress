@@ -48,13 +48,15 @@ Implementation status:
   pixel-size, and color values used directly by ImageIO, Raster, and Execution.
   Mirrored Core values and product-boundary field conversions have been removed.
 - Completed: request-scoped `ImagePipeline` owns source and ImageIO/Raster
-  execution; transitional resolvers, plans, and solver remain until the next
-  pipeline phases. The public `WICompress` target is an umbrella facade.
+  execution. Process validation and decision ownership now live directly in the
+  pipeline without a Process Resolver or ExecutionPlan; transitional Target
+  resolver, plan, and solver remain for the next phase. The public `WICompress`
+  target is an umbrella facade.
 - Completed: `WIImageFormat` is an ImageIO-produced public result fact. It has no
   public Data detection initializer; source inspection produces it once.
 - Completed: synchronous `WIImageProcess` vertical slice with public
   `WIPixelSize`, resizing slot and built-ins, aspect-ratio crop, shared Output
-  values, pure geometry resolution, and a resolved execution plan.
+  values, pure geometry calculation, and direct pipeline execution.
 - Completed: file-backed Process URL execution, on-demand original-byte reads,
   two-axis-safe thumbnail sampling, and overflow validation before Raster.
 - Completed: Target now uses the shared `WIImageOutput`; its frozen default is

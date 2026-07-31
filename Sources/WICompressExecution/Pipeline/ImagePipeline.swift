@@ -8,6 +8,7 @@
 
 import CoreGraphics
 import Foundation
+import UniformTypeIdentifiers
 import WIImageDomain
 import WIImageIO
 import WIImageRaster
@@ -133,24 +134,50 @@ final class ImagePipeline {
         case .returnOriginal:
             return try originalData()
         case .copyFromSource:
-            do {
-                return try source.copy(
-                    as: plan.destinationType,
-                    options: CopyOptions(
-                        compressionQuality: plan.quality,
-                        metadata: plan.metadata
-                    )
-                )
-            } catch {
-                throw Self.mapExecutionError(
-                    error,
-                    destinationFormat: plan.destinationFormat
-                )
-            }
+            return try copyFromSource(
+                as: plan.destinationType,
+                destinationFormat: plan.destinationFormat,
+                metadata: plan.metadata,
+                quality: plan.quality
+            )
         case .render:
             let image = try render(plan)
             return try encodeRendered(image, plan: plan)
         }
+    }
+
+    func copyFromSource(
+        output: WIResolvedImageOutput,
+        metadata: WIImageMetadataOptions,
+        quality: Double?
+    ) throws(WICompressError) -> Data {
+        try copyFromSource(
+            as: output.destinationType,
+            destinationFormat: output.destinationFormat,
+            metadata: metadata,
+            quality: quality
+        )
+    }
+
+    func renderAndEncode(
+        geometry: WIResolvedRender,
+        output: WIResolvedImageOutput,
+        metadata: WIImageMetadataOptions,
+        quality: Double?
+    ) throws(WICompressError) -> Data {
+        let image = try render(
+            geometry: geometry,
+            destinationFormat: output.destinationFormat,
+            jpegBackground: output.jpegBackground,
+            outputColorSpace: output.colorSpace
+        )
+        return try encodeRendered(
+            image,
+            as: output.destinationType,
+            destinationFormat: output.destinationFormat,
+            metadata: metadata,
+            quality: quality
+        )
     }
 
     func render(
@@ -172,20 +199,58 @@ final class ImagePipeline {
         _ image: CGImage,
         plan: WIExecutionPlan
     ) throws(WICompressError) -> Data {
+        try encodeRendered(
+            image,
+            as: plan.destinationType,
+            destinationFormat: plan.destinationFormat,
+            metadata: plan.metadata,
+            quality: plan.quality
+        )
+    }
+
+    private func copyFromSource(
+        as destinationType: UTType,
+        destinationFormat: WIImageFormat,
+        metadata: WIImageMetadataOptions,
+        quality: Double?
+    ) throws(WICompressError) -> Data {
+        do {
+            return try source.copy(
+                as: destinationType,
+                options: CopyOptions(
+                    compressionQuality: quality,
+                    metadata: metadata
+                )
+            )
+        } catch {
+            throw Self.mapExecutionError(
+                error,
+                destinationFormat: destinationFormat
+            )
+        }
+    }
+
+    private func encodeRendered(
+        _ image: CGImage,
+        as destinationType: UTType,
+        destinationFormat: WIImageFormat,
+        metadata: WIImageMetadataOptions,
+        quality: Double?
+    ) throws(WICompressError) -> Data {
         do {
             return try Encoder.encode(
                 image,
-                as: plan.destinationType,
+                as: destinationType,
                 options: EncodeOptions(
-                    compressionQuality: plan.quality,
-                    metadata: plan.metadata
+                    compressionQuality: quality,
+                    metadata: metadata
                 ),
                 metadataFrom: source
             )
         } catch {
             throw Self.mapExecutionError(
                 error,
-                destinationFormat: plan.destinationFormat
+                destinationFormat: destinationFormat
             )
         }
     }

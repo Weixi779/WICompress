@@ -1,7 +1,7 @@
 # WICompress 2.0 Image Pipeline
 
-状态：内部编排边界已冻结；Phase 1 已由 `ImagePipeline` 接管 source 与 execution
-生命周期，Process/Target 决策迁移尚未实施。
+状态：内部编排边界已冻结；Phase 2 已由 `ImagePipeline` 接管 Process 的校验、决策与
+执行，Target 的反馈搜索迁移尚未实施。
 
 本文是 WICompress 2.0 内部图片执行架构的单一来源。它定义一次 terminal 调用由谁持有
 输入、检查结果、工作像素和执行决策，也明确哪些已有中间层不再属于最终架构。

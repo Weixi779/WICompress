@@ -32,10 +32,7 @@ enum WICompressionTargetResolver {
         for target: WICompressionTarget,
         pipeline: ImagePipeline
     ) throws(WICompressError) -> WIResolvedImageOutput {
-        try WIImageOutputResolver.resolve(
-            target.output,
-            pipeline: pipeline
-        )
+        try pipeline.resolveOutput(target.output)
     }
 
     static func canReturnOriginal(

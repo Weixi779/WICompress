@@ -1,5 +1,5 @@
 //
-//  WIImageOutputResolver.swift
+//  ImagePipeline+Output.swift
 //  WICompressExecution
 //
 //  Created by weixi on 2026/7/30.
@@ -31,19 +31,14 @@ struct WIResolvedImageOutput: Sendable, Equatable {
     }
 }
 
-enum WIImageOutputResolver {
-    static func resolve(
-        _ output: WIImageOutput,
-        pipeline: ImagePipeline
+extension ImagePipeline {
+    func resolveOutput(
+        _ output: WIImageOutput
     ) throws(WICompressError) -> WIResolvedImageOutput {
-        let destination = try resolvedDestination(
-            for: output.representation,
-            descriptor: pipeline.descriptor
+        let destination = try destination(
+            for: output.representation
         )
-        let colorSpace = try resolvedColorSpace(
-            output.colorSpace,
-            pipeline: pipeline
-        )
+        let colorSpace = try outputColorSpace(output.colorSpace)
         let isWritable = Capabilities.canEncode(destination.type)
 
         return WIResolvedImageOutput(
@@ -54,9 +49,8 @@ enum WIImageOutputResolver {
         )
     }
 
-    private static func resolvedDestination(
-        for representation: WIImageRepresentation,
-        descriptor: WIImageIO.Descriptor
+    private func destination(
+        for representation: WIImageRepresentation
     ) throws(WICompressError) -> (
         type: UTType,
         jpegBackground: WIJPEGBackground?
@@ -88,7 +82,7 @@ enum WIImageOutputResolver {
         }
     }
 
-    private static func validateJPEGBackground(
+    private func validateJPEGBackground(
         _ background: WIJPEGBackground
     ) throws(WICompressError) {
         guard case .color(let color) = background else {
@@ -104,16 +98,15 @@ enum WIImageOutputResolver {
         }
     }
 
-    private static func resolvedColorSpace(
-        _ decision: WIImageColorSpace,
-        pipeline: ImagePipeline
+    private func outputColorSpace(
+        _ decision: WIImageColorSpace
     ) throws(WICompressError) -> WIResolvedOutputColorSpace {
         switch decision {
         case .preserve:
             return WIResolvedOutputColorSpace(target: nil)
         case .convert(let target):
             _ = try makeCGColorSpace(target)
-            let sourceColorSpace = try pipeline.sourceColorSpace()
+            let sourceColorSpace = try sourceColorSpace()
             return WIResolvedOutputColorSpace(
                 target: sourceColorSpace == target
                     ? nil
@@ -122,7 +115,7 @@ enum WIImageOutputResolver {
         }
     }
 
-    private static func makeCGColorSpace(
+    private func makeCGColorSpace(
         _ colorSpace: WIColorSpace
     ) throws(WICompressError) -> CGColorSpace {
         do {

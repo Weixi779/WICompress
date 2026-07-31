@@ -63,6 +63,16 @@ struct WICompressImageIOCoreTests {
         }
     }
 
+    private struct DecodedPixels: Equatable {
+        let width: Int
+        let height: Int
+        let bitsPerComponent: Int
+        let bitsPerPixel: Int
+        let bytesPerRow: Int
+        let bitmapInfo: UInt32
+        let data: Data
+    }
+
     private static func resource(_ name: String, extension ext: String) throws -> URL {
         try #require(
             Bundle.module.url(
@@ -97,6 +107,27 @@ struct WICompressImageIOCoreTests {
         let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
         let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
         return image.colorSpace?.name as String?
+    }
+
+    private static func decodedPixels(_ data: Data) throws -> DecodedPixels {
+        let source = try #require(
+            CGImageSourceCreateWithData(data as CFData, nil)
+        )
+        let image = try #require(
+            CGImageSourceCreateImageAtIndex(source, 0, nil)
+        )
+        let provider = try #require(image.dataProvider)
+        let pixels = try #require(provider.data)
+
+        return DecodedPixels(
+            width: image.width,
+            height: image.height,
+            bitsPerComponent: image.bitsPerComponent,
+            bitsPerPixel: image.bitsPerPixel,
+            bytesPerRow: image.bytesPerRow,
+            bitmapInfo: image.bitmapInfo.rawValue,
+            data: pixels as Data
+        )
     }
 
     private static func pixelColor(_ data: Data, x: Int, y: Int) throws -> PixelColor {
@@ -419,29 +450,21 @@ struct WICompressImageIOCoreTests {
                 colorSpace: .preserve
             )
         )
-        let pipeline = try ImagePipeline(data: inputData)
-        #expect(pipeline.descriptor.hasUnmodeledMetadata)
-        let plan = try WIImageProcessResolver.resolve(
-            process,
-            pipeline: pipeline
-        )
-
-        guard case .copyFromSource = plan.operation else {
-            Issue.record("GPS-only filtering should use ImageIO source copy")
-            return
-        }
 
         let outputData = try WICompressor.process(
             inputData,
             using: process
         ).data
         let outputInfo = try Self.imageInfo(outputData)
+        let inputPixels = try Self.decodedPixels(inputData)
+        let outputPixels = try Self.decodedPixels(outputData)
 
         #expect(try imageFormat(of: outputData) == imageFormat(of: inputData))
         #expect(outputInfo.hasGPS == false)
         #expect(outputInfo.orientation == inputInfo.orientation)
         #expect(outputInfo.displayWidth == inputInfo.displayWidth)
         #expect(outputInfo.displayHeight == inputInfo.displayHeight)
+        #expect(outputPixels == inputPixels)
     }
 
     @Test("Strip rewrites sources containing unmodeled metadata")
@@ -465,16 +488,6 @@ struct WICompressImageIOCoreTests {
                 colorSpace: .preserve
             )
         )
-        let pipeline = try ImagePipeline(data: inputData)
-        let plan = try WIImageProcessResolver.resolve(
-            process,
-            pipeline: pipeline
-        )
-
-        guard case .render = plan.operation else {
-            Issue.record("Unmodeled metadata must not use passthrough")
-            return
-        }
 
         let outputData = try WICompressor.process(
             inputData,
@@ -687,33 +700,32 @@ struct WICompressImageIOCoreTests {
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) <= 1200)
     }
 
-    @Test("Display P3 profile survives copyFromSource")
+    @Test("Display P3 profile and pixels survive metadata-only source copy")
     func displayP3ProfileSurvivesCopyFromSource() throws {
         let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
         let inputData = try Data(contentsOf: url)
         let inputInfo = try Self.imageInfo(inputData)
         try #require(inputInfo.profileName == "Display P3", "Fixture should be Display P3")
+        try #require(inputInfo.hasGPS, "Fixture should contain GPS metadata")
 
         let process = WIImageProcess(
             sizing: .original,
-            quality: 0.6,
+            quality: nil,
             output: WIImageOutput(
                 representation: .preserve,
-                metadata: .preserve,
+                metadata: .preserve.subtracting(.gps),
                 colorSpace: .preserve
             )
-        )
-        let pipeline = try ImagePipeline(data: inputData)
-        let executionPlan = try WIImageProcessResolver.resolve(
-            process,
-            pipeline: pipeline
         )
 
         let outputData = try WICompressor.process(inputData, using: process).data
         let outputInfo = try Self.imageInfo(outputData)
+        let inputPixels = try Self.decodedPixels(inputData)
+        let outputPixels = try Self.decodedPixels(outputData)
 
-        #expect(executionPlan.operation == .copyFromSource)
         #expect(outputInfo.profileName == inputInfo.profileName)
+        #expect(outputInfo.hasGPS == false)
+        #expect(outputPixels == inputPixels)
     }
 
     @Test("Display P3 profile survives redrawBitmap")
@@ -732,19 +744,10 @@ struct WICompressImageIOCoreTests {
                 colorSpace: .preserve
             )
         )
-        let pipeline = try ImagePipeline(data: inputData)
-        let executionPlan = try WIImageProcessResolver.resolve(
-            process,
-            pipeline: pipeline
-        )
 
         let outputData = try WICompressor.process(inputData, using: process).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        guard case .render = executionPlan.operation else {
-            Issue.record("Expected render execution")
-            return
-        }
         #expect(outputInfo.profileName == inputInfo.profileName)
     }
 
@@ -754,13 +757,11 @@ struct WICompressImageIOCoreTests {
         let inputData = try Data(contentsOf: url)
         let pipeline = try ImagePipeline(data: inputData)
 
-        let preservedOutput = try WIImageOutputResolver.resolve(
-            WIImageOutput(colorSpace: .preserve),
-            pipeline: pipeline
+        let preservedOutput = try pipeline.resolveOutput(
+            WIImageOutput(colorSpace: .preserve)
         )
-        let convertedOutput = try WIImageOutputResolver.resolve(
-            WIImageOutput(colorSpace: .convert(to: .sRGB)),
-            pipeline: pipeline
+        let convertedOutput = try pipeline.resolveOutput(
+            WIImageOutput(colorSpace: .convert(to: .sRGB))
         )
 
         #expect(preservedOutput.colorSpace.requiresConversion == false)

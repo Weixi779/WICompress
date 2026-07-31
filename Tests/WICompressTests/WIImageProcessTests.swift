@@ -404,24 +404,24 @@ struct WIImageProcessTests {
     @Test("Declaring a crop requires rendering even when its ratio already matches")
     func declaredCropRequiresRendering() throws {
         let data = try Self.resourceData(
-            "synthetic_tiny_1x1",
-            extension: "png"
+            "real_heic_4032x3024_o6_gps_hdr",
+            extension: "heic"
         )
-        let pipeline = try ImagePipeline(data: data)
-        let plan = try WIImageProcessResolver.resolve(
-            WIImageProcess(
+        let input = try WIImageIO.Source(data: data)
+        let output = try WICompressor.process(
+            data,
+            using: WIImageProcess(
                 sizing: .original,
-                crop: .aspectRatio(width: 1, height: 1),
+                crop: .aspectRatio(width: 3, height: 4),
                 quality: nil,
                 output: WIImageOutput(metadata: .preserve)
-            ),
-            pipeline: pipeline
-        )
+            )
+        ).data
+        let result = try WIImageIO.Source(data: output)
 
-        guard case .render = plan.operation else {
-            Issue.record("A declared crop must not use passthrough")
-            return
-        }
+        #expect(input.descriptor.orientation != .up)
+        #expect(result.descriptor.orientation == .up)
+        #expect(output != data)
     }
 
     @Test("Process preserves selected metadata while baking orientation")
