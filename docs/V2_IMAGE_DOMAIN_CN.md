@@ -1,8 +1,8 @@
 # WIImageDomain 与 WICompressDomain
 
 状态：已实现。`WIImageDomain` 是共享图片事实的基础 target，`WICompressDomain`
-拥有压缩请求语义；两者目前都不声明独立 library product，调用方仍然只需
-`import WICompress`。
+拥有压缩请求语义；两者不声明独立 library product。压缩调用方只需
+`import WICompress`，需要底层编解码能力的调用方可以单独 `import WIImageIO`。
 
 ## 为什么需要 Domain
 
@@ -35,8 +35,8 @@
 - `WIColor` / `WIColorSpace`
 - `WIImageMetadataOptions`
 - `WIImageFormat`
-- package-only `Rect` / `Orientation`
-- `WICompressError`（在独立 `WIImageIO.Error` 建立前暂时留在共享层）
+- `WIImageOrientation`
+- package-only `Rect`
 
 `WICompressDomain` 拥有调用方描述压缩意图的值：
 
@@ -45,6 +45,7 @@
 - `WIImageCrop` / `WIAspectRatio` / `WICropAnchor`
 - `WIImageOutput` / representation / metadata / color-space decisions
 - `WICompressionTarget` / `WICompressionSizing`
+- `WICompressError`
 
 Luban 纯尺寸算法与数值规范化留在 `WICompressDomain`，作为请求构造和
 `WIImageResize.luban` 的实现细节。
@@ -55,7 +56,8 @@ Luban 纯尺寸算法与数值规范化留在 `WICompressDomain`，作为请求�
   `WIImageFormat` 表达。
 - `WIImageMetadataOptions` 属于共享 Output Domain；ImageIO Descriptor 直接使用它
   表达源图实际存在的受支持 metadata 类别。
-- `Source`、Descriptor、thumbnail、encode 和 runtime capability 属于 `WIImageIO`。
+- `Reader`、Descriptor、Frame、thumbnail、encode 和 runtime capability 属于
+  `WIImageIO`；该 target 同时发布独立 product。
 - bitmap context、orientation render、Alpha surface 和颜色转换属于
   `WIImageRaster`。
 - 请求级 `ImagePipeline`、Target 反馈搜索与公开结果 `WIResult` 属于
@@ -87,3 +89,5 @@ Target hard byte contract 在构造时直接抛 `WICompressError`。
 - ImageIO、Raster、Compress Domain 与 Execution 直接消费同一套共享图片事实。
 - Process、Target、Output、Crop、Resizing 与 Luban 从共享图片事实中拆到
   `WICompressDomain`，避免独立 ImageIO product 携带整套压缩请求语义。
+- `WICompressError` 归属 `WICompressDomain`；独立产品的底层失败由
+  `WIImageIO.Error` 表达，并在 Pipeline 边界映射。

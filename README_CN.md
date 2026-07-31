@@ -66,6 +66,9 @@ dependencies: [
 ]
 ```
 
+Package 发布两个 library product：压缩场景使用 `WICompress`；只有在确实需要底层
+typed ImageIO 链路时才直接依赖 `WIImageIO`。
+
 ## 压缩效果预览
 
 下面这张对比图由 `scripts/generate-doc-assets.swift` 基于仓库内的真图
@@ -171,6 +174,28 @@ let thumbnail = try WICompressor.compress(
 print(thumbnail.byteCount)
 print(thumbnail.pixelSize)
 ```
+
+## 底层 ImageIO 能力
+
+`WIImageIO` 是独立的同步 product，提供 inspect、decode、thumbnail、source copy 和
+encode，同时不暴露 `CGImageSource`、`CGImageDestination` 与 properties 字典：
+
+```swift
+import WIImageIO
+
+let reader = try WIImageIO.read(originalData)
+let descriptor = reader.descriptor
+
+let encoded = try reader
+    .thumbnail(options: .init(maximumPixelSize: 1200))
+    .encode(
+        as: .jpeg,
+        options: .init(compressionQuality: 0.75)
+    )
+```
+
+只要 options 允许，这条链会保留来源 metadata 和 orientation。它抛出
+`WIImageIO.Error`；执行线程和 actor 切换仍由调用方决定。
 
 ## 和 UIKit / AppKit 一起使用
 

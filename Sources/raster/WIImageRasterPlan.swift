@@ -27,7 +27,7 @@ extension WIImageRaster {
         package var canvasSize: WIPixelSize
         package var sourceRect: Rect
         package var destinationRect: Rect
-        package var orientation: Orientation
+        package var orientation: WIImageOrientation
         package var alphaMode: AlphaMode
         package var canvasBackground: WIColor?
         package var imageBackground: WIColor?
@@ -37,7 +37,7 @@ extension WIImageRaster {
             canvasSize: WIPixelSize,
             sourceRect: Rect,
             destinationRect: Rect,
-            orientation: Orientation = .up,
+            orientation: WIImageOrientation = .up,
             alphaMode: AlphaMode = .preserve,
             canvasBackground: WIColor? = nil,
             imageBackground: WIColor? = nil,

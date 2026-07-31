@@ -18,10 +18,10 @@ struct WIImageDomainTests {
     }
 
     @Test(
-        "Orientation identifies display-axis swaps",
-        arguments: Orientation.allCases
+        "WIImageOrientation identifies display-axis swaps",
+        arguments: WIImageOrientation.allCases
     )
-    func orientationAxisSwap(_ orientation: Orientation) {
+    func orientationAxisSwap(_ orientation: WIImageOrientation) {
         let expected = [5, 6, 7, 8].contains(orientation.rawValue)
 
         #expect(orientation.swapsDimensions == expected)

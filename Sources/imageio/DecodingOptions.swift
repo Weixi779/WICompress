@@ -6,26 +6,30 @@
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
-package struct DecodeOptions: Hashable, Sendable {
-    package var cacheImmediately: Bool
+extension WIImageIO {
+    /// Pixel decoding behavior for a full image frame.
+    public struct DecodeOptions: Hashable, Sendable {
+        public var cacheImmediately: Bool
 
-    package init(cacheImmediately: Bool = true) {
-        self.cacheImmediately = cacheImmediately
+        public init(cacheImmediately: Bool = true) {
+            self.cacheImmediately = cacheImmediately
+        }
     }
-}
 
-package struct ThumbnailOptions: Hashable, Sendable {
-    package var maximumPixelSize: Int?
-    package var appliesOrientationTransform: Bool
-    package var cacheImmediately: Bool
+    /// ImageIO thumbnail decoding behavior.
+    public struct ThumbnailOptions: Hashable, Sendable {
+        public var maximumPixelSize: Int?
+        public var appliesOrientationTransform: Bool
+        public var cacheImmediately: Bool
 
-    package init(
-        maximumPixelSize: Int? = nil,
-        appliesOrientationTransform: Bool = true,
-        cacheImmediately: Bool = true
-    ) {
-        self.maximumPixelSize = maximumPixelSize
-        self.appliesOrientationTransform = appliesOrientationTransform
-        self.cacheImmediately = cacheImmediately
+        public init(
+            maximumPixelSize: Int? = nil,
+            appliesOrientationTransform: Bool = true,
+            cacheImmediately: Bool = true
+        ) {
+            self.maximumPixelSize = maximumPixelSize
+            self.appliesOrientationTransform = appliesOrientationTransform
+            self.cacheImmediately = cacheImmediately
+        }
     }
 }

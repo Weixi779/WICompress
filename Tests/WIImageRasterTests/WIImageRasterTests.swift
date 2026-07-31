@@ -168,11 +168,11 @@ struct WIImageRasterTests {
     }
 
     @Test(
-        "Orientation rendering matches the ImageIO display transform",
-        arguments: Orientation.allCases
+        "WIImageOrientation rendering matches the ImageIO display transform",
+        arguments: WIImageOrientation.allCases
     )
     func orientationMatchesImageIO(
-        _ orientation: Orientation
+        _ orientation: WIImageOrientation
     ) throws {
         let data = try Self.quadrantJPEG(
             width: 8,

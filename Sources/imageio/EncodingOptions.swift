@@ -8,31 +8,35 @@
 
 import WIImageDomain
 
-package struct CopyOptions: Hashable, Sendable {
-    package var maximumPixelSize: Int?
-    package var compressionQuality: Double?
-    package var metadata: WIImageMetadataOptions
+extension WIImageIO {
+    /// Source-copy encoding behavior that avoids pixel decoding when supported.
+    public struct CopyOptions: Hashable, Sendable {
+        public var maximumPixelSize: Int?
+        public var compressionQuality: Double?
+        public var metadata: MetadataOptions
 
-    package init(
-        maximumPixelSize: Int? = nil,
-        compressionQuality: Double? = nil,
-        metadata: WIImageMetadataOptions = .preserve
-    ) {
-        self.maximumPixelSize = maximumPixelSize
-        self.compressionQuality = compressionQuality
-        self.metadata = metadata
+        public init(
+            maximumPixelSize: Int? = nil,
+            compressionQuality: Double? = nil,
+            metadata: MetadataOptions = .preserve
+        ) {
+            self.maximumPixelSize = maximumPixelSize
+            self.compressionQuality = compressionQuality
+            self.metadata = metadata
+        }
     }
-}
 
-package struct EncodeOptions: Hashable, Sendable {
-    package var compressionQuality: Double?
-    package var metadata: WIImageMetadataOptions
+    /// Pixel encoding quality and metadata behavior.
+    public struct EncodeOptions: Hashable, Sendable {
+        public var compressionQuality: Double?
+        public var metadata: MetadataOptions
 
-    package init(
-        compressionQuality: Double? = nil,
-        metadata: WIImageMetadataOptions = .strip
-    ) {
-        self.compressionQuality = compressionQuality
-        self.metadata = metadata
+        public init(
+            compressionQuality: Double? = nil,
+            metadata: MetadataOptions = .strip
+        ) {
+            self.compressionQuality = compressionQuality
+            self.metadata = metadata
+        }
     }
 }

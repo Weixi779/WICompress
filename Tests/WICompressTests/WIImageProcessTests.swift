@@ -469,7 +469,7 @@ struct WIImageProcessTests {
                 )
             )
         ).data
-        #expect(try WIImageIO.colorSpace(output) == .sRGB)
+        #expect(try WIImageIO.read(output).colorSpace() == .sRGB)
     }
 
     @Test("Data and file Process terminals have equivalent behavior")
@@ -497,7 +497,7 @@ struct WIImageProcessTests {
         try data.write(to: url)
 
         let pipeline = try ImagePipeline(contentsOf: url)
-        guard case .file(let backingURL) = pipeline.input else {
+        guard case .file(let backingURL) = pipeline.reader.input else {
             Issue.record("The file terminal must keep a file-backed source")
             return
         }

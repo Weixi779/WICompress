@@ -173,9 +173,9 @@ copy     encoded input -> Data
 encode   CGImage       -> Data
 ```
 
-它可以在内部使用 scoped source handle、`CGImageSource`、`CGImageDestination` 和 typed
-options，但这些不是产品架构节点。特别是 file-backed source 仍应避免无条件把完整文件
-读入内存。
+它通过 `WIImageIO.Reader` 持有请求级 encoded input，并在模块内部使用
+`CGImageSource`、`CGImageDestination` 和 typed options。特别是 file-backed Reader
+仍应避免无条件把完整文件读入内存。
 
 ImageIO 不知道：
 
@@ -283,7 +283,7 @@ Pipeline 本身完全封闭：
 - 不使用 `WI` 公共品牌前缀。
 - 不提供 stage protocol、processor registry 或插件。
 - 不允许调用方插入任意 decode、Raster 或 encode 节点。
-- 不公开 working `CGImage`、source handle 或 Pipeline 生命周期。
+- 不公开 working `CGImage`、Pipeline 内部 Reader 或 Pipeline 生命周期。
 
 外部扩展发生在已经冻结的 Domain 插槽，例如 `WIImageResizing`：
 
@@ -352,7 +352,7 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 - working image 是否需要一个按 geometry 标识的私有缓存值。
 - 异步 terminal 的 Task 结构与 custom TaskExecutor 选择。
 - 异步 priority 映射、cancellation 检查点与传播方式。
-- 未来是否发布独立 ImageIO 或 Raster product。
+- 未来是否发布独立 Raster product。
 - 新的像素 backend、动图和 HDR execution。
 
 这些延后项不影响当前 Pipeline 所有权，也不能作为提前建立抽象的理由。

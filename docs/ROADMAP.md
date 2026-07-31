@@ -18,10 +18,10 @@ The two public product lines are tracked separately:
 The 1.x-to-2.0 source migration is tracked in
 [`V2_MIGRATION_CN.md`](V2_MIGRATION_CN.md).
 
-The internal ImageIO execution boundary is tracked in
-[`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md). It freezes the package-only target,
-typed source/options, synchronous primitive model, and static-image scope without
-exposing ImageIO implementation details to either public product line.
+The ImageIO boundary is tracked in
+[`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md). It freezes the public `WIImageIO`
+product, typed `Reader → Frame → encode` chain, synchronous primitive model, and
+static-image scope without exposing raw ImageIO implementation details.
 
 The internal Core Graphics raster boundary is tracked in
 [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md). It freezes the package-only
@@ -35,9 +35,9 @@ not an implementation contract.
 The 2.0 product and infrastructure boundaries are conceptually complete.
 Implementation status:
 
-- Completed: Swift 6.2 package baseline and package-only `WIImageIO` target.
-- Completed: typed source inspection, decode, thumbnail, source copy, pixel
-  encode, runtime capabilities, and ImageIO error mapping.
+- Completed: Swift 6.2 package baseline and public `WIImageIO` product.
+- Completed: typed Reader inspection, Frame decode/thumbnail, source copy,
+  chained encode, runtime capabilities, and Pipeline error mapping.
 - Completed: removal of the temporary `CGImageSource` migration bridge; the
   `WICompress` target no longer owns raw ImageIO source/destination operations.
 - Completed: package-only `WIImageRaster` target with one resolved-plan entry;
@@ -55,9 +55,9 @@ Implementation status:
   pipeline without architecture-level Resolver, ExecutionPlan, Executor, or
   Solver types. `WICompressor` calls the package-only Pipeline terminals
   directly; the public `WICompress` target remains an umbrella facade.
-- Completed: `WIImageFormat` and `WICompressError` are public Domain values.
-  ImageIO owns format detection; package-only ImageIO/Raster failures are mapped
-  to the shared Domain error at the Pipeline boundary.
+- Completed: `WIImageFormat` is a shared Image Domain fact and
+  `WICompressError` belongs to Compress Domain. ImageIO owns format detection
+  and exposes `WIImageIO.Error`; the Pipeline maps it to the terminal error.
 - Completed: synchronous `WIImageProcess` vertical slice with public
   `WIPixelSize`, resizing slot and built-ins, aspect-ratio crop, shared Output
   values, pure geometry calculation, and direct pipeline execution.

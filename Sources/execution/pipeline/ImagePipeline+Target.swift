@@ -488,11 +488,12 @@ extension ImagePipeline {
                 target.output.metadata != .strip
                     || descriptor.orientation == .up
             )
-            && WIImageIO.canCopy(
-                descriptor,
+            && reader.canCopy(
                 as: output.destinationType,
-                keeping: target.output.metadata,
-                compressionQuality: quality
+                options: WIImageIO.CopyOptions(
+                    compressionQuality: quality,
+                    metadata: target.output.metadata
+                )
             )
     }
 

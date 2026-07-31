@@ -150,11 +150,10 @@ Data
   -> final encoded Data
 ```
 
-当前 Execution 层 `ImagePipeline` 持有 Data/file input 与 `WIImageIO.Source`，
-并直接消费其 `Descriptor`，本身不是 decoded bitmap。底层 `CGImageSource` 由同步、
-作用域内的 `WIImageIO.Source` 管理，只在按需读取某些颜色空间信息，或进入 render
-时创建 `CGImage`。这层 source handle 对单次处理和 target solver 的多次尝试有价值，
-但没有理由直接成为长期存在的 public `ImageResource`。
+当前 Execution 层 `ImagePipeline` 持有请求级 `WIImageIO.Reader`，并直接消费其
+`Descriptor`，本身不是 decoded bitmap。底层 `CGImageSource` 由同步 Reader 管理，
+只在按需读取某些颜色空间信息，或进入 render 时创建 `WIImageIO.Frame`。Reader 对
+单次处理和 Target 多次尝试有价值，但不应成为跨请求长期存在的 `ImageResource`。
 
 这些生命周期事实最终支持了“纯描述值 + 一次 terminal execution”、不公开长期
 ImageResource 和不提供 Processor Chain。结论正文与剩余 API 问题已迁移到

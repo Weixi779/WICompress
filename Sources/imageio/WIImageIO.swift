@@ -12,17 +12,19 @@ import ImageIO
 import UniformTypeIdentifiers
 import WIImageDomain
 
-/// Stateless ImageIO operations used by WICompress execution.
-package enum WIImageIO {}
+/// ImageIO-backed inspection, decoding, copying, and encoding operations.
+public enum WIImageIO {}
 
 // MARK: - Capabilities
 
 extension WIImageIO {
-    package static func canDecode(_ type: UTType) -> Bool {
+    /// Whether the current ImageIO runtime can decode the supplied type.
+    public static func canDecode(_ type: UTType) -> Bool {
         readableTypes.contains(type)
     }
 
-    package static func canEncode(_ type: UTType) -> Bool {
+    /// Whether the current ImageIO runtime can encode the supplied type.
+    public static func canEncode(_ type: UTType) -> Bool {
         writableTypes.contains(type)
     }
 
@@ -46,30 +48,46 @@ extension WIImageIO {
 // MARK: - Inspection
 
 extension WIImageIO {
-    package static func inspect(_ data: Data) throws(WICompressError) -> Descriptor {
+    /// Opens encoded image data for inspection and pixel operations.
+    public static func read(_ data: Data) throws(WIImageIO.Error) -> Reader {
         let source = try imageSource(data)
-        return try descriptor(source, byteCount: data.count)
+        return Reader(
+            source: source,
+            input: .data(data),
+            descriptor: try descriptor(source, byteCount: data.count)
+        )
     }
 
-    package static func inspect(contentsOf url: URL) throws(WICompressError) -> Descriptor {
+    /// Opens an encoded image file without loading its complete bytes.
+    public static func read(contentsOf url: URL) throws(WIImageIO.Error) -> Reader {
         let (source, byteCount) = try fileImageSource(contentsOf: url)
-        return try descriptor(source, byteCount: byteCount)
+        return Reader(
+            source: source,
+            input: .file(url),
+            descriptor: try descriptor(source, byteCount: byteCount)
+        )
     }
 
-    private static func imageSource(_ data: Data) throws(WICompressError) -> CGImageSource {
+    /// Inspects encoded image data without decoding its pixels.
+    public static func inspect(_ data: Data) throws(WIImageIO.Error) -> Descriptor {
+        try read(data).descriptor
+    }
+
+    /// Inspects an encoded image file without loading its complete bytes.
+    public static func inspect(contentsOf url: URL) throws(WIImageIO.Error) -> Descriptor {
+        try read(contentsOf: url).descriptor
+    }
+
+    static func imageSource(_ data: Data) throws(WIImageIO.Error) -> CGImageSource {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw .invalidImageData
         }
         return source
     }
 
-    private static func imageSource(contentsOf url: URL) throws(WICompressError) -> CGImageSource {
-        try fileImageSource(contentsOf: url).source
-    }
-
-    private static func fileImageSource(
+    static func fileImageSource(
         contentsOf url: URL
-    ) throws(WICompressError) -> (source: CGImageSource, byteCount: Int) {
+    ) throws(WIImageIO.Error) -> (source: CGImageSource, byteCount: Int) {
         let byteCount = try fileByteCount(for: url)
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
             throw .invalidImageData
@@ -77,17 +95,17 @@ extension WIImageIO {
         return (source, byteCount)
     }
 
-    private static func validateStaticImage(_ source: CGImageSource) throws(WICompressError) {
+    static func validateStaticImage(_ source: CGImageSource) throws(WIImageIO.Error) {
         let frameCount = CGImageSourceGetCount(source)
         guard frameCount == 1 else {
             throw .animatedSourceUnsupported(frameCount: frameCount)
         }
     }
 
-    private static func descriptor(
+    static func descriptor(
         _ source: CGImageSource,
         byteCount: Int
-    ) throws(WICompressError) -> Descriptor {
+    ) throws(WIImageIO.Error) -> Descriptor {
         let frameCount = CGImageSourceGetCount(source)
         guard frameCount > 0 else {
             throw .invalidImageData
@@ -114,10 +132,10 @@ extension WIImageIO {
             height: pixelHeight
         )
         guard
-            let orientation = Orientation(
+            let orientation = WIImageOrientation(
                 rawValue: properties.intValue(
                     for: kCGImagePropertyOrientation
-                ) ?? Orientation.up.rawValue
+                ) ?? WIImageOrientation.up.rawValue
             )
         else {
             throw .imageInfoUnavailable
@@ -144,7 +162,7 @@ extension WIImageIO {
     private static func pixelSize(
         width: Int,
         height: Int
-    ) throws(WICompressError) -> WIPixelSize {
+    ) throws(WIImageIO.Error) -> WIPixelSize {
         guard width > 0, height > 0 else {
             throw .imageInfoUnavailable
         }
@@ -157,7 +175,7 @@ extension WIImageIO {
         return WIPixelSize(validWidth: width, height: height)
     }
 
-    private static func fileByteCount(for url: URL) throws(WICompressError) -> Int {
+    private static func fileByteCount(for url: URL) throws(WIImageIO.Error) -> Int {
         let resourceValues: URLResourceValues
         do {
             resourceValues = try url.resourceValues(forKeys: [.fileSizeKey])
@@ -214,45 +232,9 @@ extension Dictionary where Key == CFString, Value == Any {
 // MARK: - Decoding
 
 extension WIImageIO {
-    package static func colorSpace(_ data: Data) throws(WICompressError) -> WIColorSpace? {
-        try colorSpace(imageSource(data))
-    }
-
-    package static func colorSpace(contentsOf url: URL) throws(WICompressError) -> WIColorSpace? {
-        try colorSpace(imageSource(contentsOf: url))
-    }
-
-    package static func image(
-        _ data: Data,
-        options: DecodeOptions = .init()
-    ) throws(WICompressError) -> CGImage {
-        try image(imageSource(data), options: options)
-    }
-
-    package static func image(
-        contentsOf url: URL,
-        options: DecodeOptions = .init()
-    ) throws(WICompressError) -> CGImage {
-        try image(imageSource(contentsOf: url), options: options)
-    }
-
-    package static func thumbnail(
-        _ data: Data,
-        options: ThumbnailOptions
-    ) throws(WICompressError) -> CGImage {
-        try thumbnail(imageSource(data), options: options)
-    }
-
-    package static func thumbnail(
-        contentsOf url: URL,
-        options: ThumbnailOptions
-    ) throws(WICompressError) -> CGImage {
-        try thumbnail(imageSource(contentsOf: url), options: options)
-    }
-
-    private static func colorSpace(
+    static func colorSpace(
         _ source: CGImageSource
-    ) throws(WICompressError) -> WIColorSpace? {
+    ) throws(WIImageIO.Error) -> WIColorSpace? {
         guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw .imageInfoUnavailable
         }
@@ -277,10 +259,10 @@ extension WIImageIO {
         return .iccProfile(iccData as Data)
     }
 
-    private static func image(
+    static func image(
         _ source: CGImageSource,
         options: DecodeOptions
-    ) throws(WICompressError) -> CGImage {
+    ) throws(WIImageIO.Error) -> CGImage {
         try validateStaticImage(source)
 
         let properties: [CFString: Any] = [
@@ -298,10 +280,10 @@ extension WIImageIO {
         return image
     }
 
-    private static func thumbnail(
+    static func thumbnail(
         _ source: CGImageSource,
         options: ThumbnailOptions
-    ) throws(WICompressError) -> CGImage {
+    ) throws(WIImageIO.Error) -> CGImage {
         try validateStaticImage(source)
 
         var properties: [CFString: Any] = [
@@ -329,10 +311,9 @@ extension WIImageIO {
 // MARK: - Metadata
 
 extension WIImageIO {
-    private static func metadataProperties(
-        _ source: CGImageSource,
-        keeping options: WIImageMetadataOptions
-    ) -> [CFString: Any] {
+    static func metadataProvenance(
+        _ source: CGImageSource
+    ) -> MetadataProvenance? {
         guard
             let properties = CGImageSourceCopyPropertiesAtIndex(
                 source,
@@ -340,9 +321,16 @@ extension WIImageIO {
                 nil
             ) as? [CFString: Any]
         else {
-            return [:]
+            return nil
         }
-        return metadataProperties(in: properties, keeping: options)
+        return MetadataProvenance(sourceProperties: properties)
+    }
+
+    static func metadataProperties(
+        _ source: CGImageSource,
+        keeping options: WIImageMetadataOptions
+    ) -> [CFString: Any] {
+        metadataProvenance(source)?.properties(keeping: options) ?? [:]
     }
 
     static func metadataOptions(
@@ -560,63 +548,37 @@ extension Dictionary where Key == CFString, Value == Any {
 // MARK: - Copying
 
 extension WIImageIO {
-    package static func copy(
-        _ data: Data,
-        `as` type: UTType,
-        options: CopyOptions = .init()
-    ) throws(WICompressError) -> Data {
-        let source = try imageSource(data)
-        return try copy(
-            source,
-            descriptor: try descriptor(source, byteCount: data.count),
-            as: type,
-            options: options
-        )
-    }
-
-    package static func copy(
-        contentsOf url: URL,
-        `as` type: UTType,
-        options: CopyOptions = .init()
-    ) throws(WICompressError) -> Data {
-        let (source, byteCount) = try fileImageSource(contentsOf: url)
-        return try copy(
-            source,
-            descriptor: try descriptor(source, byteCount: byteCount),
-            as: type,
-            options: options
-        )
-    }
-
-    package static func canCopy(
+    static func canCopy(
         _ descriptor: Descriptor,
         `as` type: UTType,
-        keeping metadata: WIImageMetadataOptions,
-        compressionQuality: Double?
+        options: CopyOptions
     ) -> Bool {
         guard
+            descriptor.frameCount == 1,
+            canEncode(type),
             !descriptor.hasUnmodeledMetadata
-                || metadata.preservesUnmodeledMetadata
+                || options.metadata.preservesUnmodeledMetadata
         else {
             return false
         }
 
-        let removedMetadata = descriptor.metadata.subtracting(metadata)
+        let removedMetadata = descriptor.metadata.subtracting(options.metadata)
         if removedMetadata.isEmpty {
             return true
         }
 
         return removedMetadata == .gps
-            && compressionQuality == nil
+            && options.maximumPixelSize == nil
+            && options.compressionQuality == nil
             && descriptor.type == type
     }
 
-    private static func copy(
+    static func copy(
         _ source: CGImageSource,
         descriptor: Descriptor,
         as type: UTType,
         options: CopyOptions
-    ) throws(WICompressError) -> Data {
+    ) throws(WIImageIO.Error) -> Data {
         try validateStaticImage(source)
 
         let removedMetadata = descriptor.metadata.subtracting(options.metadata)
@@ -624,7 +586,7 @@ extension WIImageIO {
             !descriptor.hasUnmodeledMetadata
                 || options.metadata.preservesUnmodeledMetadata
         else {
-            throw .imageEncodeFailed(.detected(from: type))
+            throw .metadataCopyUnsupported(type)
         }
         guard removedMetadata.isEmpty else {
             guard
@@ -633,7 +595,7 @@ extension WIImageIO {
                 options.compressionQuality == nil,
                 descriptor.type == type
             else {
-                throw .imageEncodeFailed(.detected(from: type))
+                throw .metadataCopyUnsupported(type)
             }
             return try copyExcludingGPS(source, as: type)
         }
@@ -659,7 +621,7 @@ extension WIImageIO {
     private static func copyExcludingGPS(
         _ source: CGImageSource,
         as type: UTType
-    ) throws(WICompressError) -> Data {
+    ) throws(WIImageIO.Error) -> Data {
         guard
             let metadata = CGImageSourceCopyMetadataAtIndex(
                 source,
@@ -686,7 +648,7 @@ extension WIImageIO {
                 nil
             )
         else {
-            throw .imageEncodeFailed(.detected(from: type))
+            throw .imageEncodeFailed(type)
         }
         return outputData as Data
     }
@@ -695,63 +657,19 @@ extension WIImageIO {
 // MARK: - Encoding
 
 extension WIImageIO {
-    package static func encode(
-        _ image: CGImage,
-        `as` type: UTType,
-        options: EncodeOptions = .init()
-    ) throws(WICompressError) -> Data {
-        try encode(image, as: type, options: options, metadata: [:])
-    }
-
-    package static func encode(
-        _ image: CGImage,
-        `as` type: UTType,
-        options: EncodeOptions = .init(),
-        metadataFrom data: Data
-    ) throws(WICompressError) -> Data {
-        let source = try imageSource(data)
-        return try encode(
-            image,
-            as: type,
-            options: options,
-            metadata: metadataProperties(
-                source,
-                keeping: options.metadata
-            )
-        )
-    }
-
-    package static func encode(
-        _ image: CGImage,
-        `as` type: UTType,
-        options: EncodeOptions = .init(),
-        metadataFrom url: URL
-    ) throws(WICompressError) -> Data {
-        let source = try imageSource(contentsOf: url)
-        return try encode(
-            image,
-            as: type,
-            options: options,
-            metadata: metadataProperties(
-                source,
-                keeping: options.metadata
-            )
-        )
-    }
-
-    private static func encode(
+    static func encode(
         _ image: CGImage,
         as type: UTType,
         options: EncodeOptions,
-        metadata: [CFString: Any]
-    ) throws(WICompressError) -> Data {
+        metadata: [CFString: Any],
+        orientation: WIImageOrientation = .up
+    ) throws(WIImageIO.Error) -> Data {
         var properties = metadata
         if let compressionQuality = options.compressionQuality {
             properties[kCGImageDestinationLossyCompressionQuality] = compressionQuality
         }
 
-        // A CGImage has no orientation tag; copied source metadata must not rotate its pixels again.
-        properties[kCGImagePropertyOrientation] = 1
+        properties[kCGImagePropertyOrientation] = orientation.rawValue
         return try encodedData(as: type) { destination in
             CGImageDestinationAddImage(
                 destination,
@@ -768,13 +686,13 @@ extension WIImageIO {
     private static func encodedData(
         as type: UTType,
         addingImage: (CGImageDestination) -> Void
-    ) throws(WICompressError) -> Data {
+    ) throws(WIImageIO.Error) -> Data {
         let outputData = NSMutableData()
         let destination = try destination(as: type, writingTo: outputData)
         addingImage(destination)
 
         guard CGImageDestinationFinalize(destination) else {
-            throw .imageEncodeFailed(.detected(from: type))
+            throw .imageEncodeFailed(type)
         }
         return outputData as Data
     }
@@ -782,7 +700,7 @@ extension WIImageIO {
     private static func destination(
         as type: UTType,
         writingTo data: NSMutableData
-    ) throws(WICompressError) -> CGImageDestination {
+    ) throws(WIImageIO.Error) -> CGImageDestination {
         guard
             let destination = CGImageDestinationCreateWithData(
                 data,
@@ -791,7 +709,7 @@ extension WIImageIO {
                 nil
             )
         else {
-            throw .imageEncodeFailed(.detected(from: type))
+            throw .imageEncodeFailed(type)
         }
         return destination
     }

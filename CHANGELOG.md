@@ -19,8 +19,10 @@ domains: deterministic image processing and byte-target compression.
 - Shared `WIImageOutput` requirements for representation, metadata, and color
   space.
 - One `WIResult` from every Process and Target terminal.
-- Package-only `WIImageDomain`, `WIImageIO`, `WIImageRaster`, and
-  `WICompressExecution` modules behind the public umbrella.
+- Public `WIImageIO` product with typed `Reader → Frame → encode`, inspection,
+  thumbnail, source-copy, runtime capability, and `WIImageIO.Error` APIs.
+- Package-only `WIImageDomain`, `WIImageRaster`, `WICompressDomain`, and
+  `WICompressExecution` modules behind the public umbrella and ImageIO product.
 
 ### Changed
 

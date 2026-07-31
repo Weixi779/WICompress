@@ -18,6 +18,10 @@ let package = Package(
             name: "WICompress",
             targets: ["WICompress"]
         ),
+        .library(
+            name: "WIImageIO",
+            targets: ["WIImageIO"]
+        ),
     ],
     dependencies: [],
     targets: [
@@ -72,7 +76,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WIImageIOTests",
-            dependencies: ["WIImageDomain", "WIImageIO"],
+            dependencies: ["WIImageIO"],
             path: "Tests/WIImageIOTests"
         ),
         .testTarget(

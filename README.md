@@ -75,6 +75,10 @@ dependencies: [
 ]
 ```
 
+The package publishes two library products. Use `WICompress` for compression
+terminals. Use `WIImageIO` only when a lower-level typed ImageIO chain is the
+actual requirement.
+
 ## Compression Preview
 
 The comparison image below is generated from repository fixtures with
@@ -183,6 +187,30 @@ let thumbnail = try WICompressor.compress(
 print(thumbnail.byteCount)
 print(thumbnail.pixelSize)
 ```
+
+## Lower-Level ImageIO
+
+`WIImageIO` is a separate synchronous product for inspection, decoding,
+thumbnailing, source copy, and encoding without exposing `CGImageSource`,
+`CGImageDestination`, or property dictionaries:
+
+```swift
+import WIImageIO
+
+let reader = try WIImageIO.read(originalData)
+let descriptor = reader.descriptor
+
+let encoded = try reader
+    .thumbnail(options: .init(maximumPixelSize: 1200))
+    .encode(
+        as: .jpeg,
+        options: .init(compressionQuality: 0.75)
+    )
+```
+
+The chain preserves source metadata provenance and orientation where the chosen
+options allow it. It throws `WIImageIO.Error`; scheduling and actor hops remain
+the caller's responsibility.
 
 ## Working With UIKit or AppKit
 

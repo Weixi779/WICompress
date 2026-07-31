@@ -11,7 +11,6 @@ import Foundation
 import ImageIO
 import Testing
 import UniformTypeIdentifiers
-import WIImageDomain
 @testable import WIImageIO
 
 @Suite("WIImageFormat Detection")
@@ -19,7 +18,7 @@ struct WIImageFormatTests {
 
     struct FormatCase: CustomTestStringConvertible, Sendable {
         let type: UTType
-        let expected: WIImageFormat
+        let expected: WIImageIO.Format
         let testDescription: String
     }
 
@@ -65,7 +64,7 @@ struct WIImageFormatTests {
 
     @Test("Empty data cannot produce an inspected format")
     func emptyDataHasNoFormat() {
-        #expect(throws: WICompressError.invalidImageData) {
+        #expect(throws: WIImageIO.Error.invalidImageData) {
             try WIImageIO.inspect(Data())
         }
     }
@@ -74,7 +73,7 @@ struct WIImageFormatTests {
     func randomBytesHaveNoFormat() {
         let data = Data([0x00, 0x01, 0x02, 0x03, 0x04])
 
-        #expect(throws: WICompressError.invalidImageData) {
+        #expect(throws: WIImageIO.Error.invalidImageData) {
             try WIImageIO.inspect(data)
         }
     }
@@ -83,9 +82,9 @@ struct WIImageFormatTests {
 
     @Test("isHEIF is true only for .heif")
     func isHEIFFlag() {
-        #expect(WIImageFormat.heif.isHEIF == true)
-        #expect(WIImageFormat.jpeg.isHEIF == false)
-        #expect(WIImageFormat.png.isHEIF == false)
-        #expect(WIImageFormat.unknown.isHEIF == false)
+        #expect(WIImageIO.Format.heif.isHEIF == true)
+        #expect(WIImageIO.Format.jpeg.isHEIF == false)
+        #expect(WIImageIO.Format.png.isHEIF == false)
+        #expect(WIImageIO.Format.unknown.isHEIF == false)
     }
 }

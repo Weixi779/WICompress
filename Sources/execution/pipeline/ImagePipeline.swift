@@ -15,13 +15,11 @@ import WIImageIO
 import WIImageRaster
 
 package final class ImagePipeline {
-    enum Input {
-        case data(Data)
-        case file(URL)
-    }
+    let reader: WIImageIO.Reader
 
-    let input: Input
-    let descriptor: WIImageIO.Descriptor
+    var descriptor: WIImageIO.Descriptor {
+        reader.descriptor
+    }
 
     var byteCount: Int {
         descriptor.byteCount
@@ -29,49 +27,41 @@ package final class ImagePipeline {
 
     convenience init(data: Data) throws(WICompressError) {
         try self.init(
-            input: .data(data),
-            descriptor: try WIImageIO.inspect(data)
+            reader: Self.imageIO { () throws(WIImageIO.Error) in
+                try WIImageIO.read(data)
+            }
         )
     }
 
     convenience init(contentsOf url: URL) throws(WICompressError) {
         try self.init(
-            input: .file(url),
-            descriptor: try WIImageIO.inspect(contentsOf: url)
+            reader: Self.imageIO { () throws(WIImageIO.Error) in
+                try WIImageIO.read(contentsOf: url)
+            }
         )
     }
 
     private init(
-        input: Input,
-        descriptor: WIImageIO.Descriptor
+        reader: WIImageIO.Reader
     ) throws(WICompressError) {
-        guard descriptor.frameCount == 1 else {
-            throw .animatedSourceUnsupported(frameCount: descriptor.frameCount)
+        guard reader.descriptor.frameCount == 1 else {
+            throw .animatedSourceUnsupported(
+                frameCount: reader.descriptor.frameCount
+            )
         }
 
-        self.input = input
-        self.descriptor = descriptor
+        self.reader = reader
     }
 
     func originalData() throws(WICompressError) -> Data {
-        switch input {
-        case .data(let data):
-            return data
-        case .file(let url):
-            do {
-                return try Data(contentsOf: url)
-            } catch {
-                throw .fileReadFailed(url)
-            }
+        try Self.imageIO { () throws(WIImageIO.Error) in
+            try reader.originalData()
         }
     }
 
     func sourceColorSpace() throws(WICompressError) -> WIColorSpace? {
-        switch input {
-        case .data(let data):
-            return try WIImageIO.colorSpace(data)
-        case .file(let url):
-            return try WIImageIO.colorSpace(contentsOf: url)
+        try Self.imageIO { () throws(WIImageIO.Error) in
+            try reader.colorSpace()
         }
     }
 
@@ -86,7 +76,9 @@ package final class ImagePipeline {
     func result(
         for data: Data
     ) throws(WICompressError) -> WIResult {
-        let outputDescriptor = try WIImageIO.inspect(data)
+        let outputDescriptor = try Self.imageIO { () throws(WIImageIO.Error) in
+            try WIImageIO.read(data).descriptor
+        }
 
         guard outputDescriptor.frameCount == 1 else {
             throw .animatedSourceUnsupported(
@@ -167,20 +159,12 @@ package final class ImagePipeline {
         metadata: WIImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
-        let options = CopyOptions(
+        let options = WIImageIO.CopyOptions(
             compressionQuality: quality,
             metadata: metadata
         )
-        switch input {
-        case .data(let data):
-            return try WIImageIO.copy(
-                data,
-                as: destinationType,
-                options: options
-            )
-        case .file(let url):
-            return try WIImageIO.copy(
-                contentsOf: url,
+        return try Self.imageIO { () throws(WIImageIO.Error) in
+            try reader.copy(
                 as: destinationType,
                 options: options
             )
@@ -193,25 +177,17 @@ package final class ImagePipeline {
         metadata: WIImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
-        let options = EncodeOptions(
+        let options = WIImageIO.EncodeOptions(
             compressionQuality: quality,
             metadata: metadata
         )
-        switch input {
-        case .data(let data):
-            return try WIImageIO.encode(
-                image,
-                as: destinationType,
-                options: options,
-                metadataFrom: data
-            )
-        case .file(let url):
-            return try WIImageIO.encode(
-                image,
-                as: destinationType,
-                options: options,
-                metadataFrom: url
-            )
+        return try Self.imageIO { () throws(WIImageIO.Error) in
+            try reader
+                .frame(image)
+                .encode(
+                    as: destinationType,
+                    options: options
+                )
         }
     }
 
@@ -223,7 +199,7 @@ package final class ImagePipeline {
     ) throws(WICompressError) -> CGImage {
         let sourceImage: CGImage
         let sourceRect: Rect
-        let orientation: Orientation
+        let orientation: WIImageOrientation
         if usesFullOrientedSource(geometry) {
             if let maximumPixelSize = thumbnailMaximumPixelSize(
                 for: geometry
@@ -267,28 +243,19 @@ package final class ImagePipeline {
     }
 
     private func decodedImage() throws(WICompressError) -> CGImage {
-        switch input {
-        case .data(let data):
-            return try WIImageIO.image(data)
-        case .file(let url):
-            return try WIImageIO.image(contentsOf: url)
+        try Self.imageIO { () throws(WIImageIO.Error) in
+            try reader.image().image
         }
     }
 
     private func decodedThumbnail(
         maximumPixelSize: Int
     ) throws(WICompressError) -> CGImage {
-        let options = ThumbnailOptions(
+        let options = WIImageIO.ThumbnailOptions(
             maximumPixelSize: maximumPixelSize
         )
-        switch input {
-        case .data(let data):
-            return try WIImageIO.thumbnail(data, options: options)
-        case .file(let url):
-            return try WIImageIO.thumbnail(
-                contentsOf: url,
-                options: options
-            )
+        return try Self.imageIO { () throws(WIImageIO.Error) in
+            try reader.thumbnail(options: options).image
         }
     }
 
@@ -395,6 +362,36 @@ package final class ImagePipeline {
              .contextCreationFailed,
              .imageCreationFailed:
             return .imageRenderingFailed
+        }
+    }
+
+    private static func imageIO<Value>(
+        _ operation: () throws(WIImageIO.Error) -> Value
+    ) throws(WICompressError) -> Value {
+        do {
+            return try operation()
+        } catch {
+            throw map(error)
+        }
+    }
+
+    private static func map(
+        _ error: WIImageIO.Error
+    ) -> WICompressError {
+        switch error {
+        case .fileReadFailed(let url):
+            return .fileReadFailed(url)
+        case .invalidImageData:
+            return .invalidImageData
+        case .imageInfoUnavailable:
+            return .imageInfoUnavailable
+        case .animatedSourceUnsupported(let frameCount):
+            return .animatedSourceUnsupported(frameCount: frameCount)
+        case .imageDecodeFailed:
+            return .imageDecodeFailed
+        case .metadataCopyUnsupported(let type),
+             .imageEncodeFailed(let type):
+            return .imageEncodeFailed(.detected(from: type))
         }
     }
 }

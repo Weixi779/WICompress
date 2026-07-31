@@ -82,8 +82,8 @@ stale snippets.
 
 ## Architecture
 
-The package is split into five supporting targets and one public umbrella
-product target:
+The package exposes `WICompress` and the lower-level `WIImageIO` product over
+five supporting targets:
 
 ```text
                     WIImageDomain
@@ -96,11 +96,12 @@ product target:
 ```
 
 `WIImageDomain` owns shared image facts: pixel size, color, format, metadata,
-orientation, geometry, and the currently shared public error. `WICompressDomain`
-owns Process, Target, Output, crop, resizing, and Luban request semantics. There
-are no mirrored Core models. `WIImageIO` owns format detection and all package-only
-ImageIO primitives. `WICompressExecution` owns the request-scoped `ImagePipeline`,
-pure Process/Target calculations, and `WIResult`.
+orientation, and geometry. `WICompressDomain` owns Process, Target, Output,
+crop, resizing, Luban, and `WICompressError`. There are no mirrored Core models.
+`WIImageIO` is an independent synchronous product with `Reader`, `Descriptor`,
+`Frame`, scoped options, and `WIImageIO.Error`. `WICompressExecution` owns the
+request-scoped `ImagePipeline`, pure Process/Target calculations, ImageIO/Raster
+error mapping, and `WIResult`.
 `WICompress` re-exports the public contracts and contains only
 `WICompressor`, whose terminals call the package-only `ImagePipeline` directly.
 
@@ -119,7 +120,7 @@ Data / URL + WIImageProcess
        encoded Data -> result inspection -> WIResult
 ```
 
-The Process file terminal keeps a file-backed ImageIO source. It reads the
+The Process file terminal keeps a file-backed `WIImageIO.Reader`. It reads the
 complete original bytes only when a return-original operation needs them.
 
 Target-based `compress(_:to:)` declares an output contract (`maxBytes` plus
@@ -148,8 +149,8 @@ Key types:
 4. **WIImageOutput** - shared representation, composable
    `WIImageMetadataOptions`, and color-space requirements used by both Process
    and Target.
-5. **ImagePipeline** - request-scoped owner of the encoded input,
-   `WIImageIO.Descriptor`, original-byte lifecycle, and
+5. **ImagePipeline** - request-scoped owner of one `WIImageIO.Reader`, its
+   `Descriptor`, original-byte lifecycle, and
    Process/Target decisions, Target candidate search, and ImageIO/Raster
    execution. Its package terminals are called directly by `WICompressor`;
    there is no second terminal forwarding type.
@@ -157,8 +158,10 @@ Key types:
    detection from encoded sources and platform type identifiers.
 7. **WILuban** - internal `WICompressDomain` ratio math
    (`ratio(width:height:)`, `ensureEven`).
-8. **WICompressError** - public Domain failure model (`LocalizedError`); the only
-   error thrown by public construction, resizing, and terminal APIs.
+8. **WICompressError** - public compression failure model (`LocalizedError`);
+   the only error thrown by construction, resizing, and compressor terminals.
+   `WIImageIO` exposes its own typed `WIImageIO.Error`, which Execution maps at
+   the product boundary.
 9. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
    (`maxBytes` / `WICompressionSizing` / shared `WIImageOutput`) returning
    `WIResult`. A throwing Target initializer establishes its hard byte invariant;
@@ -181,9 +184,10 @@ Key types:
   `.jpeg(background: .white/.black)` to flatten alpha intentionally.
 - **UIKit-free / cross-platform core**: no `#if os(iOS)`, no UIKit/CoreImage.
   Builds and is fully tested on macOS via `swift test`.
-- **Typed throws**: the whole throwing surface uses `throws(WICompressError)`.
-  Builds cleanly under Swift 6 language mode and strict concurrency; public
-  types are `Sendable`.
+- **Typed throws**: compressor terminals and request construction use
+  `throws(WICompressError)`; the standalone ImageIO product uses
+  `throws(WIImageIO.Error)`. Builds cleanly under Swift 6 language mode and
+  strict concurrency; cross-task public values are `Sendable`.
 - **Image resizing**: Luban ratio is computed from EXIF-oriented display
   dimensions. The default long-image branch constrains the short side
   (`ceil(shortSide / 1280)`), matching original Luban. Dividing the long side
@@ -194,7 +198,8 @@ Key types:
   `CGImageDestinationCopyTypeIdentifiers()`.
 - **Passthrough**: never returns the original if it would violate Process or
   Target output requirements.
-- **Error handling**: throws `WICompressError`, never returns optional/nil.
+- **Error handling**: neither public surface returns optional/nil for failures;
+  Execution maps `WIImageIO.Error` to `WICompressError` at the Pipeline boundary.
 
 ## Code Style
 

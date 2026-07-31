@@ -251,7 +251,7 @@ package enum WIImageRaster {
 
     private static func applyOrientationTransform(
         to context: CGContext,
-        orientation: Orientation,
+        orientation: WIImageOrientation,
         pixelWidth: Int,
         pixelHeight: Int
     ) {
