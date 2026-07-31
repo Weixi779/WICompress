@@ -14,9 +14,9 @@ import WIImageIO
 enum WIImageProcessResolver {
     static func resolve(
         _ process: WIImageProcess,
-        imageSource: WIImageSource
+        pipeline: ImagePipeline
     ) throws(WICompressError) -> WIExecutionPlan {
-        let descriptor = imageSource.descriptor
+        let descriptor = pipeline.descriptor
         guard descriptor.format != .unknown else {
             throw .unsupportedSourceFormat(descriptor.type?.identifier)
         }
@@ -29,7 +29,7 @@ enum WIImageProcessResolver {
         )
         let resolvedOutput = try WIImageOutputResolver.resolve(
             process.output,
-            imageSource: imageSource
+            pipeline: pipeline
         )
         let quality = resolvedOutput.destinationFormat.supportsLossyQuality
             ? process.quality
@@ -58,7 +58,7 @@ enum WIImageProcessResolver {
         if canCopyFromSource(
             process: process,
             geometry: geometry,
-            imageSource: imageSource,
+            pipeline: pipeline,
             quality: quality,
             destinationType: resolvedOutput.destinationType,
             outputColorSpace: resolvedOutput.colorSpace
@@ -140,7 +140,7 @@ enum WIImageProcessResolver {
     private static func canCopyFromSource(
         process: WIImageProcess,
         geometry: WIResolvedProcessGeometry,
-        imageSource: WIImageSource,
+        pipeline: ImagePipeline,
         quality: Double?,
         destinationType: UTType,
         outputColorSpace: WIResolvedOutputColorSpace
@@ -151,9 +151,9 @@ enum WIImageProcessResolver {
             && outputColorSpace.requiresConversion == false
             && (
                 process.output.metadata != .strip
-                    || imageSource.descriptor.orientation == .up
+                    || pipeline.descriptor.orientation == .up
             )
-            && imageSource.imageIOSource.canCopy(
+            && pipeline.source.canCopy(
                 as: destinationType,
                 keeping: process.output.metadata,
                 compressionQuality: quality

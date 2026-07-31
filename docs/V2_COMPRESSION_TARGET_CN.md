@@ -6,6 +6,10 @@
 后续实现可以依赖这些结论，不需要重新打开 1.x `geometry`、`preference` 或平台 preset
 的讨论。
 
+内部状态与编排已经由
+[`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 重新冻结；本文关于独立
+Resolver、Solver 和 ExecutionPlan 的描述仅记录当前实现，不再代表目标架构。
+
 跨产品线边界以 [`V2_DOMAIN_MODEL_CN.md`](V2_DOMAIN_MODEL_CN.md) 为准。能力全集、
 外部平台调研和设计取舍证据保留在
 [`V2_CAPABILITY_MAP_CN.md`](V2_CAPABILITY_MAP_CN.md)；本文不重复调研过程。

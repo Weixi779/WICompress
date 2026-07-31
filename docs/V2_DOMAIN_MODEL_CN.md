@@ -8,6 +8,8 @@
 
 相关文档：
 
+- [`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md)：2.0 内部状态、执行决策与
+  ImageIO/Raster 编排的最终边界。
 - [`V2_CAPABILITY_MAP_CN.md`](V2_CAPABILITY_MAP_CN.md)：1.x 能力盘点、组合证据与外部调研。
 - [`V2_IMAGE_PROCESS_CN.md`](V2_IMAGE_PROCESS_CN.md)：已冻结的 `WIImageProcess`
   合同。
@@ -34,35 +36,31 @@ Photos 权限或平台分享业务。
 机制，但不能为了复用类型混淆控制权：
 
 ```text
-WIImageProcess
-    -> Process Resolver
-    -> one Execution Plan
-
-WICompressionTarget
-    -> Target Solver
-    -> zero or more Execution Plans
-
-Execution Plan
-    -> inspect / render / encode
-    -> encoded result
+WIImageProcess ────────┐
+                       ├──> internal ImagePipeline
+WICompressionTarget ───┘       ├──> ImageIO
+                               └──> Raster
+                                      ↓
+                                   WIResult
 ```
 
-`Execution Plan` 只表示内部汇合边界，不冻结最终类型名。
+Process 与 Target 是同一 Pipeline 内的两种算法；内部状态和编排以
+[`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 为准。
 
 ## Domain 所有权
 
 | Domain | 拥有的事实或决定 | 不拥有 |
 |---|---|---|
-| Source Inspection | format、pixel size、orientation、Alpha、frames、metadata、color、writability | 调用方 Policy、UI scale |
+| Source Inspection | format、byte count、pixel size、orientation、Alpha、frames、metadata、gain map | 按需 source color、runtime capability、调用方 Policy、UI scale |
 | Size Calculation | 根据完整源像素返回完整目标宽高 | ImageIO 编码、View content mode |
 | Crop Calculation | 根据 concrete ratio 与 normalized anchor 返回 source pixel rect | resizing、quality、UI alignment |
 | Image Processing | concrete crop、resize、方向和颜色渲染 | maxBytes 搜索、平台分享意图 |
 | Output | container、Alpha 处理、metadata、output color | Target 的 candidate ranking |
 | Process | 调用方选择的 sizing、pixel operation、quality 和 output | 最终 byte 上限 |
 | Target | maxBytes 合同与候选搜索 | 调用方固定 quality、UI placement |
-| Execution Core | 消费完整 plan，并选择 ImageIO/Raster 执行路径 | 解释 `fit`、`fill`、Luban 或平台规则 |
+| Image Pipeline | 持有一次调用的 source facts、执行决策与工作像素生命周期 | 对外扩展节点或 UI 语义 |
 
-Quality 的所有权随产品线变化：在 Process 中由调用方决定，在 Target 中由 solver 决定。
+Quality 的所有权随产品线变化：在 Process 中由调用方决定，在 Target 中由内部搜索算法决定。
 因此 quality 不能仅为了字段复用而被无条件塞进共享 Output。
 
 ## 共享 Output Domain
@@ -101,14 +99,14 @@ representation 明确处理：
 `pngIfAlphaOtherwiseJPEG` 对应的语义作为常用一等能力保留，不折叠进含糊的
 `automatic`。最终 case 名称和 Swift 拼写在 API 阶段冻结。
 
-两条产品线共享同一套 Output resolver 与 typed errors：
+两条产品线共享同一套 Output 解释规则与 typed errors：
 
 - JPEG 遇到透明源且未显式铺底。
 - JPEG background 不是 opaque color。
 - 当前平台不能写入目标 representation。
 - ICC Profile 无效或明确 color conversion 无法兑现。
 
-Resolver 不使用 warning 或静默换格式满足合同。
+Pipeline 不使用 warning 或静默换格式满足合同。
 
 ### Metadata
 
@@ -173,7 +171,7 @@ Concrete Color Space 至少支持 sRGB、Display P3 与 custom ICC Profile。最
 | Source inspection 与 pixel decode 分开 | 读取 properties 不要求提前创建完整 bitmap |
 | 不公开长期 `ImageResource` 生命周期 | 调用方不拥有 `CGImageSource`、`CGImage` 或内部 Task |
 | `fit`、`fill`、`fitInside`、alignment 退出核心 Domain | 这些名称混合了 UI 展示、尺寸约束和像素处理 |
-| Resizing 是完整 PixelSize 到 PixelSize 的插槽 | 调用方可使用内置算法或自定义实现，Execution Core 不解释半成品 ratio 或长边 |
+| Resizing 是完整 PixelSize 到 PixelSize 的插槽 | 调用方可使用内置算法或自定义实现，Pipeline 不解释半成品 ratio 或长边 |
 | 压缩处理不隐式 upscale | 内置压缩 resizing 默认只缩小；调用方显式选择或实现允许放大的 resizer 时可以放大 |
 | Crop 使用 normalized anchor | 左上原点、`x/y` 位于 `0...1`、默认中心；不公开九宫格方位枚举 |
 | Crop 先于 resizing 解析 | resizing 接收裁后完整尺寸，底层仍可一次绘制 |
@@ -199,7 +197,7 @@ ImageIO 与 Raster 是执行机制，不是公共 Domain 的定义者。模块�
 [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)。2.0 不从现有
 `WICompressOptions`、`WIWritePlan` 或四条 write path 反推新 API。
 
-上层冻结后，Execution Core 只应接收已经解释完成的事实：
+上层冻结后，ImagePipeline 持有 source facts，并把 Domain 意图解释成具体执行参数：
 
 ```text
 source facts
@@ -214,9 +212,9 @@ source facts
     -> encoded result
 ```
 
-Luban、custom resizing、aspect ratio、anchor、Target ranking 和平台限制都必须在进入
-执行层前被解析。ImageRaster 只接收 resolved geometry，不重新提供 `fit`、`fill` 或
-第二套 processing policy。
+Luban、custom resizing、aspect ratio、anchor、Target ranking 和平台限制都由
+Pipeline 内对应算法解释。ImageRaster 只接收 concrete geometry，不重新提供 `fit`、
+`fill` 或第二套 processing policy。
 
 ## 当前非目标
 

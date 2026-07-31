@@ -150,7 +150,7 @@ Data
   -> final encoded Data
 ```
 
-当前 Execution 层 `WIImageSource` 持有 Data/file backing 与 `WIImageIO.Source`，
+当前 Execution 层 `ImagePipeline` 持有 Data/file input 与 `WIImageIO.Source`，
 并直接消费其 `Descriptor`，本身不是 decoded bitmap。底层 `CGImageSource` 由同步、
 作用域内的 `WIImageIO.Source` 管理，只在按需读取某些颜色空间信息，或进入 render
 时创建 `CGImage`。这层 source handle 对单次处理和 target solver 的多次尝试有价值，

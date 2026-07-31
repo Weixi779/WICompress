@@ -1,28 +1,140 @@
 //
-//  WIImageExecutor.swift
+//  ImagePipeline.swift
 //  WICompressExecution
 //
-//  Created by weixi on 2026/6/22.
+//  Created by weixi on 2026/7/31.
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
-import Foundation
 import CoreGraphics
+import Foundation
 import WIImageDomain
 import WIImageIO
 import WIImageRaster
 
-enum WIImageExecutor {
-    static func execute(
-        _ imageSource: WIImageSource,
-        plan: WIExecutionPlan
+final class ImagePipeline {
+    enum Input {
+        case data(Data)
+        case file(URL)
+    }
+
+    let input: Input
+    let source: WIImageIO.Source
+    let descriptor: WIImageIO.Descriptor
+
+    var byteCount: Int {
+        source.byteCount
+    }
+
+    convenience init(data: Data) throws(WICompressError) {
+        let source: WIImageIO.Source
+        do {
+            source = try WIImageIO.Source(data: data)
+        } catch {
+            throw Self.mapSourceError(error)
+        }
+
+        try self.init(
+            input: .data(data),
+            source: source
+        )
+    }
+
+    convenience init(contentsOf url: URL) throws(WICompressError) {
+        let source: WIImageIO.Source
+        do {
+            source = try WIImageIO.Source(contentsOf: url)
+        } catch {
+            throw Self.mapSourceError(error)
+        }
+
+        try self.init(
+            input: .file(url),
+            source: source
+        )
+    }
+
+    private init(
+        input: Input,
+        source: WIImageIO.Source
+    ) throws(WICompressError) {
+        let descriptor = source.descriptor
+        guard descriptor.frameCount == 1 else {
+            throw .animatedSourceUnsupported(frameCount: descriptor.frameCount)
+        }
+
+        self.input = input
+        self.source = source
+        self.descriptor = descriptor
+    }
+
+    func originalData() throws(WICompressError) -> Data {
+        switch input {
+        case .data(let data):
+            return data
+        case .file(let url):
+            do {
+                return try Data(contentsOf: url)
+            } catch {
+                throw .fileReadFailed(url)
+            }
+        }
+    }
+
+    func sourceColorSpace() throws(WICompressError) -> WIColorSpace? {
+        do {
+            return try source.colorSpace()
+        } catch {
+            throw Self.mapSourceError(error)
+        }
+    }
+
+    func originalResult() throws(WICompressError) -> WIResult {
+        WIResult(
+            data: try originalData(),
+            format: descriptor.format,
+            pixelSize: descriptor.orientedPixelSize
+        )
+    }
+
+    func result(
+        for data: Data
+    ) throws(WICompressError) -> WIResult {
+        let outputSource: WIImageIO.Source
+        do {
+            outputSource = try WIImageIO.Source(data: data)
+        } catch {
+            throw Self.mapSourceError(error)
+        }
+
+        let outputDescriptor = outputSource.descriptor
+        guard outputDescriptor.frameCount == 1 else {
+            throw .animatedSourceUnsupported(
+                frameCount: outputDescriptor.frameCount
+            )
+        }
+        guard outputDescriptor.format != .unknown else {
+            throw .unsupportedSourceFormat(
+                outputDescriptor.type?.identifier
+            )
+        }
+
+        return WIResult(
+            data: data,
+            format: outputDescriptor.format,
+            pixelSize: outputDescriptor.orientedPixelSize
+        )
+    }
+
+    func execute(
+        _ plan: WIExecutionPlan
     ) throws(WICompressError) -> Data {
         switch plan.operation {
         case .returnOriginal:
-            return try imageSource.originalData()
+            return try originalData()
         case .copyFromSource:
             do {
-                return try imageSource.imageIOSource.copy(
+                return try source.copy(
                     as: plan.destinationType,
                     options: CopyOptions(
                         compressionQuality: plan.quality,
@@ -30,28 +142,25 @@ enum WIImageExecutor {
                     )
                 )
             } catch {
-                throw map(error, destinationFormat: plan.destinationFormat)
+                throw Self.mapExecutionError(
+                    error,
+                    destinationFormat: plan.destinationFormat
+                )
             }
         case .render:
-            let image = try render(imageSource, plan: plan)
-            return try encodeRendered(
-                image,
-                imageSource: imageSource,
-                plan: plan
-            )
+            let image = try render(plan)
+            return try encodeRendered(image, plan: plan)
         }
     }
 
-    static func render(
-        _ imageSource: WIImageSource,
-        plan: WIExecutionPlan
+    func render(
+        _ plan: WIExecutionPlan
     ) throws(WICompressError) -> CGImage {
         guard case .render(let geometry) = plan.operation else {
             throw .executionPlanUnavailable
         }
 
         return try render(
-            imageSource,
             geometry: geometry,
             destinationFormat: plan.destinationFormat,
             jpegBackground: plan.jpegBackground,
@@ -59,9 +168,8 @@ enum WIImageExecutor {
         )
     }
 
-    static func encodeRendered(
+    func encodeRendered(
         _ image: CGImage,
-        imageSource: WIImageSource,
         plan: WIExecutionPlan
     ) throws(WICompressError) -> Data {
         do {
@@ -72,15 +180,17 @@ enum WIImageExecutor {
                     compressionQuality: plan.quality,
                     metadata: plan.metadata
                 ),
-                metadataFrom: imageSource.imageIOSource
+                metadataFrom: source
             )
         } catch {
-            throw map(error, destinationFormat: plan.destinationFormat)
+            throw Self.mapExecutionError(
+                error,
+                destinationFormat: plan.destinationFormat
+            )
         }
     }
 
-    private static func render(
-        _ imageSource: WIImageSource,
+    private func render(
         geometry: WIResolvedRender,
         destinationFormat: WIImageFormat,
         jpegBackground: WIJPEGBackground?,
@@ -89,22 +199,21 @@ enum WIImageExecutor {
         let sourceImage: CGImage
         let sourceRect: Rect
         let orientation: Orientation
-        if usesFullOrientedSource(
-            geometry,
-            descriptor: imageSource.descriptor
-        ) {
+        if usesFullOrientedSource(geometry) {
             if let maximumPixelSize = thumbnailMaximumPixelSize(
-                for: geometry,
-                descriptor: imageSource.descriptor
+                for: geometry
             ) {
                 do {
-                    sourceImage = try imageSource.imageIOSource.thumbnail(
+                    sourceImage = try source.thumbnail(
                         options: ThumbnailOptions(
                             maximumPixelSize: maximumPixelSize
                         )
                     )
                 } catch {
-                    throw map(error, destinationFormat: destinationFormat)
+                    throw Self.mapExecutionError(
+                        error,
+                        destinationFormat: destinationFormat
+                    )
                 }
                 sourceRect = Rect(
                     x: 0,
@@ -115,21 +224,27 @@ enum WIImageExecutor {
                 orientation = .up
             } else {
                 do {
-                    sourceImage = try imageSource.imageIOSource.image()
+                    sourceImage = try source.image()
                 } catch {
-                    throw map(error, destinationFormat: destinationFormat)
+                    throw Self.mapExecutionError(
+                        error,
+                        destinationFormat: destinationFormat
+                    )
                 }
                 sourceRect = geometry.sourceRect
-                orientation = imageSource.descriptor.orientation
+                orientation = descriptor.orientation
             }
         } else {
             do {
-                sourceImage = try imageSource.imageIOSource.image()
+                sourceImage = try source.image()
             } catch {
-                throw map(error, destinationFormat: destinationFormat)
+                throw Self.mapExecutionError(
+                    error,
+                    destinationFormat: destinationFormat
+                )
             }
             sourceRect = geometry.sourceRect
-            orientation = imageSource.descriptor.orientation
+            orientation = descriptor.orientation
         }
 
         return try rasterImage(
@@ -149,9 +264,8 @@ enum WIImageExecutor {
         )
     }
 
-    private static func thumbnailMaximumPixelSize(
-        for geometry: WIResolvedRender,
-        descriptor: WIImageIO.Descriptor
+    private func thumbnailMaximumPixelSize(
+        for geometry: WIResolvedRender
     ) -> Int? {
         let displaySize = descriptor.orientedPixelSize
         let widthScale = geometry.destinationRect.width
@@ -179,9 +293,8 @@ enum WIImageExecutor {
         )
     }
 
-    private static func usesFullOrientedSource(
-        _ geometry: WIResolvedRender,
-        descriptor: WIImageIO.Descriptor
+    private func usesFullOrientedSource(
+        _ geometry: WIResolvedRender
     ) -> Bool {
         let displaySize = descriptor.orientedPixelSize
         return geometry.sourceRect == Rect(
@@ -192,24 +305,24 @@ enum WIImageExecutor {
         )
     }
 
-    private static func rasterImage(
+    private func rasterImage(
         _ image: CGImage,
         plan: WIImageRaster.Plan
     ) throws(WICompressError) -> CGImage {
         do {
             return try WIImageRaster.image(image, plan: plan)
         } catch {
-            throw map(error)
+            throw Self.map(error)
         }
     }
 
-    private static func rasterAlphaMode(
+    private func rasterAlphaMode(
         destinationFormat: WIImageFormat
     ) -> WIImageRaster.AlphaMode {
         destinationFormat == .jpeg ? .opaque : .preserve
     }
 
-    private static func rasterJPEGBackground(
+    private func rasterJPEGBackground(
         from background: WIJPEGBackground?
     ) -> WIColor? {
         switch background {
@@ -224,7 +337,7 @@ enum WIImageExecutor {
         }
     }
 
-    private static func rasterColorSpace(
+    private func rasterColorSpace(
         from colorSpace: WIResolvedOutputColorSpace
     ) -> WIImageRaster.OutputColorSpace {
         guard let target = colorSpace.target else {
@@ -234,7 +347,36 @@ enum WIImageExecutor {
         return .convert(target)
     }
 
-    private static func map(
+    private static func mapSourceError(
+        _ error: WIImageIO.Error
+    ) -> WICompressError {
+        switch error {
+        case .invalidImageData:
+            return .invalidImageData
+        case .sourcePropertiesUnavailable,
+             .invalidPixelSize,
+             .pixelCountOverflow,
+             .imageCreationFailed:
+            return .imageInfoUnavailable
+        case .thumbnailCreationFailed:
+            return .thumbnailCreationFailed
+        case .animatedSourceUnsupported(let frameCount):
+            return .animatedSourceUnsupported(frameCount: frameCount)
+        case .metadataCopyUnsupported:
+            return .executionPlanUnavailable
+        case .destinationCreationFailed(let typeIdentifier):
+            return .destinationCreationFailed(
+                .detected(from: typeIdentifier)
+            )
+        case .destinationFinalizationFailed(let typeIdentifier):
+            return .encodeFailed(.detected(from: typeIdentifier))
+        case .fileReadFailed(let url),
+             .fileSizeUnavailable(let url):
+            return .fileReadFailed(url)
+        }
+    }
+
+    private static func mapExecutionError(
         _ error: WIImageIO.Error,
         destinationFormat: WIImageFormat
     ) -> WICompressError {

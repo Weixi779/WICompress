@@ -252,6 +252,19 @@ struct WICompressorPublicSurfaceTests {
         }
     }
 
+    @Test("Target validation precedes file source creation")
+    func targetValidationPrecedesFileSourceCreation() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wi-compress-missing-\(UUID().uuidString)")
+
+        #expect(throws: WICompressError.invalidTarget) {
+            _ = try WICompressor.compress(
+                contentsOf: url,
+                to: WICompressionTarget(maxBytes: 0)
+            )
+        }
+    }
+
     @Test("Target JPEG requires an opaque custom background")
     func targetJPEGRequiresOpaqueCustomBackground() throws {
         let data = try Self.tinyPNGData()

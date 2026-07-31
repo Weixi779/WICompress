@@ -13,6 +13,7 @@ import Testing
 import WICompress
 @testable import WICompressExecution
 @testable import WIImageDomain
+@testable import WIImageIO
 
 @Suite("WICompress ImageIO Core", .tags(.imageIOCore, .compression))
 struct WICompressImageIOCoreTests {
@@ -418,11 +419,11 @@ struct WICompressImageIOCoreTests {
                 colorSpace: .preserve
             )
         )
-        let imageSource = try WIImageSource(data: inputData)
-        #expect(imageSource.descriptor.hasUnmodeledMetadata)
+        let pipeline = try ImagePipeline(data: inputData)
+        #expect(pipeline.descriptor.hasUnmodeledMetadata)
         let plan = try WIImageProcessResolver.resolve(
             process,
-            imageSource: imageSource
+            pipeline: pipeline
         )
 
         guard case .copyFromSource = plan.operation else {
@@ -464,10 +465,10 @@ struct WICompressImageIOCoreTests {
                 colorSpace: .preserve
             )
         )
-        let imageSource = try WIImageSource(data: inputData)
+        let pipeline = try ImagePipeline(data: inputData)
         let plan = try WIImageProcessResolver.resolve(
             process,
-            imageSource: imageSource
+            pipeline: pipeline
         )
 
         guard case .render = plan.operation else {
@@ -702,10 +703,10 @@ struct WICompressImageIOCoreTests {
                 colorSpace: .preserve
             )
         )
-        let inputSource = try WIImageSource(data: inputData)
+        let pipeline = try ImagePipeline(data: inputData)
         let executionPlan = try WIImageProcessResolver.resolve(
             process,
-            imageSource: inputSource
+            pipeline: pipeline
         )
 
         let outputData = try WICompressor.process(inputData, using: process).data
@@ -731,10 +732,10 @@ struct WICompressImageIOCoreTests {
                 colorSpace: .preserve
             )
         )
-        let inputSource = try WIImageSource(data: inputData)
+        let pipeline = try ImagePipeline(data: inputData)
         let executionPlan = try WIImageProcessResolver.resolve(
             process,
-            imageSource: inputSource
+            pipeline: pipeline
         )
 
         let outputData = try WICompressor.process(inputData, using: process).data
@@ -751,19 +752,19 @@ struct WICompressImageIOCoreTests {
     func outputColorSpaceResolutionUsesSourceFacts() throws {
         let url = try Self.resource("real_heic_4032x3024_o1_gps_hdr", extension: "heic")
         let inputData = try Data(contentsOf: url)
-        let inputSource = try WIImageSource(data: inputData)
+        let pipeline = try ImagePipeline(data: inputData)
 
         let preservedOutput = try WIImageOutputResolver.resolve(
             WIImageOutput(colorSpace: .preserve),
-            imageSource: inputSource
+            pipeline: pipeline
         )
         let convertedOutput = try WIImageOutputResolver.resolve(
             WIImageOutput(colorSpace: .convert(to: .sRGB)),
-            imageSource: inputSource
+            pipeline: pipeline
         )
 
         #expect(preservedOutput.colorSpace.requiresConversion == false)
-        #expect(try inputSource.sourceColorSpace() == .displayP3)
+        #expect(try pipeline.sourceColorSpace() == .displayP3)
         #expect(convertedOutput.colorSpace.target == .sRGB)
     }
 
@@ -875,7 +876,7 @@ struct WICompressImageIOCoreTests {
     func lossyTargetReturnsExistingCandidateWhenAttemptBudgetCannotCoverAnotherSize() throws {
         let url = try Self.resource("real_jpeg_2098x1350_landscape", extension: "jpg")
         let inputData = try Data(contentsOf: url)
-        let imageSource = try WIImageSource(data: inputData)
+        let pipeline = try ImagePipeline(data: inputData)
         let target = WICompressionTarget(
             maxBytes: 60_000,
             sizing: WICompressionSizing(maximumPixelSize: 1200),
@@ -884,14 +885,14 @@ struct WICompressImageIOCoreTests {
 
         let sizing = try WICompressionTargetResolver.sizing(
             for: target,
-            imageSource: imageSource
+            pipeline: pipeline
         )
         let output = try WICompressionTargetResolver.output(
             for: target,
-            imageSource: imageSource
+            pipeline: pipeline
         )
         let outputData = try WICompressionSolver.compress(
-            imageSource,
+            pipeline,
             to: target,
             sizing: sizing,
             output: output,

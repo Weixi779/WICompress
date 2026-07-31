@@ -34,15 +34,15 @@ struct WIResolvedImageOutput: Sendable, Equatable {
 enum WIImageOutputResolver {
     static func resolve(
         _ output: WIImageOutput,
-        imageSource: WIImageSource
+        pipeline: ImagePipeline
     ) throws(WICompressError) -> WIResolvedImageOutput {
         let destination = try resolvedDestination(
             for: output.representation,
-            descriptor: imageSource.descriptor
+            descriptor: pipeline.descriptor
         )
         let colorSpace = try resolvedColorSpace(
             output.colorSpace,
-            imageSource: imageSource
+            pipeline: pipeline
         )
         let isWritable = Capabilities.canEncode(destination.type)
 
@@ -106,14 +106,14 @@ enum WIImageOutputResolver {
 
     private static func resolvedColorSpace(
         _ decision: WIImageColorSpace,
-        imageSource: WIImageSource
+        pipeline: ImagePipeline
     ) throws(WICompressError) -> WIResolvedOutputColorSpace {
         switch decision {
         case .preserve:
             return WIResolvedOutputColorSpace(target: nil)
         case .convert(let target):
             _ = try makeCGColorSpace(target)
-            let sourceColorSpace = try imageSource.sourceColorSpace()
+            let sourceColorSpace = try pipeline.sourceColorSpace()
             return WIResolvedOutputColorSpace(
                 target: sourceColorSpace == target
                     ? nil

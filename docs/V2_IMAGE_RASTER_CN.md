@@ -7,6 +7,10 @@
 decode 与 encode 之间，只执行已经解析完成的几何和输出决定，不定义
 `WIImageProcess`、`WICompressionTarget` 或 UI 展示语义。
 
+内部状态与编排已经由
+[`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 重新冻结；本文出现的
+resolver、solver、Execution Plan 和 Execution Core 仅记录当前实现或历史迁移背景。
+
 相关文档：
 
 - [`V2_DOMAIN_MODEL_CN.md`](V2_DOMAIN_MODEL_CN.md)：跨产品线 Domain 与执行边界。

@@ -8,7 +8,6 @@
 
 import Foundation
 import WIImageDomain
-import WIImageIO
 
 /// ImageIO-backed image processing and compression entry point.
 package enum WICompressionExecution {
@@ -18,8 +17,8 @@ package enum WICompressionExecution {
         _ data: Data,
         using process: WIImageProcess = .default
     ) throws(WICompressError) -> WIResult {
-        let imageSource = try WIImageSource(data: data)
-        return try self.process(imageSource, using: process)
+        let pipeline = try ImagePipeline(data: data)
+        return try self.process(pipeline, using: process)
     }
 
     /// Reads and processes image data from a file URL.
@@ -27,23 +26,24 @@ package enum WICompressionExecution {
         contentsOf url: URL,
         using process: WIImageProcess = .default
     ) throws(WICompressError) -> WIResult {
-        let imageSource = try WIImageSource(contentsOf: url)
-        return try self.process(imageSource, using: process)
+        let pipeline = try ImagePipeline(contentsOf: url)
+        return try self.process(pipeline, using: process)
     }
 
     private static func process(
-        _ imageSource: WIImageSource,
+        _ pipeline: ImagePipeline,
         using process: WIImageProcess
     ) throws(WICompressError) -> WIResult {
         let executionPlan = try WIImageProcessResolver.resolve(
             process,
-            imageSource: imageSource
+            pipeline: pipeline
         )
-        let outputData = try WIImageExecutor.execute(
-            imageSource,
-            plan: executionPlan
-        )
-        return try compressionResult(for: outputData)
+        if executionPlan.operation == .returnOriginal {
+            return try pipeline.originalResult()
+        }
+
+        let outputData = try pipeline.execute(executionPlan)
+        return try pipeline.result(for: outputData)
     }
 
     /// Compresses image data to satisfy a target contract.
@@ -53,8 +53,8 @@ package enum WICompressionExecution {
     ) throws(WICompressError) -> WIResult {
         try WICompressionTargetValidator.validate(target)
 
-        let imageSource = try WIImageSource(data: data)
-        return try compress(imageSource, to: target)
+        let pipeline = try ImagePipeline(data: data)
+        return try compress(pipeline, to: target)
     }
 
     /// Reads image data from a file URL and compresses it to satisfy a target contract.
@@ -64,37 +64,33 @@ package enum WICompressionExecution {
     ) throws(WICompressError) -> WIResult {
         try WICompressionTargetValidator.validate(target)
 
-        let imageSource = try WIImageSource(contentsOf: url)
-        return try compress(imageSource, to: target)
+        let pipeline = try ImagePipeline(contentsOf: url)
+        return try compress(pipeline, to: target)
     }
 
     private static func compress(
-        _ imageSource: WIImageSource,
+        _ pipeline: ImagePipeline,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WIResult {
         let sizing = try WICompressionTargetResolver.sizing(
             for: target,
-            imageSource: imageSource
+            pipeline: pipeline
         )
         let output = try WICompressionTargetResolver.output(
             for: target,
-            imageSource: imageSource
+            pipeline: pipeline
         )
         if WICompressionTargetResolver.canReturnOriginal(
             target: target,
             sizing: sizing,
             output: output,
-            imageSource: imageSource
+            pipeline: pipeline
         ) {
-            let data = try imageSource.originalData()
-            return compressionResult(
-                for: data,
-                descriptor: imageSource.descriptor
-            )
+            return try pipeline.originalResult()
         }
 
         let outputData = try WICompressionSolver.compress(
-            imageSource,
+            pipeline,
             to: target,
             sizing: sizing,
             output: output
@@ -105,33 +101,6 @@ package enum WICompressionExecution {
             )
         }
 
-        return try compressionResult(for: outputData)
-    }
-
-    private static func compressionResult(
-        for data: Data
-    ) throws(WICompressError) -> WIResult {
-        let imageSource = try WIImageSource(data: data)
-        guard imageSource.descriptor.format != .unknown else {
-            throw WICompressError.unsupportedSourceFormat(
-                imageSource.descriptor.type?.identifier
-            )
-        }
-
-        return compressionResult(
-            for: data,
-            descriptor: imageSource.descriptor
-        )
-    }
-
-    private static func compressionResult(
-        for data: Data,
-        descriptor: WIImageIO.Descriptor
-    ) -> WIResult {
-        WIResult(
-            data: data,
-            format: descriptor.format,
-            pixelSize: descriptor.orientedPixelSize
-        )
+        return try pipeline.result(for: outputData)
     }
 }

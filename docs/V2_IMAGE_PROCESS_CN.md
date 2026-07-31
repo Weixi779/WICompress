@@ -7,6 +7,10 @@ Process 删除尚未实施。
 输出组合与执行边界。1.x 事实和调研证据保留在
 [`V2_CAPABILITY_MAP_CN.md`](V2_CAPABILITY_MAP_CN.md)。
 
+内部状态与编排已经由
+[`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 重新冻结；本文关于
+Resolver、ExecutionPlan 和 Executor 的描述仅记录当前实现，不再代表目标架构。
+
 相关文档：
 
 - [`V2_DOMAIN_MODEL_CN.md`](V2_DOMAIN_MODEL_CN.md)：跨产品线共享 Domain。
@@ -254,8 +258,8 @@ suspension point。
 
 当前同步 base name 已确认为 `WICompressor.process(_:using:)` 与
 `WICompressor.process(contentsOf:using:)`。异步 overload 尚未加入；它必须消费同一个
-`WIImageProcessResolver -> WIExecutionPlan -> WIImageExecutor` 核心，不能建立第二套
-resolver 或改变执行语义。
+`ImagePipeline` 同步核心，不能建立第二套 resolver 或改变执行语义。当前
+`WIImageProcessResolver -> WIExecutionPlan` 仍是待迁移的过渡决策路径。
 
 ## 当前实施状态
 

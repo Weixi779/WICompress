@@ -13,9 +13,9 @@ import WIImageIO
 enum WICompressionTargetResolver {
     static func sizing(
         for target: WICompressionTarget,
-        imageSource: WIImageSource
+        pipeline: ImagePipeline
     ) throws(WICompressError) -> WIResolvedCompressionSizing {
-        let descriptor = imageSource.descriptor
+        let descriptor = pipeline.descriptor
         guard descriptor.format != .unknown else {
             throw .unsupportedSourceFormat(
                 descriptor.type?.identifier
@@ -30,11 +30,11 @@ enum WICompressionTargetResolver {
 
     static func output(
         for target: WICompressionTarget,
-        imageSource: WIImageSource
+        pipeline: ImagePipeline
     ) throws(WICompressError) -> WIResolvedImageOutput {
         try WIImageOutputResolver.resolve(
             target.output,
-            imageSource: imageSource
+            pipeline: pipeline
         )
     }
 
@@ -42,10 +42,10 @@ enum WICompressionTargetResolver {
         target: WICompressionTarget,
         sizing: WIResolvedCompressionSizing,
         output: WIResolvedImageOutput,
-        imageSource: WIImageSource
+        pipeline: ImagePipeline
     ) -> Bool {
         guard
-            imageSource.byteCount <= target.maxBytes,
+            pipeline.byteCount <= target.maxBytes,
             !sizing.hasCrop,
             sizing.basePixelSize == sizing.sourcePixelSize,
             target.output.representation == .preserve,
@@ -55,14 +55,14 @@ enum WICompressionTargetResolver {
         }
 
         return (
-            !imageSource.descriptor.hasUnmodeledMetadata
+            !pipeline.descriptor.hasUnmodeledMetadata
                 || target.output.metadata.preservesUnmodeledMetadata
         )
-            && imageSource.descriptor.metadata.isSubset(
+            && pipeline.descriptor.metadata.isSubset(
                 of: target.output.metadata
             ) && (
             target.output.metadata != .strip
-                || imageSource.descriptor.orientation == .up
+                || pipeline.descriptor.orientation == .up
         )
     }
 
@@ -70,7 +70,7 @@ enum WICompressionTargetResolver {
         for target: WICompressionTarget,
         sizing: WIResolvedCompressionSizing,
         output: WIResolvedImageOutput,
-        imageSource: WIImageSource,
+        pipeline: ImagePipeline,
         pixelSize: WIPixelSize,
         quality: Double?
     ) throws(WICompressError) -> WIExecutionPlan {
@@ -86,7 +86,7 @@ enum WICompressionTargetResolver {
             target: target,
             sizing: sizing,
             output: output,
-            imageSource: imageSource,
+            pipeline: pipeline,
             pixelSize: pixelSize,
             quality: resolvedQuality
         ) {
@@ -130,7 +130,7 @@ enum WICompressionTargetResolver {
         target: WICompressionTarget,
         sizing: WIResolvedCompressionSizing,
         output: WIResolvedImageOutput,
-        imageSource: WIImageSource,
+        pipeline: ImagePipeline,
         pixelSize: WIPixelSize,
         quality: Double?
     ) -> Bool {
@@ -140,9 +140,9 @@ enum WICompressionTargetResolver {
             && !output.colorSpace.requiresConversion
             && (
                 target.output.metadata != .strip
-                    || imageSource.descriptor.orientation == .up
+                    || pipeline.descriptor.orientation == .up
             )
-            && imageSource.imageIOSource.canCopy(
+            && pipeline.source.canCopy(
                 as: output.destinationType,
                 keeping: target.output.metadata,
                 compressionQuality: quality

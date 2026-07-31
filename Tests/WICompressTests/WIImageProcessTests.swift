@@ -13,6 +13,7 @@ import Testing
 import WICompress
 @testable import WICompressExecution
 @testable import WIImageDomain
+@testable import WIImageIO
 
 @Suite("WIImageProcess", .tags(.imageProcess, .publicAPI))
 struct WIImageProcessTests {
@@ -246,7 +247,7 @@ struct WIImageProcessTests {
                 quality: 0.7
             )
         )
-        let outputSource = try WIImageSource(data: result.data)
+        let outputSource = try WIImageIO.Source(data: result.data)
 
         #expect(result.pixelSize == WIPixelSize(width: 320, height: 180))
         #expect(result.format == .jpeg)
@@ -274,7 +275,7 @@ struct WIImageProcessTests {
                 output: WIImageOutput(representation: .png)
             )
         ).data
-        let outputSource = try WIImageSource(data: output)
+        let outputSource = try WIImageIO.Source(data: output)
 
         #expect(outputSource.descriptor.orientedPixelSize.width == 512)
         #expect(outputSource.descriptor.orientedPixelSize.height == 512)
@@ -360,7 +361,7 @@ struct WIImageProcessTests {
             )
         ).data
 
-        #expect(try WIImageSource(data: output).descriptor.format == .png)
+        #expect(try WIImageIO.Source(data: output).descriptor.format == .png)
     }
 
     @Test("Transparent sources require an explicit JPEG background")
@@ -406,7 +407,7 @@ struct WIImageProcessTests {
             "synthetic_tiny_1x1",
             extension: "png"
         )
-        let source = try WIImageSource(data: data)
+        let pipeline = try ImagePipeline(data: data)
         let plan = try WIImageProcessResolver.resolve(
             WIImageProcess(
                 sizing: .original,
@@ -414,7 +415,7 @@ struct WIImageProcessTests {
                 quality: nil,
                 output: WIImageOutput(metadata: .preserve)
             ),
-            imageSource: source
+            pipeline: pipeline
         )
 
         guard case .render = plan.operation else {
@@ -442,7 +443,7 @@ struct WIImageProcessTests {
                 )
             )
         ).data
-        let outputSource = try WIImageSource(data: output)
+        let outputSource = try WIImageIO.Source(data: output)
 
         #expect(outputSource.descriptor.metadata.contains(.gps))
         #expect(outputSource.descriptor.orientation == .up)
@@ -468,9 +469,9 @@ struct WIImageProcessTests {
                 )
             )
         ).data
-        let outputSource = try WIImageSource(data: output)
+        let outputSource = try WIImageIO.Source(data: output)
 
-        #expect(try outputSource.sourceColorSpace() == .sRGB)
+        #expect(try outputSource.colorSpace() == .sRGB)
     }
 
     @Test("Data and file Process terminals have equivalent behavior")
@@ -497,8 +498,8 @@ struct WIImageProcessTests {
         }
         try data.write(to: url)
 
-        let fileSource = try WIImageSource(contentsOf: url)
-        guard case .file(let backingURL) = fileSource.backing else {
+        let pipeline = try ImagePipeline(contentsOf: url)
+        guard case .file(let backingURL) = pipeline.input else {
             Issue.record("The file terminal must keep a file-backed source")
             return
         }
@@ -534,11 +535,11 @@ struct WIImageProcessTests {
         }
         try data.write(to: url)
 
-        let source = try WIImageSource(contentsOf: url)
+        let pipeline = try ImagePipeline(contentsOf: url)
         try FileManager.default.removeItem(at: url)
 
         #expect(throws: WICompressError.fileReadFailed(url)) {
-            try source.originalData()
+            try pipeline.originalData()
         }
     }
 

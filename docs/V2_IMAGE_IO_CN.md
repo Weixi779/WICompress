@@ -5,6 +5,10 @@
 本文记录 WICompress 2.0 对 Apple ImageIO 的内部二次封装方案。它只定义执行基础设施，
 不定义 `WIImageProcess` 或 `WICompressionTarget` 的公共产品语义。
 
+内部状态与编排已经由
+[`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 重新冻结；本文出现的
+resolver、solver、Execution Plan 和 Execution Core 仅记录当前实现或历史迁移背景。
+
 相关文档：
 
 - [`V2_DOMAIN_MODEL_CN.md`](V2_DOMAIN_MODEL_CN.md)：跨产品线 Domain 与 Execution Core
