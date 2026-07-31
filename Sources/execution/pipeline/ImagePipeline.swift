@@ -20,52 +20,35 @@ package final class ImagePipeline {
     }
 
     let input: Input
-    let source: WIImageIO.Source
     let descriptor: WIImageIO.Descriptor
 
     var byteCount: Int {
-        source.byteCount
+        descriptor.byteCount
     }
 
     convenience init(data: Data) throws(WICompressError) {
-        let source: WIImageIO.Source
-        do {
-            source = try WIImageIO.Source(data: data)
-        } catch {
-            throw Self.mapSourceError(error)
-        }
-
         try self.init(
             input: .data(data),
-            source: source
+            descriptor: try WIImageIO.inspect(data)
         )
     }
 
     convenience init(contentsOf url: URL) throws(WICompressError) {
-        let source: WIImageIO.Source
-        do {
-            source = try WIImageIO.Source(contentsOf: url)
-        } catch {
-            throw Self.mapSourceError(error)
-        }
-
         try self.init(
             input: .file(url),
-            source: source
+            descriptor: try WIImageIO.inspect(contentsOf: url)
         )
     }
 
     private init(
         input: Input,
-        source: WIImageIO.Source
+        descriptor: WIImageIO.Descriptor
     ) throws(WICompressError) {
-        let descriptor = source.descriptor
         guard descriptor.frameCount == 1 else {
             throw .animatedSourceUnsupported(frameCount: descriptor.frameCount)
         }
 
         self.input = input
-        self.source = source
         self.descriptor = descriptor
     }
 
@@ -83,10 +66,11 @@ package final class ImagePipeline {
     }
 
     func sourceColorSpace() throws(WICompressError) -> WIColorSpace? {
-        do {
-            return try source.colorSpace()
-        } catch {
-            throw Self.mapSourceError(error)
+        switch input {
+        case .data(let data):
+            return try WIImageIO.colorSpace(data)
+        case .file(let url):
+            return try WIImageIO.colorSpace(contentsOf: url)
         }
     }
 
@@ -101,14 +85,8 @@ package final class ImagePipeline {
     func result(
         for data: Data
     ) throws(WICompressError) -> WIResult {
-        let outputSource: WIImageIO.Source
-        do {
-            outputSource = try WIImageIO.Source(data: data)
-        } catch {
-            throw Self.mapSourceError(error)
-        }
+        let outputDescriptor = try WIImageIO.inspect(data)
 
-        let outputDescriptor = outputSource.descriptor
         guard outputDescriptor.frameCount == 1 else {
             throw .animatedSourceUnsupported(
                 frameCount: outputDescriptor.frameCount
@@ -134,7 +112,6 @@ package final class ImagePipeline {
     ) throws(WICompressError) -> Data {
         try copyFromSource(
             as: output.destinationType,
-            destinationFormat: output.destinationFormat,
             metadata: metadata,
             quality: quality
         )
@@ -179,7 +156,6 @@ package final class ImagePipeline {
         try encodeRendered(
             image,
             as: output.destinationType,
-            destinationFormat: output.destinationFormat,
             metadata: metadata,
             quality: quality
         )
@@ -187,22 +163,25 @@ package final class ImagePipeline {
 
     private func copyFromSource(
         as destinationType: UTType,
-        destinationFormat: WIImageFormat,
         metadata: WIImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
-        do {
-            return try source.copy(
+        let options = CopyOptions(
+            compressionQuality: quality,
+            metadata: metadata
+        )
+        switch input {
+        case .data(let data):
+            return try WIImageIO.copy(
+                data,
                 as: destinationType,
-                options: CopyOptions(
-                    compressionQuality: quality,
-                    metadata: metadata
-                )
+                options: options
             )
-        } catch {
-            throw Self.mapExecutionError(
-                error,
-                destinationFormat: destinationFormat
+        case .file(let url):
+            return try WIImageIO.copy(
+                contentsOf: url,
+                as: destinationType,
+                options: options
             )
         }
     }
@@ -210,24 +189,27 @@ package final class ImagePipeline {
     private func encodeRendered(
         _ image: CGImage,
         as destinationType: UTType,
-        destinationFormat: WIImageFormat,
         metadata: WIImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
-        do {
-            return try Encoder.encode(
+        let options = EncodeOptions(
+            compressionQuality: quality,
+            metadata: metadata
+        )
+        switch input {
+        case .data(let data):
+            return try WIImageIO.encode(
                 image,
                 as: destinationType,
-                options: EncodeOptions(
-                    compressionQuality: quality,
-                    metadata: metadata
-                ),
-                metadataFrom: source
+                options: options,
+                metadataFrom: data
             )
-        } catch {
-            throw Self.mapExecutionError(
-                error,
-                destinationFormat: destinationFormat
+        case .file(let url):
+            return try WIImageIO.encode(
+                image,
+                as: destinationType,
+                options: options,
+                metadataFrom: url
             )
         }
     }
@@ -245,18 +227,9 @@ package final class ImagePipeline {
             if let maximumPixelSize = thumbnailMaximumPixelSize(
                 for: geometry
             ) {
-                do {
-                    sourceImage = try source.thumbnail(
-                        options: ThumbnailOptions(
-                            maximumPixelSize: maximumPixelSize
-                        )
-                    )
-                } catch {
-                    throw Self.mapExecutionError(
-                        error,
-                        destinationFormat: destinationFormat
-                    )
-                }
+                sourceImage = try decodedThumbnail(
+                    maximumPixelSize: maximumPixelSize
+                )
                 sourceRect = Rect(
                     x: 0,
                     y: 0,
@@ -265,26 +238,12 @@ package final class ImagePipeline {
                 )
                 orientation = .up
             } else {
-                do {
-                    sourceImage = try source.image()
-                } catch {
-                    throw Self.mapExecutionError(
-                        error,
-                        destinationFormat: destinationFormat
-                    )
-                }
+                sourceImage = try decodedImage()
                 sourceRect = geometry.sourceRect
                 orientation = descriptor.orientation
             }
         } else {
-            do {
-                sourceImage = try source.image()
-            } catch {
-                throw Self.mapExecutionError(
-                    error,
-                    destinationFormat: destinationFormat
-                )
-            }
+            sourceImage = try decodedImage()
             sourceRect = geometry.sourceRect
             orientation = descriptor.orientation
         }
@@ -304,6 +263,32 @@ package final class ImagePipeline {
                 colorSpace: rasterColorSpace(from: outputColorSpace)
             )
         )
+    }
+
+    private func decodedImage() throws(WICompressError) -> CGImage {
+        switch input {
+        case .data(let data):
+            return try WIImageIO.image(data)
+        case .file(let url):
+            return try WIImageIO.image(contentsOf: url)
+        }
+    }
+
+    private func decodedThumbnail(
+        maximumPixelSize: Int
+    ) throws(WICompressError) -> CGImage {
+        let options = ThumbnailOptions(
+            maximumPixelSize: maximumPixelSize
+        )
+        switch input {
+        case .data(let data):
+            return try WIImageIO.thumbnail(data, options: options)
+        case .file(let url):
+            return try WIImageIO.thumbnail(
+                contentsOf: url,
+                options: options
+            )
+        }
     }
 
     private func thumbnailMaximumPixelSize(
@@ -387,64 +372,6 @@ package final class ImagePipeline {
         }
 
         return .convert(target)
-    }
-
-    private static func mapSourceError(
-        _ error: WIImageIO.Error
-    ) -> WICompressError {
-        switch error {
-        case .invalidImageData:
-            return .invalidImageData
-        case .sourcePropertiesUnavailable,
-             .invalidPixelSize,
-             .pixelCountOverflow,
-             .imageCreationFailed:
-            return .imageInfoUnavailable
-        case .thumbnailCreationFailed:
-            return .imageDecodeFailed
-        case .animatedSourceUnsupported(let frameCount):
-            return .animatedSourceUnsupported(frameCount: frameCount)
-        case .metadataCopyUnsupported:
-            return .imageEncodeFailed(.unknown)
-        case .destinationCreationFailed(let typeIdentifier):
-            return .imageEncodeFailed(
-                .detected(from: typeIdentifier)
-            )
-        case .destinationFinalizationFailed(let typeIdentifier):
-            return .imageEncodeFailed(.detected(from: typeIdentifier))
-        case .fileReadFailed(let url),
-             .fileSizeUnavailable(let url):
-            return .fileReadFailed(url)
-        }
-    }
-
-    private static func mapExecutionError(
-        _ error: WIImageIO.Error,
-        destinationFormat: WIImageFormat
-    ) -> WICompressError {
-        switch error {
-        case .invalidImageData:
-            return .invalidImageData
-        case .sourcePropertiesUnavailable,
-             .invalidPixelSize,
-             .pixelCountOverflow:
-            return .imageInfoUnavailable
-        case .fileReadFailed(let url),
-             .fileSizeUnavailable(let url):
-            return .fileReadFailed(url)
-        case .imageCreationFailed:
-            return .imageDecodeFailed
-        case .thumbnailCreationFailed:
-            return .imageDecodeFailed
-        case .animatedSourceUnsupported(let frameCount):
-            return .animatedSourceUnsupported(frameCount: frameCount)
-        case .metadataCopyUnsupported:
-            return .imageEncodeFailed(destinationFormat)
-        case .destinationCreationFailed:
-            return .imageEncodeFailed(destinationFormat)
-        case .destinationFinalizationFailed:
-            return .imageEncodeFailed(destinationFormat)
-        }
     }
 
     private static func map(

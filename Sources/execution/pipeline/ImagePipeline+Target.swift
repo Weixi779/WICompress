@@ -9,6 +9,7 @@
 import CoreGraphics
 import Foundation
 import WIImageDomain
+import WIImageIO
 
 extension ImagePipeline {
     private static let defaultMaxEncodeAttempts = 40
@@ -486,7 +487,8 @@ extension ImagePipeline {
                 target.output.metadata != .strip
                     || descriptor.orientation == .up
             )
-            && source.canCopy(
+            && WIImageIO.canCopy(
+                descriptor,
                 as: output.destinationType,
                 keeping: target.output.metadata,
                 compressionQuality: quality

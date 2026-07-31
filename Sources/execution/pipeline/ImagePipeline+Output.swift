@@ -39,7 +39,7 @@ extension ImagePipeline {
             for: output.representation
         )
         let colorSpace = try outputColorSpace(output.colorSpace)
-        let isWritable = Capabilities.canEncode(destination.type)
+        let isWritable = WIImageIO.canEncode(destination.type)
 
         return ImageDestination(
             destinationType: destination.type,

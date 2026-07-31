@@ -1,5 +1,5 @@
 //
-//  WIImageSourceTests.swift
+//  WIImageOperationsTests.swift
 //  WIImageIOTests
 //
 //  Created by weixi on 2026/7/29.
@@ -18,10 +18,10 @@ extension Tag {
     @Tag static var imageIOCore: Self
 }
 
-@Suite("WIImageIO Source", .tags(.imageIOCore))
-struct WIImageSourceTests {
-    @Test("Data source exposes typed, orientation-aware facts")
-    func dataSourceDescriptor() throws {
+@Suite("WIImageIO Operations", .tags(.imageIOCore))
+struct WIImageOperationsTests {
+    @Test("Data inspection exposes typed, orientation-aware facts")
+    func dataDescriptor() throws {
         let data = try Self.encodedImage(
             width: 40,
             height: 20,
@@ -30,10 +30,8 @@ struct WIImageSourceTests {
             hasGPS: true,
             hasTIFFOrientation: true
         )
-        let source = try Source(data: data)
-        let descriptor = source.descriptor
+        let descriptor = try WIImageIO.inspect(data)
 
-        #expect(source.byteCount == data.count)
         #expect(descriptor.byteCount == data.count)
         #expect(descriptor.type == .jpeg)
         #expect(descriptor.format == .jpeg)
@@ -48,12 +46,12 @@ struct WIImageSourceTests {
         #expect(descriptor.frameCount == 1)
         #expect(descriptor.hasAlpha != true)
         #expect(descriptor.metadata.contains(.gps))
-        #expect(Capabilities.canDecode(.jpeg))
-        #expect(Capabilities.canEncode(.jpeg))
+        #expect(WIImageIO.canDecode(.jpeg))
+        #expect(WIImageIO.canEncode(.jpeg))
     }
 
-    @Test("File source inspects without changing encoded byte count")
-    func fileSourceDescriptor() throws {
+    @Test("File inspection preserves the encoded byte count")
+    func fileDescriptor() throws {
         let data = try Self.encodedImage(
             width: 12,
             height: 8,
@@ -65,13 +63,12 @@ struct WIImageSourceTests {
         try data.write(to: url, options: .atomic)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let source = try Source(contentsOf: url)
+        let descriptor = try WIImageIO.inspect(contentsOf: url)
 
-        #expect(source.byteCount == data.count)
-        #expect(source.descriptor.byteCount == data.count)
-        #expect(source.descriptor.format == .png)
-        #expect(source.descriptor.pixelSize.width == 12)
-        #expect(source.descriptor.pixelSize.height == 8)
+        #expect(descriptor.byteCount == data.count)
+        #expect(descriptor.format == .png)
+        #expect(descriptor.pixelSize.width == 12)
+        #expect(descriptor.pixelSize.height == 8)
     }
 
     @Test("Transparent PNG reports alpha")
@@ -83,7 +80,7 @@ struct WIImageSourceTests {
             alpha: 96
         )
 
-        let descriptor = try Source(data: data).descriptor
+        let descriptor = try WIImageIO.inspect(data)
 
         #expect(descriptor.hasAlpha == true)
     }
@@ -97,24 +94,23 @@ struct WIImageSourceTests {
             frameCount: 2
         )
 
-        let source = try Source(data: data)
-        let descriptor = source.descriptor
+        let descriptor = try WIImageIO.inspect(data)
 
         #expect(descriptor.frameCount == 2)
         #expect(descriptor.format == .unknown)
-        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
-            try source.image()
+        #expect(throws: WICompressError.animatedSourceUnsupported(frameCount: 2)) {
+            try WIImageIO.image(data)
         }
-        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
-            try source.thumbnail(options: ThumbnailOptions())
+        #expect(throws: WICompressError.animatedSourceUnsupported(frameCount: 2)) {
+            try WIImageIO.thumbnail(data, options: ThumbnailOptions())
         }
-        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
-            try source.copy(as: .png)
+        #expect(throws: WICompressError.animatedSourceUnsupported(frameCount: 2)) {
+            try WIImageIO.copy(data, as: .png)
         }
     }
 
-    @Test("Data and file sources have equivalent decode and copy semantics")
-    func dataAndFileSourceParity() throws {
+    @Test("Data and file inputs have equivalent decode and copy semantics")
+    func dataAndFileParity() throws {
         let data = try Self.encodedImage(
             width: 40,
             height: 20,
@@ -129,24 +125,24 @@ struct WIImageSourceTests {
         try data.write(to: url, options: .atomic)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let dataSource = try Source(data: data)
-        let fileSource = try Source(contentsOf: url)
-        let dataImage = try dataSource.image()
-        let fileImage = try fileSource.image()
-        let dataThumbnail = try dataSource.thumbnail(
+        let dataDescriptor = try WIImageIO.inspect(data)
+        let fileDescriptor = try WIImageIO.inspect(contentsOf: url)
+        let dataImage = try WIImageIO.image(data)
+        let fileImage = try WIImageIO.image(contentsOf: url)
+        let dataThumbnail = try WIImageIO.thumbnail(
+            data,
             options: ThumbnailOptions(maximumPixelSize: 10)
         )
-        let fileThumbnail = try fileSource.thumbnail(
+        let fileThumbnail = try WIImageIO.thumbnail(
+            contentsOf: url,
             options: ThumbnailOptions(maximumPixelSize: 10)
         )
-        let dataCopy = try Source(
-            data: dataSource.copy(as: .jpeg)
-        ).descriptor
-        let fileCopy = try Source(
-            data: fileSource.copy(as: .jpeg)
-        ).descriptor
+        let dataCopy = try WIImageIO.inspect(WIImageIO.copy(data, as: .jpeg))
+        let fileCopy = try WIImageIO.inspect(
+            WIImageIO.copy(contentsOf: url, as: .jpeg)
+        )
 
-        #expect(dataSource.descriptor == fileSource.descriptor)
+        #expect(dataDescriptor == fileDescriptor)
         #expect(dataImage.width == fileImage.width)
         #expect(dataImage.height == fileImage.height)
         #expect(dataThumbnail.width == fileThumbnail.width)
@@ -166,12 +162,13 @@ struct WIImageSourceTests {
             typeIdentifier: UTType.jpeg.identifier
         )
 
-        let image = try Source(data: data).image(
+        let decodedImage = try WIImageIO.image(
+            data,
             options: DecodeOptions(cacheImmediately: false)
         )
 
-        #expect(image.width == 40)
-        #expect(image.height == 20)
+        #expect(decodedImage.width == 40)
+        #expect(decodedImage.height == 20)
     }
 
     @Test("Thumbnail applies orientation and respects the maximum pixel size")
@@ -183,16 +180,17 @@ struct WIImageSourceTests {
             orientation: 6
         )
 
-        let thumbnail = try Source(data: data).thumbnail(
+        let result = try WIImageIO.thumbnail(
+            data,
             options: ThumbnailOptions(maximumPixelSize: 10)
         )
 
-        #expect(thumbnail.width == 5)
-        #expect(thumbnail.height == 10)
+        #expect(result.width == 5)
+        #expect(result.height == 10)
     }
 
-    @Test("Source copy preserves metadata and orientation coupling")
-    func sourceCopy() throws {
+    @Test("Copy preserves metadata and orientation coupling")
+    func copiedMetadata() throws {
         let data = try Self.encodedImage(
             width: 40,
             height: 20,
@@ -201,17 +199,15 @@ struct WIImageSourceTests {
             hasGPS: true
         )
 
-        let copiedData = try Source(data: data).copy(
-            as: .jpeg
-        )
+        let copiedData = try WIImageIO.copy(data, as: .jpeg)
         let properties = try Self.properties(in: copiedData)
 
         #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
         #expect(properties[kCGImagePropertyGPSDictionary] != nil)
     }
 
-    @Test("Source copy can remove GPS metadata without decoding pixels")
-    func sourceCopyExcludingGPS() throws {
+    @Test("Copy can remove GPS metadata without decoding pixels")
+    func copyExcludingGPS() throws {
         let data = try Self.encodedImage(
             width: 40,
             height: 20,
@@ -219,10 +215,10 @@ struct WIImageSourceTests {
             orientation: 6,
             hasGPS: true
         )
-        let source = try Source(data: data)
         let metadata = WIImageMetadataOptions.preserve.subtracting(.gps)
 
-        let copiedData = try source.copy(
+        let copiedData = try WIImageIO.copy(
+            data,
             as: .jpeg,
             options: CopyOptions(metadata: metadata)
         )
@@ -240,15 +236,17 @@ struct WIImageSourceTests {
             typeIdentifier: UTType.png.identifier,
             pngAuthor: "WICompress"
         )
-        let source = try Source(data: data)
+        let descriptor = try WIImageIO.inspect(data)
 
-        #expect(source.descriptor.hasUnmodeledMetadata)
-        #expect(!source.canCopy(
+        #expect(descriptor.hasUnmodeledMetadata)
+        #expect(!WIImageIO.canCopy(
+            descriptor,
             as: .png,
             keeping: .strip,
             compressionQuality: nil
         ))
-        #expect(source.canCopy(
+        #expect(WIImageIO.canCopy(
+            descriptor,
             as: .png,
             keeping: .preserve,
             compressionQuality: nil
@@ -265,19 +263,21 @@ struct WIImageSourceTests {
             hasGPS: true,
             hasTIFFOrientation: true
         )
-        let source = try Source(data: data)
-        let image = try source.thumbnail(options: ThumbnailOptions())
-
-        let strippedData = try Encoder.encode(
-            image,
-            as: .jpeg,
-            metadataFrom: source
+        let decodedImage = try WIImageIO.thumbnail(
+            data,
+            options: ThumbnailOptions()
         )
-        let preservedData = try Encoder.encode(
-            image,
+
+        let strippedData = try WIImageIO.encode(
+            decodedImage,
+            as: .jpeg,
+            metadataFrom: data
+        )
+        let preservedData = try WIImageIO.encode(
+            decodedImage,
             as: .jpeg,
             options: EncodeOptions(metadata: .preserve),
-            metadataFrom: source
+            metadataFrom: data
         )
         let strippedProperties = try Self.properties(in: strippedData)
         let preservedProperties = try Self.properties(in: preservedData)
@@ -304,12 +304,12 @@ struct WIImageSourceTests {
             ]
         ]
 
-        let options = Source.metadataOptions(in: properties)
-        let exifOnly = Source.metadataProperties(
+        let options = WIImageIO.metadataOptions(in: properties)
+        let exifOnly = WIImageIO.metadataProperties(
             in: properties,
             keeping: .exif
         )
-        let makerNotesOnly = Source.metadataProperties(
+        let makerNotesOnly = WIImageIO.metadataProperties(
             in: properties,
             keeping: .makerNotes
         )
@@ -358,7 +358,7 @@ struct WIImageSourceTests {
             ]
         ]
 
-        let options = Source.metadataOptions(in: properties)
+        let options = WIImageIO.metadataOptions(in: properties)
 
         #expect(options == .makerNotes)
     }
@@ -370,18 +370,17 @@ struct WIImageSourceTests {
             height: 4,
             typeIdentifier: UTType.png.identifier
         )
-        let source = try Source(data: data)
         let type = UTType(exportedAs: "com.wicompress.unsupported")
 
-        #expect(throws: WIImageIO.Error.destinationCreationFailed(type)) {
-            try source.copy(as: type)
+        #expect(throws: WICompressError.imageEncodeFailed(.unknown)) {
+            try WIImageIO.copy(data, as: type)
         }
     }
 
     @Test("Invalid encoded bytes fail explicitly")
     func invalidDataFails() {
-        #expect(throws: WIImageIO.Error.invalidImageData) {
-            try Source(data: Data([0x00, 0x01, 0x02]))
+        #expect(throws: WICompressError.invalidImageData) {
+            try WIImageIO.inspect(Data([0x00, 0x01, 0x02]))
         }
     }
 
@@ -391,8 +390,8 @@ struct WIImageSourceTests {
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("png")
 
-        #expect(throws: WIImageIO.Error.fileReadFailed(url)) {
-            try Source(contentsOf: url)
+        #expect(throws: WICompressError.fileReadFailed(url)) {
+            try WIImageIO.inspect(contentsOf: url)
         }
     }
 

@@ -10,27 +10,29 @@ import Foundation
 import UniformTypeIdentifiers
 import WIImageDomain
 
-package struct Descriptor: Sendable, Equatable {
-    package let type: UTType?
-    package let byteCount: Int
-    package let pixelSize: WIPixelSize
-    package let orientation: Orientation
-    package let frameCount: Int
-    package let hasAlpha: Bool?
-    package let metadata: WIImageMetadataOptions
-    package let hasUnmodeledMetadata: Bool
-    package let hasGainMap: Bool
+extension WIImageIO {
+    package struct Descriptor: Sendable, Equatable {
+        package let type: UTType?
+        package let byteCount: Int
+        package let pixelSize: WIPixelSize
+        package let orientation: Orientation
+        package let frameCount: Int
+        package let hasAlpha: Bool?
+        package let metadata: WIImageMetadataOptions
+        package let hasUnmodeledMetadata: Bool
+        package let hasGainMap: Bool
 
-    package var format: WIImageFormat {
-        .detected(from: type)
-    }
+        package var format: WIImageFormat {
+            .detected(from: type)
+        }
 
-    package var orientedPixelSize: WIPixelSize {
-        orientation.swapsDimensions
-            ? WIPixelSize(
-                validWidth: pixelSize.height,
-                height: pixelSize.width
-            )
-            : pixelSize
+        package var orientedPixelSize: WIPixelSize {
+            orientation.swapsDimensions
+                ? WIPixelSize(
+                    validWidth: pixelSize.height,
+                    height: pixelSize.width
+                )
+                : pixelSize
+        }
     }
 }

@@ -247,13 +247,13 @@ struct WIImageProcessTests {
                 quality: 0.7
             )
         )
-        let outputSource = try WIImageIO.Source(data: result.data)
+        let outputDescriptor = try WIImageIO.inspect(result.data)
 
         #expect(result.pixelSize == WIPixelSize(width: 320, height: 180))
         #expect(result.format == .jpeg)
         #expect(result.byteCount == result.data.count)
-        #expect(outputSource.descriptor.orientedPixelSize == result.pixelSize)
-        #expect(outputSource.descriptor.format == result.format)
+        #expect(outputDescriptor.orientedPixelSize == result.pixelSize)
+        #expect(outputDescriptor.format == result.format)
     }
 
     @Test("Process crop fixes the encoded aspect ratio before resizing")
@@ -275,11 +275,11 @@ struct WIImageProcessTests {
                 output: WIImageOutput(representation: .png)
             )
         ).data
-        let outputSource = try WIImageIO.Source(data: output)
+        let outputDescriptor = try WIImageIO.inspect(output)
 
-        #expect(outputSource.descriptor.orientedPixelSize.width == 512)
-        #expect(outputSource.descriptor.orientedPixelSize.height == 512)
-        #expect(outputSource.descriptor.format == .png)
+        #expect(outputDescriptor.orientedPixelSize.width == 512)
+        #expect(outputDescriptor.orientedPixelSize.height == 512)
+        #expect(outputDescriptor.format == .png)
     }
 
     @Test("Non-center Process crop uses EXIF-oriented coordinates")
@@ -361,7 +361,7 @@ struct WIImageProcessTests {
             )
         ).data
 
-        #expect(try WIImageIO.Source(data: output).descriptor.format == .png)
+        #expect(try WIImageIO.inspect(output).format == .png)
     }
 
     @Test("Transparent sources require an explicit JPEG background")
@@ -407,7 +407,7 @@ struct WIImageProcessTests {
             "real_heic_4032x3024_o6_gps_hdr",
             extension: "heic"
         )
-        let input = try WIImageIO.Source(data: data)
+        let inputDescriptor = try WIImageIO.inspect(data)
         let output = try WICompressor.process(
             data,
             using: WIImageProcess(
@@ -417,10 +417,10 @@ struct WIImageProcessTests {
                 output: WIImageOutput(metadata: .preserve)
             )
         ).data
-        let result = try WIImageIO.Source(data: output)
+        let resultDescriptor = try WIImageIO.inspect(output)
 
-        #expect(input.descriptor.orientation != .up)
-        #expect(result.descriptor.orientation == .up)
+        #expect(inputDescriptor.orientation != .up)
+        #expect(resultDescriptor.orientation == .up)
         #expect(output != data)
     }
 
@@ -443,11 +443,11 @@ struct WIImageProcessTests {
                 )
             )
         ).data
-        let outputSource = try WIImageIO.Source(data: output)
+        let outputDescriptor = try WIImageIO.inspect(output)
 
-        #expect(outputSource.descriptor.metadata.contains(.gps))
-        #expect(outputSource.descriptor.orientation == .up)
-        #expect(outputSource.descriptor.format == .jpeg)
+        #expect(outputDescriptor.metadata.contains(.gps))
+        #expect(outputDescriptor.orientation == .up)
+        #expect(outputDescriptor.format == .jpeg)
     }
 
     @Test("Process converts rendered pixels to sRGB")
@@ -469,9 +469,7 @@ struct WIImageProcessTests {
                 )
             )
         ).data
-        let outputSource = try WIImageIO.Source(data: output)
-
-        #expect(try outputSource.colorSpace() == .sRGB)
+        #expect(try WIImageIO.colorSpace(output) == .sRGB)
     }
 
     @Test("Data and file Process terminals have equivalent behavior")
@@ -517,8 +515,8 @@ struct WIImageProcessTests {
         #expect(fileResult.byteCount == dataResult.byteCount)
     }
 
-    @Test("File-backed sources load original bytes only on demand")
-    func fileBackedSourceLoadsOriginalOnDemand() throws {
+    @Test("File-backed inputs load original bytes only on demand")
+    func fileBackedInputLoadsOriginalOnDemand() throws {
         let data = try Self.resourceData(
             "synthetic_tiny_1x1",
             extension: "png"

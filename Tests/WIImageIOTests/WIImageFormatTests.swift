@@ -58,15 +58,15 @@ struct WIImageFormatTests {
     @Test("Known image data is detected from its container type", arguments: knownFormatCases)
     func knownImageDataDetected(_ formatCase: FormatCase) throws {
         let data = try #require(Self.makeImageData(type: formatCase.type))
-        let source = try WIImageIO.Source(data: data)
+        let descriptor = try WIImageIO.inspect(data)
 
-        #expect(source.descriptor.format == formatCase.expected)
+        #expect(descriptor.format == formatCase.expected)
     }
 
     @Test("Empty data cannot produce an inspected format")
     func emptyDataHasNoFormat() {
-        #expect(throws: WIImageIO.Error.invalidImageData) {
-            try WIImageIO.Source(data: Data())
+        #expect(throws: WICompressError.invalidImageData) {
+            try WIImageIO.inspect(Data())
         }
     }
 
@@ -74,8 +74,8 @@ struct WIImageFormatTests {
     func randomBytesHaveNoFormat() {
         let data = Data([0x00, 0x01, 0x02, 0x03, 0x04])
 
-        #expect(throws: WIImageIO.Error.invalidImageData) {
-            try WIImageIO.Source(data: data)
+        #expect(throws: WICompressError.invalidImageData) {
+            try WIImageIO.inspect(data)
         }
     }
 

@@ -11,5 +11,5 @@ import WIImageDomain
 @testable import WIImageIO
 
 func imageFormat(of data: Data) throws -> WIImageFormat {
-    try WIImageIO.Source(data: data).descriptor.format
+    try WIImageIO.inspect(data).format
 }

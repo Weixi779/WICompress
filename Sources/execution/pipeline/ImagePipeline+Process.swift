@@ -8,6 +8,7 @@
 
 import Foundation
 import WIImageDomain
+import WIImageIO
 
 extension ImagePipeline {
     package static func process(
@@ -119,7 +120,8 @@ extension ImagePipeline {
                 process.output.metadata != .strip
                     || descriptor.orientation == .up
             )
-            && source.canCopy(
+            && WIImageIO.canCopy(
+                descriptor,
                 as: output.destinationType,
                 keeping: process.output.metadata,
                 compressionQuality: quality
