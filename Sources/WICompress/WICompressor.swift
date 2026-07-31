@@ -17,7 +17,7 @@ public enum WICompressor {
         _ data: Data,
         using process: WIImageProcess = .default
     ) throws(WICompressError) -> WIResult {
-        try WICompressionExecution.process(data, using: process)
+        try ImagePipeline.process(data, using: process)
     }
 
     /// Reads and processes image data from a file URL.
@@ -25,7 +25,7 @@ public enum WICompressor {
         contentsOf url: URL,
         using process: WIImageProcess = .default
     ) throws(WICompressError) -> WIResult {
-        try WICompressionExecution.process(
+        try ImagePipeline.process(
             contentsOf: url,
             using: process
         )
@@ -36,7 +36,7 @@ public enum WICompressor {
         _ data: Data,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WIResult {
-        try WICompressionExecution.compress(data, to: target)
+        try ImagePipeline.compress(data, to: target)
     }
 
     /// Reads image data from a file URL and compresses it to satisfy a target contract.
@@ -44,7 +44,7 @@ public enum WICompressor {
         contentsOf url: URL,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WIResult {
-        try WICompressionExecution.compress(
+        try ImagePipeline.compress(
             contentsOf: url,
             to: target
         )

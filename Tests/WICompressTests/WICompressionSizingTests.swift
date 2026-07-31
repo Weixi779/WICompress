@@ -91,9 +91,8 @@ struct WICompressionSizingTests {
     func sizingResolvesFourCombinations(
         _ sizingCase: SizingCase
     ) throws {
-        let resolved = try WICompressionSizingResolver.resolve(
-            sizingCase.sizing,
-            sourcePixelSize: WIPixelSize(width: 4000, height: 3000)
+        let resolved = try sizingCase.sizing.geometry(
+            for: WIPixelSize(width: 4000, height: 3000)
         )
 
         #expect(resolved.sourceRect == sizingCase.expectedSourceRect)
@@ -102,13 +101,11 @@ struct WICompressionSizingTests {
 
     @Test("Aspect-ratio anchor moves the fixed crop without changing its size")
     func aspectRatioAnchorMovesCrop() throws {
-        let resolved = try WICompressionSizingResolver.resolve(
-            WICompressionSizing(
+        let resolved = try WICompressionSizing(
                 aspectRatio: WIAspectRatio(width: 1, height: 1),
                 anchor: WICropAnchor(x: 0, y: 0.5)
-            ),
-            sourcePixelSize: WIPixelSize(width: 4000, height: 3000)
-        )
+            )
+            .geometry(for: WIPixelSize(width: 4000, height: 3000))
 
         #expect(
             resolved.sourceRect == Rect(

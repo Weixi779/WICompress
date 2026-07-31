@@ -7,7 +7,7 @@
 
 内部状态与编排已经由
 [`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 重新冻结；本文出现的
-resolver、solver、Execution Plan 和 Execution Core 仅记录当前实现或历史迁移背景。
+resolver、solver、Execution Plan 和 Execution Core 仅属于历史迁移背景。
 
 相关文档：
 
@@ -281,19 +281,17 @@ Data / file URL + Sendable options
 `WIImageIO` 不是新的公共 pipeline，也不解释 Domain。完整方向是：
 
 ```text
-WIImageProcess ────────┐
-                       ├─> resolver / solver
-WICompressionTarget ───┘
-                              ↓
-                   concrete Execution Plan
-                              ↓
-                WIImageIO inspect / decode
-                              ↓
-                 WIImageRaster.image when needed
-                              ↓
-                    WIImageIO encode / copy
-                              ↓
-                             Data
+Data / file URL + Process / Target
+              ↓
+       request ImagePipeline
+              ↓
+      WIImageIO inspect / decode
+              ↓
+   WIImageRaster.image when needed
+              ↓
+       WIImageIO encode / copy
+              ↓
+             Data
 ```
 
 Raster 与 ImageIO primitive 分属两个内部能力，但对外仍是一次 terminal execution 和
@@ -301,8 +299,8 @@ Raster 与 ImageIO primitive 分属两个内部能力，但对外仍是一次 te
 WICompress 的普通调用方。Raster 的 resolved-geometry 输入、单次绘制和 surface
 生命周期以 [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md) 为准。
 
-Target solver 可以在一次顶层调用中复用同一个 source，并在相同尺寸的 quality search
-中复用已经 render 的 `CGImage`。这也是不能只保留静态
+Target 搜索可以在一次顶层调用中复用同一个 source，并在相同尺寸的 quality search 中
+复用已经 render 的 `CGImage`。这也是不能只保留静态
 `ImageIOCodec.inspect/decode/encode(Data, ...)` facade 的原因：one-shot API 会重复创建
 source，或把缓存生命周期隐藏进静态类型。
 
@@ -333,8 +331,8 @@ ImageIO 层使用 typed throws 表达基础设施失败，至少能够区分：
 | `WIImageEncoder` 中的 thumbnail options | `WIImageIO` Thumbnail |
 | `WIImageEncoder` 中的 destination create/add/finalize | `WIImageIO` Encode / Copy |
 | bitmap/canvas/color render | `WIImageRaster` |
-| `WIWritePlanResolver` 的 Domain 决策 | 由 2.0 Process / Target resolver 替换 |
-| `WICompressionSolver` 的 candidate search | Target Domain 保留 |
+| `WIWritePlanResolver` 的 Domain 决策 | 请求级 `ImagePipeline` |
+| Target candidate search | `ImagePipeline` 内部 Target 算法 |
 
 当前迁移后，WICompress target 已不再直接拼接 ImageIO source/destination option
 dictionary，也不再持有 bitmap render/orientation normalization helper。旧执行路径已经

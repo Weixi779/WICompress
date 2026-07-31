@@ -126,14 +126,12 @@ struct WIImageProcessTests {
         _ crop: WIImageCrop,
         expected: Rect
     ) throws {
-        let geometry = try WIImageProcessGeometry.resolve(
-            process: WIImageProcess(
+        let geometry = try WIImageProcess(
                 sizing: .original,
                 crop: crop,
                 quality: nil
-            ),
-            sourcePixelSize: WIPixelSize(width: 4_000, height: 3_000)
-        )
+            )
+            .geometry(for: WIPixelSize(width: 4_000, height: 3_000))
 
         #expect(geometry.sourceRect == expected)
         #expect(
@@ -156,14 +154,12 @@ struct WIImageProcessTests {
             }
         }
 
-        let geometry = try WIImageProcessGeometry.resolve(
-            process: WIImageProcess(
+        let geometry = try WIImageProcess(
                 sizing: .resize(using: HalfSize()),
                 crop: .aspectRatio(width: 1, height: 1),
                 quality: nil
-            ),
-            sourcePixelSize: WIPixelSize(width: 4_000, height: 3_000)
-        )
+            )
+            .geometry(for: WIPixelSize(width: 4_000, height: 3_000))
 
         #expect(
             geometry.croppedPixelSize
@@ -219,14 +215,12 @@ struct WIImageProcessTests {
     )
     func unexecutableResizingResultFails(_ size: WIPixelSize) {
         #expect(throws: WICompressError.invalidResizingResult) {
-            try WIImageProcessGeometry.resolve(
-                process: WIImageProcess(
+            try WIImageProcess(
                     sizing: .resize(
                         using: FixedResizing(size: size)
                     )
-                ),
-                sourcePixelSize: WIPixelSize(width: 400, height: 100)
-            )
+                )
+                .geometry(for: WIPixelSize(width: 400, height: 100))
         }
     }
 

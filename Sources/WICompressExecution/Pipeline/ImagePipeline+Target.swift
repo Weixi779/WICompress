@@ -1,43 +1,151 @@
 //
-//  WICompressionSolver.swift
+//  ImagePipeline+Target.swift
 //  WICompressExecution
 //
-//  Created by weixi on 2026/6/28.
+//  Created by weixi on 2026/7/31.
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
 //
 
 import CoreGraphics
 import Foundation
 import WIImageDomain
-import WIImageIO
 
-/// Target byte-budget search over one fixed crop and a uniformly scaled base size.
-enum WICompressionSolver {
+extension ImagePipeline {
     private static let defaultMaxEncodeAttempts = 40
     private static let maxCandidateSearchEncodeAttempts = 8
-    private static let defaultTargetQuality = 0.6
 
-    static func compress(
-        _ pipeline: ImagePipeline,
-        to target: WICompressionTarget,
-        sizing: WIResolvedCompressionSizing,
-        output: WIResolvedImageOutput,
+    package static func compress(
+        _ data: Data,
+        to target: WICompressionTarget
+    ) throws(WICompressError) -> WIResult {
+        try validate(target)
+        let pipeline = try ImagePipeline(data: data)
+        return try pipeline.compressValidated(target)
+    }
+
+    package static func compress(
+        contentsOf url: URL,
+        to target: WICompressionTarget
+    ) throws(WICompressError) -> WIResult {
+        try validate(target)
+        let pipeline = try ImagePipeline(contentsOf: url)
+        return try pipeline.compressValidated(target)
+    }
+
+    func compress(
+        _ target: WICompressionTarget,
         maxEncodeAttempts: Int = defaultMaxEncodeAttempts
-    ) throws(WICompressError) -> Data {
-        let initialPlan = try WICompressionTargetResolver.executionPlan(
-            for: target,
+    ) throws(WICompressError) -> WIResult {
+        try Self.validate(target)
+        return try compressValidated(
+            target,
+            maxEncodeAttempts: maxEncodeAttempts
+        )
+    }
+
+    private static func validate(
+        _ target: WICompressionTarget
+    ) throws(WICompressError) {
+        guard target.maxBytes > 0 else {
+            throw .invalidTarget
+        }
+
+        if let maximumPixelSize = target.sizing.maximumPixelSize,
+           maximumPixelSize <= 0 {
+            throw .invalidTarget
+        }
+
+        if let aspectRatio = target.sizing.aspectRatio {
+            do {
+                _ = try ImageCropGeometry.aspectRatio(
+                    of: WIImageCrop(
+                        aspectRatio: aspectRatio,
+                        anchor: target.sizing.anchor
+                    )
+                )
+            } catch {
+                throw .invalidTarget
+            }
+        } else if target.sizing.anchor != .center {
+            throw .invalidTarget
+        }
+    }
+
+    private func compressValidated(
+        _ target: WICompressionTarget,
+        maxEncodeAttempts: Int = defaultMaxEncodeAttempts
+    ) throws(WICompressError) -> WIResult {
+        guard descriptor.format != .unknown else {
+            throw .unsupportedSourceFormat(descriptor.type?.identifier)
+        }
+
+        let sizing = try target.sizing.geometry(
+            for: descriptor.orientedPixelSize
+        )
+        let output = try imageDestination(target.output)
+
+        if canReturnOriginal(
+            target: target,
+            sizing: sizing,
+            output: output
+        ) {
+            return try originalResult()
+        }
+
+        guard output.isWritable else {
+            throw .unsupportedDestinationFormat(output.destinationFormat)
+        }
+
+        let data = try compressTargetData(
+            target,
             sizing: sizing,
             output: output,
-            pipeline: pipeline,
-            pixelSize: sizing.basePixelSize,
-            quality: defaultTargetQuality
+            maxEncodeAttempts: maxEncodeAttempts
         )
+        guard data.count <= target.maxBytes else {
+            throw .targetUnsatisfiable(
+                smallestByteCount: data.count
+            )
+        }
 
-        guard initialPlan.destinationFormat.supportsLossyQuality,
-              initialPlan.quality != nil else {
-            if initialPlan.destinationFormat == .png {
-                return try solveLossless(
-                    pipeline,
+        return try result(for: data)
+    }
+
+    private func canReturnOriginal(
+        target: WICompressionTarget,
+        sizing: TargetGeometry,
+        output: ImageDestination
+    ) -> Bool {
+        guard
+            byteCount <= target.maxBytes,
+            !sizing.hasCrop,
+            sizing.basePixelSize == sizing.sourcePixelSize,
+            target.output.representation == .preserve,
+            !output.colorSpace.requiresConversion
+        else {
+            return false
+        }
+
+        return (
+            !descriptor.hasUnmodeledMetadata
+                || target.output.metadata.preservesUnmodeledMetadata
+        )
+            && descriptor.metadata.isSubset(of: target.output.metadata)
+            && (
+                target.output.metadata != .strip
+                    || descriptor.orientation == .up
+            )
+    }
+
+    private func compressTargetData(
+        _ target: WICompressionTarget,
+        sizing: TargetGeometry,
+        output: ImageDestination,
+        maxEncodeAttempts: Int
+    ) throws(WICompressError) -> Data {
+        guard output.destinationFormat.supportsLossyQuality else {
+            if output.destinationFormat == .png {
+                return try searchLossless(
                     target: target,
                     sizing: sizing,
                     output: output,
@@ -45,11 +153,23 @@ enum WICompressionSolver {
                 )
             }
 
-            return try pipeline.execute(initialPlan)
+            let image = try renderedImageIfNeeded(
+                target: target,
+                sizing: sizing,
+                output: output,
+                pixelSize: sizing.basePixelSize,
+                quality: nil
+            )
+            return try encodeCandidate(
+                image,
+                target: target,
+                output: output,
+                quality: nil
+            )
         }
 
         let profile = WILossyQualityProfile(
-            format: initialPlan.destinationFormat
+            format: output.destinationFormat
         )
         let referencePixelSize = sizing.basePixelSize
         var currentLongSide = max(
@@ -78,29 +198,23 @@ enum WICompressionSolver {
                 sizing: sizing,
                 maxLongSide: longSideOverride
             )
-            let plan = try WICompressionTargetResolver.executionPlan(
-                for: target,
+            let renderedImage = try renderedImageIfNeeded(
+                target: target,
                 sizing: sizing,
                 output: output,
-                pipeline: pipeline,
                 pixelSize: pixelSize,
                 quality: highQuality
-            )
-            let renderedImage = try renderedImageIfNeeded(
-                pipeline,
-                plan: plan
             )
             let outputPixelSize = renderedImage.map {
                 WIPixelSize(width: $0.width, height: $0.height)
             } ?? pixelSize
-            let outcome: WIFixedSizeSolveOutcome
+            let outcome: FixedSizeOutcome
             do {
-                outcome = try solveFixedSize(
-                    pipeline,
-                    plan: plan,
+                outcome = try searchFixedSize(
+                    target: target,
+                    output: output,
                     renderedImage: renderedImage,
                     outputPixelSize: outputPixelSize,
-                    maxBytes: target.maxBytes,
                     profile: profile,
                     highQuality: highQuality,
                     attemptCount: &attemptCount,
@@ -139,7 +253,7 @@ enum WICompressionSolver {
                     current: currentLongSide,
                     encodedBytes: estimateByteCount,
                     maxBytes: target.maxBytes,
-                    format: plan.destinationFormat
+                    format: output.destinationFormat
                 )
             else {
                 if !candidates.isEmpty {
@@ -159,11 +273,10 @@ enum WICompressionSolver {
         }
     }
 
-    private static func solveLossless(
-        _ pipeline: ImagePipeline,
+    private func searchLossless(
         target: WICompressionTarget,
-        sizing: WIResolvedCompressionSizing,
-        output: WIResolvedImageOutput,
+        sizing: TargetGeometry,
+        output: ImageDestination,
         maxEncodeAttempts: Int
     ) throws(WICompressError) -> Data {
         var currentLongSide = max(
@@ -179,22 +292,17 @@ enum WICompressionSolver {
                 sizing: sizing,
                 maxLongSide: longSideOverride
             )
-            let plan = try WICompressionTargetResolver.executionPlan(
-                for: target,
+            let renderedImage = try renderedImageIfNeeded(
+                target: target,
                 sizing: sizing,
                 output: output,
-                pipeline: pipeline,
                 pixelSize: pixelSize,
                 quality: nil
             )
-            let renderedImage = try renderedImageIfNeeded(
-                pipeline,
-                plan: plan
-            )
-            let data = try encode(
-                pipeline,
-                plan: plan,
-                renderedImage: renderedImage,
+            let data = try encodeCandidate(
+                renderedImage,
+                target: target,
+                output: output,
                 quality: nil,
                 attemptCount: &attemptCount,
                 maxEncodeAttempts: maxEncodeAttempts
@@ -212,7 +320,7 @@ enum WICompressionSolver {
                 current: currentLongSide,
                 encodedBytes: data.count,
                 maxBytes: target.maxBytes,
-                format: plan.destinationFormat
+                format: output.destinationFormat
             ) else {
                 throw WICompressError.targetUnsatisfiable(
                     smallestByteCount: smallestByteCount
@@ -224,31 +332,30 @@ enum WICompressionSolver {
         }
     }
 
-    private static func solveFixedSize(
-        _ pipeline: ImagePipeline,
-        plan: WIExecutionPlan,
+    private func searchFixedSize(
+        target: WICompressionTarget,
+        output: ImageDestination,
         renderedImage: CGImage?,
         outputPixelSize: WIPixelSize,
-        maxBytes: Int,
         profile: WILossyQualityProfile,
         highQuality: Double,
         attemptCount: inout Int,
         maxEncodeAttempts: Int
-    ) throws(WICompressError) -> WIFixedSizeSolveOutcome {
-        let highData = try encode(
-            pipeline,
-            plan: plan,
-            renderedImage: renderedImage,
+    ) throws(WICompressError) -> FixedSizeOutcome {
+        let highData = try encodeCandidate(
+            renderedImage,
+            target: target,
+            output: output,
             quality: highQuality,
             attemptCount: &attemptCount,
             maxEncodeAttempts: maxEncodeAttempts
         )
-        if highData.count <= maxBytes {
-            return WIFixedSizeSolveOutcome(
+        if highData.count <= target.maxBytes {
+            return FixedSizeOutcome(
                 candidate: WISolvedCompressionCandidate(
                     data: highData,
                     pixelSize: outputPixelSize,
-                    format: plan.destinationFormat,
+                    format: output.destinationFormat,
                     quality: highQuality
                 ),
                 smallestByteCount: highData.count,
@@ -256,52 +363,48 @@ enum WICompressionSolver {
             )
         }
 
-        let kneeData = try encode(
-            pipeline,
-            plan: plan,
-            renderedImage: renderedImage,
+        let kneeData = try encodeCandidate(
+            renderedImage,
+            target: target,
+            output: output,
             quality: profile.qKnee,
             attemptCount: &attemptCount,
             maxEncodeAttempts: maxEncodeAttempts
         )
-        if kneeData.count <= maxBytes {
+        if kneeData.count <= target.maxBytes {
             let candidate = try searchQuality(
-                pipeline,
-                plan: plan,
+                target: target,
+                output: output,
                 renderedImage: renderedImage,
-                maxBytes: maxBytes,
                 lowQuality: profile.qKnee,
                 highQuality: highQuality,
                 lowData: kneeData,
                 outputPixelSize: outputPixelSize,
-                destinationFormat: plan.destinationFormat,
                 attemptCount: &attemptCount,
                 maxEncodeAttempts: maxEncodeAttempts
             )
-            return WIFixedSizeSolveOutcome(
+            return FixedSizeOutcome(
                 candidate: candidate,
                 smallestByteCount: kneeData.count,
                 dimensionSearchByteCount: highData.count
             )
         }
 
-        return WIFixedSizeSolveOutcome(
+        return FixedSizeOutcome(
             candidate: nil,
             smallestByteCount: min(highData.count, kneeData.count),
             dimensionSearchByteCount: min(highData.count, kneeData.count)
         )
     }
 
-    private static func searchQuality(
-        _ pipeline: ImagePipeline,
-        plan: WIExecutionPlan,
+    private func searchQuality(
+        target: WICompressionTarget,
+        output: ImageDestination,
         renderedImage: CGImage?,
-        maxBytes: Int,
         lowQuality: Double,
         highQuality: Double,
         lowData: Data,
         outputPixelSize: WIPixelSize,
-        destinationFormat: WIImageFormat,
         attemptCount: inout Int,
         maxEncodeAttempts: Int
     ) throws(WICompressError) -> WISolvedCompressionCandidate {
@@ -312,16 +415,16 @@ enum WICompressionSolver {
 
         for _ in 0..<6 {
             let quality = (lowerBound + upperBound) / 2
-            let data = try encode(
-                pipeline,
-                plan: plan,
-                renderedImage: renderedImage,
+            let data = try encodeCandidate(
+                renderedImage,
+                target: target,
+                output: output,
                 quality: quality,
                 attemptCount: &attemptCount,
                 maxEncodeAttempts: maxEncodeAttempts
             )
 
-            if data.count <= maxBytes {
+            if data.count <= target.maxBytes {
                 lowerBound = quality
                 bestData = data
                 bestQuality = quality
@@ -333,15 +436,15 @@ enum WICompressionSolver {
         return WISolvedCompressionCandidate(
             data: bestData,
             pixelSize: outputPixelSize,
-            format: destinationFormat,
+            format: output.destinationFormat,
             quality: bestQuality
         )
     }
 
-    private static func encode(
-        _ pipeline: ImagePipeline,
-        plan: WIExecutionPlan,
-        renderedImage: CGImage?,
+    private func encodeCandidate(
+        _ renderedImage: CGImage?,
+        target: WICompressionTarget,
+        output: ImageDestination,
         quality: Double?,
         attemptCount: inout Int,
         maxEncodeAttempts: Int
@@ -353,32 +456,113 @@ enum WICompressionSolver {
         }
 
         attemptCount += 1
+        return try encodeCandidate(
+            renderedImage,
+            target: target,
+            output: output,
+            quality: quality
+        )
+    }
 
-        var qualityPlan = plan
-        qualityPlan.quality = quality
+    private func encodeCandidate(
+        _ renderedImage: CGImage?,
+        target: WICompressionTarget,
+        output: ImageDestination,
+        quality: Double?
+    ) throws(WICompressError) -> Data {
         if let renderedImage {
-            return try pipeline.encodeRendered(
+            return try encodeRendered(
                 renderedImage,
-                plan: qualityPlan
+                output: output,
+                metadata: target.output.metadata,
+                quality: quality
             )
         }
 
-        return try pipeline.execute(qualityPlan)
+        return try copyFromSource(
+            output: output,
+            metadata: target.output.metadata,
+            quality: quality
+        )
     }
 
-    private static func renderedImageIfNeeded(
-        _ pipeline: ImagePipeline,
-        plan: WIExecutionPlan
+    private func renderedImageIfNeeded(
+        target: WICompressionTarget,
+        sizing: TargetGeometry,
+        output: ImageDestination,
+        pixelSize: WIPixelSize,
+        quality: Double?
     ) throws(WICompressError) -> CGImage? {
-        guard case .render = plan.operation else {
+        if canCopyFromSource(
+            target: target,
+            sizing: sizing,
+            output: output,
+            pixelSize: pixelSize,
+            quality: quality
+        ) {
             return nil
         }
 
-        return try pipeline.render(plan)
+        return try render(
+            geometry: targetRender(
+                sizing: sizing,
+                pixelSize: pixelSize
+            ),
+            output: output
+        )
     }
 
-    private static func candidatePixelSize(
-        sizing: WIResolvedCompressionSizing,
+    private func canCopyFromSource(
+        target: WICompressionTarget,
+        sizing: TargetGeometry,
+        output: ImageDestination,
+        pixelSize: WIPixelSize,
+        quality: Double?
+    ) -> Bool {
+        !sizing.hasCrop
+            && pixelSize == sizing.sourcePixelSize
+            && target.output.representation == .preserve
+            && !output.colorSpace.requiresConversion
+            && (
+                target.output.metadata != .strip
+                    || descriptor.orientation == .up
+            )
+            && source.canCopy(
+                as: output.destinationType,
+                keeping: target.output.metadata,
+                compressionQuality: quality
+            )
+    }
+
+    private func targetRender(
+        sizing: TargetGeometry,
+        pixelSize: WIPixelSize
+    ) throws(WICompressError) -> RenderGeometry {
+        let canvasSize: WIPixelSize
+        do {
+            canvasSize = try WIPixelSize(
+                validatingWidth: pixelSize.width,
+                height: pixelSize.height
+            )
+        } catch {
+            throw .invalidTarget
+        }
+
+        return RenderGeometry(
+            sourceRect: sizing.sourceRect,
+            canvasSize: canvasSize,
+            destinationRect: Rect(
+                x: 0,
+                y: 0,
+                width: Double(pixelSize.width),
+                height: Double(pixelSize.height)
+            ),
+            canvasBackground: nil
+        )
+    }
+
+    private func candidatePixelSize(
+        sizing: TargetGeometry,
         maxLongSide: Int?
     ) -> WIPixelSize {
         guard let maxLongSide else {
@@ -391,7 +575,7 @@ enum WICompressionSolver {
         )
     }
 
-    private static func shouldReturnBestCandidate(
+    private func shouldReturnBestCandidate(
         _ candidates: [WISolvedCompressionCandidate],
         attemptCount: Int,
         maxEncodeAttempts: Int
@@ -404,10 +588,10 @@ enum WICompressionSolver {
             maxEncodeAttempts - attemptCount,
             0
         )
-        return remainingAttempts < maxCandidateSearchEncodeAttempts
+        return remainingAttempts < Self.maxCandidateSearchEncodeAttempts
     }
 
-    private static func minByteCount(
+    private func minByteCount(
         _ lhs: Int?,
         _ rhs: Int?
     ) -> Int? {
@@ -424,7 +608,7 @@ enum WICompressionSolver {
     }
 }
 
-private struct WIFixedSizeSolveOutcome: Sendable, Equatable {
+private struct FixedSizeOutcome: Sendable, Equatable {
     var candidate: WISolvedCompressionCandidate?
     var smallestByteCount: Int?
     var dimensionSearchByteCount: Int?

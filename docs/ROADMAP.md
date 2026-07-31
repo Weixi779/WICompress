@@ -48,10 +48,11 @@ Implementation status:
   pixel-size, and color values used directly by ImageIO, Raster, and Execution.
   Mirrored Core values and product-boundary field conversions have been removed.
 - Completed: request-scoped `ImagePipeline` owns source and ImageIO/Raster
-  execution. Process validation and decision ownership now live directly in the
-  pipeline without a Process Resolver or ExecutionPlan; transitional Target
-  resolver, plan, and solver remain for the next phase. The public `WICompress`
-  target is an umbrella facade.
+  execution. Process and Target validation, decision ownership, Target feedback
+  search, working-image reuse, and result checks now live directly in the
+  pipeline without architecture-level Resolver, ExecutionPlan, Executor, or
+  Solver types. `WICompressor` calls the package-only Pipeline terminals
+  directly; the public `WICompress` target remains an umbrella facade.
 - Completed: `WIImageFormat` is an ImageIO-produced public result fact. It has no
   public Data detection initializer; source inspection produces it once.
 - Completed: synchronous `WIImageProcess` vertical slice with public
@@ -63,9 +64,9 @@ Implementation status:
   Alpha-aware PNG/JPEG, stripped metadata, and conversion to sRGB. The duplicate
   public `WICompressionOutput` has been removed.
 - Completed: Target now exposes the frozen `WICompressionSizing` contract,
-  resolves crop and base size once, and drives the shared `WIExecutionPlan`
-  directly. The old public geometry/preference/canvas domain and transitional
-  `WIWritePlan` adapter have been removed.
+  resolves crop and base size once, and runs its feedback search directly in
+  `ImagePipeline`. The old public geometry/preference/canvas domain and
+  transitional `WIWritePlan` adapter have been removed.
 - Completed: the 1.x Options/Policy terminals, legacy resolver, and write-plan
   adapter have been removed rather than maintained as a second architecture.
 - Completed: the package and module remain `WICompress`, while the public

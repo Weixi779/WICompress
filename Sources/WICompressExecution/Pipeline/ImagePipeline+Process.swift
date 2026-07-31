@@ -10,20 +10,35 @@ import Foundation
 import WIImageDomain
 
 extension ImagePipeline {
-    func process(
+    package static func process(
+        _ data: Data,
+        using process: WIImageProcess
+    ) throws(WICompressError) -> WIResult {
+        try validate(process)
+        let pipeline = try ImagePipeline(data: data)
+        return try pipeline.processValidated(process)
+    }
+
+    package static func process(
+        contentsOf url: URL,
+        using process: WIImageProcess
+    ) throws(WICompressError) -> WIResult {
+        try validate(process)
+        let pipeline = try ImagePipeline(contentsOf: url)
+        return try pipeline.processValidated(process)
+    }
+
+    private func processValidated(
         _ process: WIImageProcess
     ) throws(WICompressError) -> WIResult {
         guard descriptor.format != .unknown else {
             throw .unsupportedSourceFormat(descriptor.type?.identifier)
         }
 
-        try validateQuality(process.quality)
-
-        let geometry = try WIImageProcessGeometry.resolve(
-            process: process,
-            sourcePixelSize: descriptor.orientedPixelSize
+        let geometry = try process.geometry(
+            for: descriptor.orientedPixelSize
         )
-        let output = try resolveOutput(process.output)
+        let output = try imageDestination(process.output)
         let quality = output.destinationFormat.supportsLossyQuality
             ? process.quality
             : nil
@@ -65,22 +80,23 @@ extension ImagePipeline {
         return try result(for: data)
     }
 
-    private func validateQuality(
-        _ quality: Double?
+    private static func validate(
+        _ process: WIImageProcess
     ) throws(WICompressError) {
-        guard let quality else {
-            return
+        if let quality = process.quality {
+            guard quality.isFinite, (0...1).contains(quality) else {
+                throw .invalidProcessQuality
+            }
         }
-        guard quality.isFinite, (0...1).contains(quality) else {
-            throw .invalidProcessQuality
-        }
+
+        _ = try ImageCropGeometry.aspectRatio(of: process.crop)
     }
 
     private func canReturnOriginal(
         process: WIImageProcess,
-        geometry: WIResolvedProcessGeometry,
+        geometry: ProcessGeometry,
         quality: Double?,
-        output: WIResolvedImageOutput
+        output: ImageDestination
     ) -> Bool {
         guard
             process.crop == nil,
@@ -105,9 +121,9 @@ extension ImagePipeline {
 
     private func canCopyFromSource(
         process: WIImageProcess,
-        geometry: WIResolvedProcessGeometry,
+        geometry: ProcessGeometry,
         quality: Double?,
-        output: WIResolvedImageOutput
+        output: ImageDestination
     ) -> Bool {
         process.crop == nil
             && geometry.changesPixelSize == false
@@ -125,10 +141,10 @@ extension ImagePipeline {
     }
 
     private func processRender(
-        from geometry: WIResolvedProcessGeometry
-    ) -> WIResolvedRender {
+        from geometry: ProcessGeometry
+    ) -> RenderGeometry {
         let targetSize = geometry.targetPixelSize
-        return WIResolvedRender(
+        return RenderGeometry(
             sourceRect: geometry.sourceRect,
             canvasSize: targetSize,
             destinationRect: Rect(

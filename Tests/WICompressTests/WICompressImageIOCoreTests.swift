@@ -757,10 +757,10 @@ struct WICompressImageIOCoreTests {
         let inputData = try Data(contentsOf: url)
         let pipeline = try ImagePipeline(data: inputData)
 
-        let preservedOutput = try pipeline.resolveOutput(
+        let preservedOutput = try pipeline.imageDestination(
             WIImageOutput(colorSpace: .preserve)
         )
-        let convertedOutput = try pipeline.resolveOutput(
+        let convertedOutput = try pipeline.imageDestination(
             WIImageOutput(colorSpace: .convert(to: .sRGB))
         )
 
@@ -846,8 +846,8 @@ struct WICompressImageIOCoreTests {
         ))
     }
 
-    @Test("Target solver keeps the fixed aspect ratio while shrinking")
-    func targetSolverKeepsFixedAspectRatio() throws {
+    @Test("Target search keeps the fixed aspect ratio while shrinking")
+    func targetSearchKeepsFixedAspectRatio() throws {
         let url = try Self.resource(
             "real_jpeg_2098x1350_landscape",
             extension: "jpg"
@@ -884,24 +884,13 @@ struct WICompressImageIOCoreTests {
             output: WIImageOutput(representation: .jpeg(background: .disallow))
         )
 
-        let sizing = try WICompressionTargetResolver.sizing(
-            for: target,
-            pipeline: pipeline
-        )
-        let output = try WICompressionTargetResolver.output(
-            for: target,
-            pipeline: pipeline
-        )
-        let outputData = try WICompressionSolver.compress(
-            pipeline,
-            to: target,
-            sizing: sizing,
-            output: output,
+        let result = try pipeline.compress(
+            target,
             maxEncodeAttempts: 12
         )
-        let outputInfo = try Self.imageInfo(outputData)
+        let outputInfo = try Self.imageInfo(result.data)
 
-        #expect(outputData.count <= target.maxBytes)
+        #expect(result.byteCount <= target.maxBytes)
         #expect(max(outputInfo.displayWidth, outputInfo.displayHeight) == 1200)
     }
 

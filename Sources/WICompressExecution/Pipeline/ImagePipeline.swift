@@ -13,7 +13,7 @@ import WIImageDomain
 import WIImageIO
 import WIImageRaster
 
-final class ImagePipeline {
+package final class ImagePipeline {
     enum Input {
         case data(Data)
         case file(URL)
@@ -127,27 +127,8 @@ final class ImagePipeline {
         )
     }
 
-    func execute(
-        _ plan: WIExecutionPlan
-    ) throws(WICompressError) -> Data {
-        switch plan.operation {
-        case .returnOriginal:
-            return try originalData()
-        case .copyFromSource:
-            return try copyFromSource(
-                as: plan.destinationType,
-                destinationFormat: plan.destinationFormat,
-                metadata: plan.metadata,
-                quality: plan.quality
-            )
-        case .render:
-            let image = try render(plan)
-            return try encodeRendered(image, plan: plan)
-        }
-    }
-
     func copyFromSource(
-        output: WIResolvedImageOutput,
+        output: ImageDestination,
         metadata: WIImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
@@ -160,51 +141,47 @@ final class ImagePipeline {
     }
 
     func renderAndEncode(
-        geometry: WIResolvedRender,
-        output: WIResolvedImageOutput,
+        geometry: RenderGeometry,
+        output: ImageDestination,
         metadata: WIImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
         let image = try render(
             geometry: geometry,
-            destinationFormat: output.destinationFormat,
-            jpegBackground: output.jpegBackground,
-            outputColorSpace: output.colorSpace
+            output: output
         )
         return try encodeRendered(
             image,
-            as: output.destinationType,
-            destinationFormat: output.destinationFormat,
+            output: output,
             metadata: metadata,
             quality: quality
         )
     }
 
     func render(
-        _ plan: WIExecutionPlan
+        geometry: RenderGeometry,
+        output: ImageDestination
     ) throws(WICompressError) -> CGImage {
-        guard case .render(let geometry) = plan.operation else {
-            throw .executionPlanUnavailable
-        }
-
         return try render(
             geometry: geometry,
-            destinationFormat: plan.destinationFormat,
-            jpegBackground: plan.jpegBackground,
-            outputColorSpace: plan.outputColorSpace
+            destinationFormat: output.destinationFormat,
+            jpegBackground: output.jpegBackground,
+            outputColorSpace: output.colorSpace
         )
     }
 
     func encodeRendered(
         _ image: CGImage,
-        plan: WIExecutionPlan
+        output: ImageDestination,
+        metadata: WIImageMetadataOptions,
+        quality: Double?
     ) throws(WICompressError) -> Data {
         try encodeRendered(
             image,
-            as: plan.destinationType,
-            destinationFormat: plan.destinationFormat,
-            metadata: plan.metadata,
-            quality: plan.quality
+            as: output.destinationType,
+            destinationFormat: output.destinationFormat,
+            metadata: metadata,
+            quality: quality
         )
     }
 
@@ -256,10 +233,10 @@ final class ImagePipeline {
     }
 
     private func render(
-        geometry: WIResolvedRender,
+        geometry: RenderGeometry,
         destinationFormat: WIImageFormat,
         jpegBackground: WIJPEGBackground?,
-        outputColorSpace: WIResolvedOutputColorSpace
+        outputColorSpace: DestinationColorSpace
     ) throws(WICompressError) -> CGImage {
         let sourceImage: CGImage
         let sourceRect: Rect
@@ -330,7 +307,7 @@ final class ImagePipeline {
     }
 
     private func thumbnailMaximumPixelSize(
-        for geometry: WIResolvedRender
+        for geometry: RenderGeometry
     ) -> Int? {
         let displaySize = descriptor.orientedPixelSize
         let widthScale = geometry.destinationRect.width
@@ -359,7 +336,7 @@ final class ImagePipeline {
     }
 
     private func usesFullOrientedSource(
-        _ geometry: WIResolvedRender
+        _ geometry: RenderGeometry
     ) -> Bool {
         let displaySize = descriptor.orientedPixelSize
         return geometry.sourceRect == Rect(
@@ -403,7 +380,7 @@ final class ImagePipeline {
     }
 
     private func rasterColorSpace(
-        from colorSpace: WIResolvedOutputColorSpace
+        from colorSpace: DestinationColorSpace
     ) -> WIImageRaster.OutputColorSpace {
         guard let target = colorSpace.target else {
             return .source
@@ -428,7 +405,7 @@ final class ImagePipeline {
         case .animatedSourceUnsupported(let frameCount):
             return .animatedSourceUnsupported(frameCount: frameCount)
         case .metadataCopyUnsupported:
-            return .executionPlanUnavailable
+            return .executionUnavailable
         case .destinationCreationFailed(let typeIdentifier):
             return .destinationCreationFailed(
                 .detected(from: typeIdentifier)
@@ -462,7 +439,7 @@ final class ImagePipeline {
         case .animatedSourceUnsupported(let frameCount):
             return .animatedSourceUnsupported(frameCount: frameCount)
         case .metadataCopyUnsupported:
-            return .executionPlanUnavailable
+            return .executionUnavailable
         case .destinationCreationFailed:
             return .destinationCreationFailed(destinationFormat)
         case .destinationFinalizationFailed:
@@ -477,7 +454,7 @@ final class ImagePipeline {
         case .invalidSourceRect,
              .invalidDestinationRect,
              .sourceRectOutOfBounds:
-            return .executionPlanUnavailable
+            return .executionUnavailable
         case .unsupportedColorSpace:
             return .unsupportedColorSpace
         case .invalidICCProfile:
@@ -492,4 +469,11 @@ final class ImagePipeline {
             return .colorConversionFailed
         }
     }
+}
+
+struct RenderGeometry: Sendable, Equatable {
+    let sourceRect: Rect
+    let canvasSize: WIPixelSize
+    let destinationRect: Rect
+    let canvasBackground: WIColor?
 }

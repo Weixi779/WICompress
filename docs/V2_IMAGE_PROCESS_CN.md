@@ -1,7 +1,7 @@
 # WICompress 2.0 Image Process
 
-状态：Process Domain、同步 Swift API 与执行边界已落地；异步 terminal 和 1.x
-Process 删除尚未实施。
+状态：Process Domain、同步 Swift API、执行边界与 1.x Process 删除已落地；异步
+terminal 尚未实施。
 
 本文记录 `WIImageProcess` 正向处理产品线已经接受的职责、尺寸插槽、裁切语义、
 输出组合与执行边界。1.x 事实和调研证据保留在
@@ -9,7 +9,7 @@ Process 删除尚未实施。
 
 内部状态与编排已经由
 [`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 重新冻结；本文关于
-Resolver、ExecutionPlan 和 Executor 的描述仅记录当前实现，不再代表目标架构。
+Resolver、ExecutionPlan 和 Executor 的旧描述仅属于历史迁移背景，这些架构类型已删除。
 
 相关文档：
 
@@ -280,8 +280,8 @@ suspension point。
 - 1.x `compress(_:options:)`、旧 Policy 名称和 legacy write-plan resolver
   已删除；2.0 不维护第二套 Process 架构。
 - `WICompressionTarget` 已共享 `WIImageOutput`；两条产品线共用同一个
-  `ImagePipeline` 和底层执行能力。Target 的 Plan/Resolver 仍是待迁移实现，不再是
-  Process 架构。
+  `ImagePipeline` 和底层执行能力。Target 的 validation、passthrough、反馈搜索和 hard
+  byte check 也已迁入 Pipeline；架构级 Plan/Resolver/Solver 已删除。
 - 尚未实现 async terminal。
 
 ## 已接受

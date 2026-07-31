@@ -12,7 +12,7 @@ import WIImageIO
 
 /// Pure dimension and quality-profile math for the target byte-budget search.
 ///
-/// The solver shrinks the longest side by an area-proportional estimate and
+/// The search shrinks the longest side by an area-proportional estimate and
 /// restarts a fresh quality search at the smaller size. These functions hold no
 /// ImageIO or I/O state so they can be reasoned about and unit-tested directly.
 enum WICompressionSizeEstimation {

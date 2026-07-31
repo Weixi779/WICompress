@@ -12,7 +12,7 @@ import UniformTypeIdentifiers
 import WIImageDomain
 import WIImageIO
 
-struct WIResolvedOutputColorSpace: Sendable, Equatable {
+struct DestinationColorSpace: Sendable, Equatable {
     let target: WIColorSpace?
 
     var requiresConversion: Bool {
@@ -20,10 +20,10 @@ struct WIResolvedOutputColorSpace: Sendable, Equatable {
     }
 }
 
-struct WIResolvedImageOutput: Sendable, Equatable {
+struct ImageDestination: Sendable, Equatable {
     let destinationType: UTType
     let jpegBackground: WIJPEGBackground?
-    let colorSpace: WIResolvedOutputColorSpace
+    let colorSpace: DestinationColorSpace
     let isWritable: Bool
 
     var destinationFormat: WIImageFormat {
@@ -32,16 +32,16 @@ struct WIResolvedImageOutput: Sendable, Equatable {
 }
 
 extension ImagePipeline {
-    func resolveOutput(
+    func imageDestination(
         _ output: WIImageOutput
-    ) throws(WICompressError) -> WIResolvedImageOutput {
+    ) throws(WICompressError) -> ImageDestination {
         let destination = try destination(
             for: output.representation
         )
         let colorSpace = try outputColorSpace(output.colorSpace)
         let isWritable = Capabilities.canEncode(destination.type)
 
-        return WIResolvedImageOutput(
+        return ImageDestination(
             destinationType: destination.type,
             jpegBackground: destination.jpegBackground,
             colorSpace: colorSpace,
@@ -100,14 +100,14 @@ extension ImagePipeline {
 
     private func outputColorSpace(
         _ decision: WIImageColorSpace
-    ) throws(WICompressError) -> WIResolvedOutputColorSpace {
+    ) throws(WICompressError) -> DestinationColorSpace {
         switch decision {
         case .preserve:
-            return WIResolvedOutputColorSpace(target: nil)
+            return DestinationColorSpace(target: nil)
         case .convert(let target):
             _ = try makeCGColorSpace(target)
             let sourceColorSpace = try sourceColorSpace()
-            return WIResolvedOutputColorSpace(
+            return DestinationColorSpace(
                 target: sourceColorSpace == target
                     ? nil
                     : target

@@ -9,7 +9,7 @@
 import Foundation
 import WIImageIO
 
-/// Errors thrown while inspecting, planning, or encoding an image.
+/// Errors thrown while inspecting, processing, or encoding an image.
 public enum WICompressError: Swift.Error, Sendable, Equatable {
     /// The file URL could not be read.
     case fileReadFailed(URL)
@@ -43,12 +43,12 @@ public enum WICompressError: Swift.Error, Sendable, Equatable {
     case invalidTarget
     /// The target constraints cannot be satisfied by the supported encoder path.
     case targetUnsatisfiable(smallestByteCount: Int?)
-    /// The target solver reached its internal resource budget.
+    /// The target search reached its internal resource budget.
     case resourceLimitExceeded(attemptCount: Int)
     /// Multi-frame image data is not supported.
     case animatedSourceUnsupported(frameCount: Int)
-    /// The request and image facts could not produce a valid execution plan.
-    case executionPlanUnavailable
+    /// The request cannot be executed from the available image facts.
+    case executionUnavailable
     /// ImageIO could not create the downsampled bitmap.
     case thumbnailCreationFailed
     /// ImageIO could not create an output destination.
@@ -100,8 +100,8 @@ extension WICompressError: LocalizedError {
             return "Target compression exceeded its resource budget after \(attemptCount) attempts."
         case .animatedSourceUnsupported(let frameCount):
             return "Animated images are not supported (\(frameCount) frames)."
-        case .executionPlanUnavailable:
-            return "Could not resolve a valid image execution plan."
+        case .executionUnavailable:
+            return "Could not execute the image request from the available source facts."
         case .thumbnailCreationFailed:
             return "Failed to create a downsampled image during compression."
         case .destinationCreationFailed(let format):

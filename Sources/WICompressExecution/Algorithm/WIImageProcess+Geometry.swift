@@ -1,5 +1,5 @@
 //
-//  WIImageProcessGeometry.swift
+//  WIImageProcess+Geometry.swift
 //  WICompressExecution
 //
 //  Created by weixi on 2026/7/30.
@@ -9,7 +9,7 @@
 import Foundation
 import WIImageDomain
 
-struct WIResolvedProcessGeometry: Sendable, Equatable {
+struct ProcessGeometry: Sendable, Equatable {
     let sourceRect: Rect
     let croppedPixelSize: WIPixelSize
     let targetPixelSize: WIPixelSize
@@ -19,21 +19,20 @@ struct WIResolvedProcessGeometry: Sendable, Equatable {
     }
 }
 
-enum WIImageProcessGeometry {
-    static func resolve(
-        process: WIImageProcess,
-        sourcePixelSize: WIPixelSize
-    ) throws(WICompressError) -> WIResolvedProcessGeometry {
+extension WIImageProcess {
+    func geometry(
+        for sourcePixelSize: WIPixelSize
+    ) throws(WICompressError) -> ProcessGeometry {
         guard sourcePixelSize.width > 0, sourcePixelSize.height > 0 else {
             throw .imageInfoUnavailable
         }
 
-        let cropGeometry = try WIImageCropGeometry.resolve(
-            process.crop,
+        let cropGeometry = try ImageCropGeometry.resolve(
+            crop,
             sourcePixelSize: sourcePixelSize
         )
         let targetPixelSize: WIPixelSize
-        switch process.sizing {
+        switch sizing {
         case .original:
             targetPixelSize = cropGeometry.pixelSize
         case .resize(let resizing):
@@ -42,14 +41,14 @@ enum WIImageProcessGeometry {
 
         try validateExecutablePixelSize(targetPixelSize)
 
-        return WIResolvedProcessGeometry(
+        return ProcessGeometry(
             sourceRect: cropGeometry.sourceRect,
             croppedPixelSize: cropGeometry.pixelSize,
             targetPixelSize: targetPixelSize
         )
     }
 
-    private static func validateExecutablePixelSize(
+    private func validateExecutablePixelSize(
         _ size: WIPixelSize
     ) throws(WICompressError) {
         guard size.width > 0, size.height > 0 else {

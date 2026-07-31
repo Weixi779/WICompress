@@ -265,6 +265,21 @@ struct WICompressorPublicSurfaceTests {
         }
     }
 
+    @Test("Process validation precedes file source creation")
+    func processValidationPrecedesFileSourceCreation() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wi-process-missing-\(UUID().uuidString)")
+
+        #expect(throws: WICompressError.invalidCrop) {
+            _ = try WICompressor.process(
+                contentsOf: url,
+                using: WIImageProcess(
+                    crop: .aspectRatio(width: 0, height: 1)
+                )
+            )
+        }
+    }
+
     @Test("Target JPEG requires an opaque custom background")
     func targetJPEGRequiresOpaqueCustomBackground() throws {
         let data = try Self.tinyPNGData()

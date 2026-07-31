@@ -83,16 +83,17 @@ values used directly by package execution. Package-only validation, `Rect`, and
 `Orientation` live beside those values; there are no mirrored Core models.
 `WIImageIO` owns the public result fact `WIImageFormat` and all package-only
 ImageIO primitives. `WICompressExecution` owns the request-scoped
-`ImagePipeline`, transitional Target resolver/plan/solver, `WICompressError`,
-and `WIResult`. `WICompress` re-exports the public contracts and contains only
-the terminal facade.
+`ImagePipeline`, pure Process/Target calculations, `WICompressError`, and
+`WIResult`. `WICompress` re-exports the public contracts and contains only
+`WICompressor`, whose terminals call the package-only `ImagePipeline` directly.
 
 Process is the deterministic `Data`/`URL` in, `WIResult` out path:
 
 ```text
 Data / URL + WIImageProcess
   -> ImagePipeline
-       validate quality and source facts
+       validate source-independent Process facts before source creation
+       inspect source
        crop -> WIImageResizing -> concrete geometry
        resolve output and choose return-original / source-copy / render
        no crop shrink -> two-axis-safe ImageIO thumbnail
@@ -110,13 +111,15 @@ sizing/output) and returns a `WIResult`:
 
 ```text
 Data / URL + WICompressionTarget
-  -> WICompressionTargetValidator   reject illegal targets up front
-  -> passthrough check              return original when it already satisfies the target
-  -> WICompressionSolver            iterative search: shrink (outer) + quality (inner)
-       uses WICompressionTargetResolver to build each WIExecutionPlan
-       uses Algorithm/ math (size estimation, layout, ranking)
-  -> hard byte check                never return data above maxBytes
-  -> WIResult
+  -> ImagePipeline
+       validate source-independent target facts before source creation
+       inspect source and resolve fixed crop/base size/output
+       passthrough when the original already satisfies every requirement
+       otherwise run feedback search: shrink (outer) + quality (inner)
+       reuse one rendered image while searching quality at fixed geometry
+       use Algorithm/ math for size estimation and candidate ranking
+       hard byte check: never return data above maxBytes
+       encoded Data -> result inspection -> WIResult
 ```
 
 Key types:
@@ -132,23 +135,21 @@ Key types:
    and Target.
 5. **ImagePipeline** - request-scoped owner of the encoded input,
    `WIImageIO.Source`, `Descriptor`, original-byte lifecycle, and
-   Process decisions plus ImageIO/Raster execution. Target decision types
-   remain transitional until the next pipeline phase.
-6. **WIExecutionPlan** - transitional Target candidate execution facts; Process
-   no longer creates or consumes it.
-7. **WIImageFormat** - public ImageIO-produced result fact
+   Process/Target decisions, Target candidate search, and ImageIO/Raster
+   execution. Its package terminals are called directly by `WICompressor`;
+   there is no second terminal forwarding type.
+6. **WIImageFormat** - public ImageIO-produced result fact
    (JPEG/PNG/HEIF/unknown); callers do not initialize it from arbitrary data.
-8. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
-9. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
-10. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
+7. **WILuban** - internal Luban ratio math (`ratio(width:height:)`, `ensureEven`).
+8. **WICompressError** - strongly typed error (`LocalizedError`); the only thrown type.
+9. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
    (`maxBytes` / `WICompressionSizing` / shared `WIImageOutput`) returning
-   `WIResult`.
-   `WICompressionTargetValidator` checks legality, `WICompressionTargetResolver`
-   produces shared `WIExecutionPlan` values, and `WICompressionSolver` runs the
-   byte-budget search.
-   Pure math lives in `Algorithm/`: `WICompressionSizingResolver` (fixed crop +
-   base candidate), `WICompressionSizeEstimation` (shrink + quality profile),
-   and `WICompressionRanking` (internal deterministic candidate selection).
+   `WIResult`. `ImagePipeline` validates the target, owns passthrough and the
+   byte-budget feedback search, and performs the final hard-limit check.
+   Pure math lives in `Algorithm/`: Process/Target geometry (fixed crop + base
+   candidate), `WICompressionSizeEstimation` (shrink + quality
+   profile), and `WICompressionRanking` (internal deterministic candidate
+   selection).
 
 ## Key Implementation Details
 

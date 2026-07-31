@@ -22,7 +22,7 @@ struct WISolvedCompressionCandidate: Sendable, Equatable {
     }
 }
 
-/// Deterministic candidate ranking. Hard constraints are filtered by the solver
+/// Deterministic candidate ranking. Hard constraints are filtered by the search
 /// before ranking; this only balances pixel area against visual fidelity.
 enum WICompressionRanking {
     static func bestCandidate(

@@ -1,5 +1,5 @@
 //
-//  WICompressionSizingResolver.swift
+//  WICompressionSizing+Geometry.swift
 //  WICompressExecution
 //
 //  Created by weixi on 2026/7/30.
@@ -9,7 +9,7 @@
 import Foundation
 import WIImageDomain
 
-struct WIResolvedCompressionSizing: Sendable, Equatable {
+struct TargetGeometry: Sendable, Equatable {
     let sourceRect: Rect
     let basePixelSize: WIPixelSize
     let sourcePixelSize: WIPixelSize
@@ -24,17 +24,16 @@ struct WIResolvedCompressionSizing: Sendable, Equatable {
     }
 }
 
-enum WICompressionSizingResolver {
-    static func resolve(
-        _ sizing: WICompressionSizing,
-        sourcePixelSize: WIPixelSize
-    ) throws(WICompressError) -> WIResolvedCompressionSizing {
-        let crop = sizing.aspectRatio.map {
-            WIImageCrop(aspectRatio: $0, anchor: sizing.anchor)
+extension WICompressionSizing {
+    func geometry(
+        for sourcePixelSize: WIPixelSize
+    ) throws(WICompressError) -> TargetGeometry {
+        let crop = aspectRatio.map {
+            WIImageCrop(aspectRatio: $0, anchor: anchor)
         }
-        let cropGeometry: WIResolvedCropGeometry
+        let cropGeometry: CropGeometry
         do {
-            cropGeometry = try WIImageCropGeometry.resolve(
+            cropGeometry = try ImageCropGeometry.resolve(
                 crop,
                 sourcePixelSize: sourcePixelSize
             )
@@ -43,7 +42,7 @@ enum WICompressionSizingResolver {
         }
 
         let basePixelSize: WIPixelSize
-        if let maximumPixelSize = sizing.maximumPixelSize {
+        if let maximumPixelSize {
             basePixelSize = WICompressionSizeEstimation.scaledPixelSize(
                 source: cropGeometry.pixelSize,
                 maxLongSide: maximumPixelSize
@@ -52,7 +51,7 @@ enum WICompressionSizingResolver {
             basePixelSize = cropGeometry.pixelSize
         }
 
-        return WIResolvedCompressionSizing(
+        return TargetGeometry(
             sourceRect: cropGeometry.sourceRect,
             basePixelSize: basePixelSize,
             sourcePixelSize: sourcePixelSize

@@ -1,7 +1,7 @@
 # WICompress 2.0 Image Raster Core
 
-状态：Phase 3 已实现。独立 `WIImageRaster` target、单次绘制入口与现有 Encoder
-集成已经完成；公共 2.0 Process/Target Domain 仍按后续阶段推进。
+状态：独立 `WIImageRaster` target、单次绘制入口以及 Process/Target Pipeline 集成均已
+完成。
 
 本文记录 WICompress 2.0 对 Core Graphics 像素绘制能力的内部二次封装。它位于 ImageIO
 decode 与 encode 之间，只执行已经解析完成的几何和输出决定，不定义
@@ -9,14 +9,14 @@ decode 与 encode 之间，只执行已经解析完成的几何和输出决定�
 
 内部状态与编排已经由
 [`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md) 重新冻结；本文出现的
-resolver、solver、Execution Plan 和 Execution Core 仅记录当前实现或历史迁移背景。
+resolver、solver、Execution Plan 和 Execution Core 仅属于历史迁移背景。
 
 相关文档：
 
 - [`V2_DOMAIN_MODEL_CN.md`](V2_DOMAIN_MODEL_CN.md)：跨产品线 Domain 与执行边界。
 - [`V2_IMAGE_PROCESS_CN.md`](V2_IMAGE_PROCESS_CN.md)：crop 与 resizing 的公共合同。
 - [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md)：Target 固定裁切与
-  solver 边界。
+  反馈搜索边界。
 - [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md)：inspect、decode、encode 与 source copy。
 
 ## 为什么独立封装
@@ -105,8 +105,8 @@ resolved output color space
 - `maxBytes`、quality search、candidate ranking 或 retry。
 - representation、metadata 或编码格式选择。
 
-Raster 不再解释 Domain。上层 resolver 负责把 crop、resizing 和 Output 转换为 concrete
-plan，Raster 只执行。
+Raster 不再解释 Domain。上层 `ImagePipeline` 负责把 crop、resizing 和 Output 转换为
+concrete geometry，Raster 只执行。
 
 ## Bitmap Surface 是隐藏实现
 
@@ -253,26 +253,23 @@ Raster target 不建立全局串行队列。
 ## 与完整执行链的关系
 
 ```text
-WIImageProcess ────────┐
-                       ├── resolver / solver
-WICompressionTarget ───┘
-                              │
-                              ▼
-                    concrete execution plan
-                              │
-                              ▼
-                       WIImageIO source
-                         │           │
-                 image/thumbnail     └── source copy passthrough
-                         │
-                         ▼
-                    ImageRaster.image
-                         │
-                         ▼
-                    WIImageIO encode
-                         │
-                         ▼
-                        Data
+Data / file URL + Process / Target
+              │
+              ▼
+       request ImagePipeline
+          │             │
+          │             └── WIImageIO source copy / original passthrough
+          ▼
+   WIImageIO image / thumbnail
+          │
+          ▼
+    ImageRaster.image
+          │
+          ▼
+     WIImageIO encode
+          │
+          ▼
+         Data
 ```
 
 ImageIO 的美感来自 inspect、image、thumbnail、encode 等离散 representation 能力；
@@ -301,7 +298,8 @@ Raster 的美感来自把有状态的 Core Graphics machinery 压缩成一次准
 - transparent PNG、JPEG flatten、sRGB/P3 conversion、CMYK fallback 与 metadata
   路径通过原有真实图片回归测试。
 - 非正 canvas、无效 rect、越界 rect 与整数溢出在创建 context 前失败。
-- Solver 仍然只 render 一次，并在 quality search 中复用同一个 `CGImage`。
+- Pipeline 在固定 geometry 的 quality search 中只 render 一次，并复用同一个
+  `CGImage`。
 
 async terminal 尚未进入公共 API，因此 sync/async parity 留给 execution phase；实际
 row padding 的观测与固定内存预算留给后续 benchmark，不扩大当前 Raster 返回值。

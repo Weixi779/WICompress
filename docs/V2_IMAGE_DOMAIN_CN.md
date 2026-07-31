@@ -50,14 +50,14 @@ Domain 内，作为 `WIImageResize.luban` 的实现细节。
 - `Source`、Descriptor、thumbnail、encode 和 runtime capability 属于 `WIImageIO`。
 - bitmap context、orientation render、Alpha surface 和颜色转换属于
   `WIImageRaster`。
-- Resolver、Execution Plan、Executor、Target Solver 和公开结果
-  `WIResult` 属于 `WICompressExecution`。
+- 请求级 `ImagePipeline`、Target 反馈搜索、错误与公开结果 `WIResult` 属于
+  `WICompressExecution`。
 - `WICompressor` 属于公开 umbrella `WICompress`。
 
 ## WIPixelSize 合同
 
 `WIPixelSize` 是唯一的像素尺寸类型。公开 initializer 接受调用方意图；ImageIO、
-Resolver 和 Raster 在进入执行边界时调用 package 校验，保证：
+Raster 和 Pipeline 在进入执行边界时调用 package 校验，保证：
 
 - width 与 height 均为正数；
 - `width * height` 不发生整数溢出。

@@ -1,5 +1,5 @@
 //
-//  WIImageCropGeometry.swift
+//  ImageCropGeometry.swift
 //  WICompressExecution
 //
 //  Created by weixi on 2026/7/30.
@@ -9,30 +9,17 @@
 import Foundation
 import WIImageDomain
 
-struct WIResolvedCropGeometry: Sendable, Equatable {
+struct CropGeometry: Sendable, Equatable {
     let sourceRect: Rect
     let pixelSize: WIPixelSize
 }
 
-enum WIImageCropGeometry {
-    static func resolve(
-        _ crop: WIImageCrop?,
-        sourcePixelSize: WIPixelSize
-    ) throws(WICompressError) -> WIResolvedCropGeometry {
-        guard sourcePixelSize.width > 0, sourcePixelSize.height > 0 else {
-            throw .imageInfoUnavailable
-        }
-
+enum ImageCropGeometry {
+    static func aspectRatio(
+        of crop: WIImageCrop?
+    ) throws(WICompressError) -> Double? {
         guard let crop else {
-            return WIResolvedCropGeometry(
-                sourceRect: Rect(
-                    x: 0,
-                    y: 0,
-                    width: Double(sourcePixelSize.width),
-                    height: Double(sourcePixelSize.height)
-                ),
-                pixelSize: sourcePixelSize
-            )
+            return nil
         }
 
         let ratioWidth = crop.aspectRatio.width
@@ -55,7 +42,33 @@ enum WIImageCropGeometry {
         guard targetRatio.isFinite, targetRatio > 0 else {
             throw .invalidCrop
         }
+        return targetRatio
+    }
 
+    static func resolve(
+        _ crop: WIImageCrop?,
+        sourcePixelSize: WIPixelSize
+    ) throws(WICompressError) -> CropGeometry {
+        guard sourcePixelSize.width > 0, sourcePixelSize.height > 0 else {
+            throw .imageInfoUnavailable
+        }
+
+        guard
+            let crop,
+            let targetRatio = try aspectRatio(of: crop)
+        else {
+            return CropGeometry(
+                sourceRect: Rect(
+                    x: 0,
+                    y: 0,
+                    width: Double(sourcePixelSize.width),
+                    height: Double(sourcePixelSize.height)
+                ),
+                pixelSize: sourcePixelSize
+            )
+        }
+
+        let anchor = crop.anchor
         let sourceWidth = sourcePixelSize.width
         let sourceHeight = sourcePixelSize.height
         let sourceRatio = Double(sourceWidth) / Double(sourceHeight)
@@ -100,7 +113,7 @@ enum WIImageCropGeometry {
 
         let originX = min(max(anchoredX, 0), availableX)
         let originY = min(max(anchoredY, 0), availableY)
-        return WIResolvedCropGeometry(
+        return CropGeometry(
             sourceRect: Rect(
                 x: Double(originX),
                 y: Double(originY),

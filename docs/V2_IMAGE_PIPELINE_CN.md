@@ -1,7 +1,7 @@
 # WICompress 2.0 Image Pipeline
 
-状态：内部编排边界已冻结；Phase 2 已由 `ImagePipeline` 接管 Process 的校验、决策与
-执行，Target 的反馈搜索迁移尚未实施。
+状态：内部编排边界已冻结并实施；Process 与 Target 的校验、决策、执行和反馈搜索均由
+请求级 `ImagePipeline` 持有。
 
 本文是 WICompress 2.0 内部图片执行架构的单一来源。它定义一次 terminal 调用由谁持有
 输入、检查结果、工作像素和执行决策，也明确哪些已有中间层不再属于最终架构。
@@ -26,7 +26,8 @@ ImageIO、Raster、输出合同和当前实施状态仍然有效。
 
 ```text
 Data / file URL + Process / Target
-    -> ImagePipeline
+    -> WICompressor public terminal
+    -> package-only ImagePipeline terminal
          -> validate source-independent input
          -> create ImageIO source when needed
          -> inspect original input at most once
@@ -318,6 +319,8 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 - Target 候选始终从原始输入派生，encoded candidate 不回灌为下一轮输入。
 - geometry 相同而只有 quality 变化时可以复用 working `CGImage`。
 - 外部扩展只产生 concrete Domain facts，不扩展 Pipeline。
+- Target 的 source-independent validation、passthrough、反馈搜索与最终 hard byte
+  check 已由 Pipeline 直接持有，不再经过架构级中间类型。
 
 ### Reject
 
@@ -328,6 +331,20 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 - 固定 Stage chain、开放 Pipeline、插件和 processor registry。
 - 为了测试或形式完整建立没有第二实现和生命周期的 protocol。
 - 把完整 Target 反馈算法伪装成纯 mapper。
+
+## 当前实施状态
+
+- `WICompressor` 的 Process 与 Target terminal 均直接调用 package-only
+  `ImagePipeline`；不存在第二个 package terminal 转发类型。
+- 两条产品线都先验证 source-independent intent，再创建并 inspect ImageIO source。
+- Process 的 crop、resizing、output 分支选择与结果生成已经迁入 Pipeline。
+- Target 的 target validation、固定 crop/base size 解析、passthrough、候选搜索、
+  working image 复用、候选选择与 hard byte check 已经迁入 Pipeline。
+- 架构级 Process/Target Resolver、`WIExecutionPlan`、`WIImageExecutor` 与
+  `WICompressionSolver` 已删除。
+- `Algorithm/` 只保留 Process/Target geometry、size estimation、quality profile 和 ranking
+  等可独立验证的计算。
+- 同步 Data 与 file URL terminal 已共享上述实现；异步 terminal 尚未实施。
 
 ### Defer
 
