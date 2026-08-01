@@ -14,7 +14,7 @@ public struct WIResult: Sendable {
     /// Encoded image data.
     public let data: Data
     /// Encoded image format.
-    public let format: WIImageFormat
+    public let format: ImageFormat
     /// Encoded pixel size.
     public let pixelSize: WIPixelSize
     /// Encoded byte count.
@@ -24,7 +24,7 @@ public struct WIResult: Sendable {
 
     package init(
         data: Data,
-        format: WIImageFormat,
+        format: ImageFormat,
         pixelSize: WIPixelSize
     ) {
         self.data = data

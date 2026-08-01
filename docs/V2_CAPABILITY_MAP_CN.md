@@ -150,9 +150,9 @@ Data
   -> final encoded Data
 ```
 
-当前 Execution 层 `ImagePipeline` 持有请求级 `WIImageIO.Reader`，并直接消费其
-`Descriptor`，本身不是 decoded bitmap。底层 `CGImageSource` 由同步 Reader 管理，
-只在按需读取某些颜色空间信息，或进入 render 时创建 `WIImageIO.Frame`。Reader 对
+当前 Execution 层 `ImagePipeline` 持有请求级 `ImageReader`，并直接消费其
+`ImageDescriptor`，本身不是 decoded bitmap。底层 `CGImageSource` 由同步 ImageReader 管理，
+只在按需读取某些颜色空间信息，或进入 render 时创建 `ImageFrame`。ImageReader 对
 单次处理和 Target 多次尝试有价值，但不应成为跨请求长期存在的 `ImageResource`。
 
 这些生命周期事实最终支持了“纯描述值 + 一次 terminal execution”、不公开长期

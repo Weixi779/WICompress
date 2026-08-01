@@ -183,7 +183,7 @@ encode，同时不暴露 `CGImageSource`、`CGImageDestination` 与 properties �
 ```swift
 import WIImageIO
 
-let reader = try WIImageIO.read(originalData)
+let reader = try ImageReader(originalData)
 let descriptor = reader.descriptor
 
 let encoded = try reader
@@ -195,7 +195,9 @@ let encoded = try reader
 ```
 
 只要 options 允许，这条链会保留来源 metadata 和 orientation。它抛出
-`WIImageIO.Error`；执行线程和 actor 切换仍由调用方决定。
+`ImageIOError`；执行线程和 actor 切换仍由调用方决定。
+
+完整的底层入口见 [WIImageIO 使用指南](Sources/image/io/WIImageIO.docc/WIImageIO.md)。
 
 ## 和 UIKit / AppKit 一起使用
 

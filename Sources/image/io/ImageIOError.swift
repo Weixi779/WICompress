@@ -1,5 +1,5 @@
 //
-//  Error.swift
+//  ImageIOError.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/8/1.
@@ -9,27 +9,25 @@
 import Foundation
 import UniformTypeIdentifiers
 
-extension WIImageIO {
-    /// Failures produced by ImageIO inspection, decoding, transcoding, and encoding.
-    public enum Error: Swift.Error, Sendable, Equatable {
-        /// The file URL could not be read.
-        case fileReadFailed(URL)
-        /// The input does not contain a readable image source.
-        case invalidImageData
-        /// Required image facts could not be inspected.
-        case imageInfoUnavailable
-        /// Multi-frame image data is not supported by static operations.
-        case animatedSourceUnsupported(frameCount: Int)
-        /// Source pixels could not be decoded.
-        case imageDecodeFailed
-        /// The requested metadata cannot be preserved by a source transcode.
-        case metadataTranscodeUnsupported(UTType)
-        /// Image data could not be encoded as the requested type.
-        case imageEncodeFailed(UTType)
-    }
+/// Failures produced by ImageIO inspection, decoding, transcoding, and encoding.
+public enum ImageIOError: Swift.Error, Sendable, Equatable {
+    /// The file URL could not be read.
+    case fileReadFailed(URL)
+    /// The input does not contain a readable image source.
+    case invalidImageData
+    /// Required image facts could not be inspected.
+    case imageInfoUnavailable
+    /// Multi-frame image data is not supported by static operations.
+    case animatedSourceUnsupported(frameCount: Int)
+    /// Source pixels could not be decoded.
+    case imageDecodeFailed
+    /// The requested metadata cannot be preserved by a source transcode.
+    case metadataTranscodeUnsupported(UTType)
+    /// Image data could not be encoded as the requested type.
+    case imageEncodeFailed(UTType)
 }
 
-extension WIImageIO.Error: LocalizedError {
+extension ImageIOError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .fileReadFailed(let url):

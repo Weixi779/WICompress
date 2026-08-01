@@ -14,7 +14,7 @@ import WIImageDomain
 struct WISolvedCompressionCandidate: Sendable, Equatable {
     var data: Data
     var pixelSize: WIPixelSize
-    var format: WIImageFormat
+    var format: ImageFormat
     var quality: Double
 
     var pixelArea: Double {

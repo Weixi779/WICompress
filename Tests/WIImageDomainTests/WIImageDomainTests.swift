@@ -29,11 +29,11 @@ struct WIImageDomainTests {
 
     @Test("Metadata aliases compose as standard OptionSet values")
     func metadataOptions() {
-        let withoutGPS = WIImageMetadataOptions.preserve
+        let withoutGPS = ImageMetadataOptions.preserve
             .subtracting(.gps)
 
-        #expect(WIImageMetadataOptions.strip.isEmpty)
-        #expect(WIImageMetadataOptions.preserve == .all)
+        #expect(ImageMetadataOptions.strip.isEmpty)
+        #expect(ImageMetadataOptions.preserve == .all)
         #expect(withoutGPS.contains(.exif))
         #expect(withoutGPS.contains(.iptc))
         #expect(withoutGPS.contains(.tiff))

@@ -49,9 +49,9 @@ Process 与 Target 是同一 Pipeline 内的两种算法；内部状态和编排
 
 公共模型按所有权拆分：`WIImageDomain` 保存像素、颜色、格式与 metadata 等共享图片事实；
 `WICompressDomain` 保存 Process、Target、Output、crop 与 resizing 等压缩请求语义。
-`WIImageFormat` 只描述容器家族，ImageIO 负责检测；`WICompressError` 属于
+`ImageFormat` 只描述容器家族，ImageIO 负责检测；`WICompressError` 属于
 `WICompressDomain`，表达请求构造、resizing 扩展点和 terminal 失败。
-独立 `WIImageIO` 产品使用 `WIImageIO.Error`，Execution 在 Pipeline 边界完成映射。
+独立 `WIImageIO` 产品使用 `ImageIOError`，Execution 在 Pipeline 边界完成映射。
 
 ## Domain 所有权
 
@@ -116,7 +116,7 @@ Pipeline 不使用 warning 或静默换格式满足合同。
 
 ### Metadata
 
-Metadata 使用一个可组合的 `WIImageMetadataOptions: OptionSet`：
+Metadata 使用一个可组合的 `ImageMetadataOptions: OptionSet`：
 
 - `.exif`
 - `.gps`
@@ -128,7 +128,7 @@ Metadata 使用一个可组合的 `WIImageMetadataOptions: OptionSet`：
 调用方通过标准集合运算表达选择，不引入逐字段 rule 对象或 metadata resolver：
 
 ```swift
-let metadata = WIImageMetadataOptions.preserve.subtracting(.gps)
+let metadata = ImageMetadataOptions.preserve.subtracting(.gps)
 ```
 
 `.makerNotes` 同时覆盖 ImageIO 的顶层厂商字典与 Exif 字典内嵌 MakerNote；它与
@@ -190,7 +190,7 @@ Concrete Color Space 至少支持 sRGB、Display P3 与 custom ICC Profile。最
 | `pngIfAlphaOtherwiseJPEG` 保留 | 它是常用、确定的 representation selection，不是含糊 automatic |
 | Color Space 只保留 preserve/convert | sRGB、Display P3 和 custom ICC 覆盖当前真实范围 |
 | 内部模块按真实能力解耦 | 不为了组件化建立没有不变量、生命周期或第二实现的空协议 |
-| ImageIO 模块边界已冻结 | 独立公开 product、`Reader → Frame → encode` typed chain、同步 primitive |
+| ImageIO 模块边界已冻结 | 独立公开 product、`ImageReader → ImageFrame → encode` typed chain、同步 primitive |
 | Raster 模块边界已冻结 | 独立 package target、唯一 `image` 入口、隐藏 bitmap surface，不发布 product |
 | ImageIO 与 Raster 实现后置 | 由已冻结的 Process、Output 和 Target 合同反推最终执行层输入 |
 | 静态图片是当前范围 | GIF、其他动图、增量和多帧 session 不属于当前规划 |

@@ -1,5 +1,5 @@
 //
-//  WIImageMetadataOptions.swift
+//  ImageMetadataOptions.swift
 //  WIImageDomain
 //
 //  Created by weixi on 2026/6/22.
@@ -9,7 +9,7 @@
 import Foundation
 
 /// Metadata categories retained in encoded output.
-public struct WIImageMetadataOptions: OptionSet, Hashable, Sendable {
+public struct ImageMetadataOptions: OptionSet, Hashable, Sendable {
     public let rawValue: UInt
 
     public init(rawValue: UInt) {

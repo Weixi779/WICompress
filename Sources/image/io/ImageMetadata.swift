@@ -1,5 +1,5 @@
 //
-//  Metadata.swift
+//  ImageMetadata.swift
 //  WIImageIO
 //
 //  Created by weixi on 2026/8/1.
@@ -10,20 +10,20 @@ import Foundation
 import ImageIO
 import WIImageDomain
 
-extension WIImageIO {
-    struct MetadataProvenance {
-        let sourceProperties: [CFString: Any]
+struct MetadataProvenance {
+    let sourceProperties: [CFString: Any]
 
-        func properties(
-            keeping options: WIImageMetadataOptions
-        ) -> [CFString: Any] {
-            WIImageIO.metadataProperties(
-                in: sourceProperties,
-                keeping: options
-            )
-        }
+    func properties(
+        keeping options: ImageMetadataOptions
+    ) -> [CFString: Any] {
+        ImageReader.metadataProperties(
+            in: sourceProperties,
+            keeping: options
+        )
     }
+}
 
+extension ImageReader {
     static func metadataProvenance(
         _ source: CGImageSource
     ) -> MetadataProvenance? {
@@ -41,9 +41,9 @@ extension WIImageIO {
 
     static func metadataOptions(
         in properties: [CFString: Any]
-    ) -> WIImageMetadataOptions {
-        var options: WIImageMetadataOptions = []
-        for option in WIImageMetadataOptions.all.singleOptions {
+    ) -> ImageMetadataOptions {
+        var options: ImageMetadataOptions = []
+        for option in ImageMetadataOptions.all.singleOptions {
             if !metadataProperties(
                 in: properties,
                 keeping: option
@@ -56,7 +56,7 @@ extension WIImageIO {
 
     static func metadataProperties(
         in properties: [CFString: Any],
-        keeping options: WIImageMetadataOptions
+        keeping options: ImageMetadataOptions
     ) -> [CFString: Any] {
         var metadata: [CFString: Any] = metadataKeys(
             for: options
@@ -125,7 +125,7 @@ extension WIImageIO {
     }
 
     private static func metadataKeys(
-        for options: WIImageMetadataOptions
+        for options: ImageMetadataOptions
     ) -> [CFString] {
         var keys: [CFString] = []
         if options.contains(.exif) {
@@ -236,7 +236,7 @@ extension WIImageIO {
     ]
 }
 
-extension WIImageMetadataOptions {
+extension ImageMetadataOptions {
     fileprivate var singleOptions: [Self] {
         [.exif, .gps, .iptc, .tiff, .makerNotes].filter(contains)
     }

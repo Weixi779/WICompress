@@ -29,7 +29,7 @@ struct WIImageOperationsTests {
             hasGPS: true,
             hasTIFFOrientation: true
         )
-        let descriptor = try WIImageIO.inspect(data)
+        let descriptor = try ImageReader.inspect(data)
 
         #expect(descriptor.byteCount == data.count)
         #expect(descriptor.type == .jpeg)
@@ -45,8 +45,8 @@ struct WIImageOperationsTests {
         #expect(descriptor.frameCount == 1)
         #expect(descriptor.hasAlpha != true)
         #expect(descriptor.metadata.contains(.gps))
-        #expect(WIImageIO.canDecode(.jpeg))
-        #expect(WIImageIO.canEncode(.jpeg))
+        #expect(ImageReader.canDecode(.jpeg))
+        #expect(ImageReader.canEncode(.jpeg))
     }
 
     @Test("File inspection preserves the encoded byte count")
@@ -62,7 +62,7 @@ struct WIImageOperationsTests {
         try data.write(to: url, options: .atomic)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let descriptor = try WIImageIO.inspect(contentsOf: url)
+        let descriptor = try ImageReader.inspect(contentsOf: url)
 
         #expect(descriptor.byteCount == data.count)
         #expect(descriptor.format == .png)
@@ -79,7 +79,7 @@ struct WIImageOperationsTests {
             alpha: 96
         )
 
-        let descriptor = try WIImageIO.inspect(data)
+        let descriptor = try ImageReader.inspect(data)
 
         #expect(descriptor.hasAlpha == true)
     }
@@ -93,20 +93,20 @@ struct WIImageOperationsTests {
             frameCount: 2
         )
 
-        let reader = try WIImageIO.read(data)
+        let reader = try ImageReader(data)
         let descriptor = reader.descriptor
 
         #expect(descriptor.frameCount == 2)
         #expect(descriptor.format == .unknown)
         #expect(!reader.canTranscode(as: .png))
-        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
-            try WIImageIO.read(data).image()
+        #expect(throws: ImageIOError.animatedSourceUnsupported(frameCount: 2)) {
+            try ImageReader(data).image()
         }
-        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
-            try WIImageIO.read(data).thumbnail()
+        #expect(throws: ImageIOError.animatedSourceUnsupported(frameCount: 2)) {
+            try ImageReader(data).thumbnail()
         }
-        #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
-            try WIImageIO.read(data).transcode(as: .png)
+        #expect(throws: ImageIOError.animatedSourceUnsupported(frameCount: 2)) {
+            try ImageReader(data).transcode(as: .png)
         }
     }
 
@@ -126,23 +126,23 @@ struct WIImageOperationsTests {
         try data.write(to: url, options: .atomic)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let dataReader = try WIImageIO.read(data)
-        let fileReader = try WIImageIO.read(contentsOf: url)
+        let dataReader = try ImageReader(data)
+        let fileReader = try ImageReader(contentsOf: url)
         let dataDescriptor = dataReader.descriptor
         let fileDescriptor = fileReader.descriptor
         let dataImage = try dataReader.image().image
         let fileImage = try fileReader.image().image
-        let thumbnailOptions = WIImageIO.ThumbnailOptions(maximumPixelSize: 10)
+        let thumbnailOptions = ImageThumbnailOptions(maximumPixelSize: 10)
         let dataThumbnail = try dataReader.thumbnail(
             options: thumbnailOptions
         ).image
         let fileThumbnail = try fileReader.thumbnail(
             options: thumbnailOptions
         ).image
-        let dataTranscode = try WIImageIO.inspect(
+        let dataTranscode = try ImageReader.inspect(
             dataReader.transcode(as: .jpeg)
         )
-        let fileTranscode = try WIImageIO.inspect(
+        let fileTranscode = try ImageReader.inspect(
             fileReader.transcode(as: .jpeg)
         )
 
@@ -166,8 +166,8 @@ struct WIImageOperationsTests {
             typeIdentifier: UTType.jpeg.identifier
         )
 
-        let decodedFrame = try WIImageIO.read(data).image(
-            options: WIImageIO.DecodeOptions(cacheImmediately: false)
+        let decodedFrame = try ImageReader(data).image(
+            options: ImageDecodeOptions(cacheImmediately: false)
         )
 
         #expect(decodedFrame.image.width == 40)
@@ -184,8 +184,8 @@ struct WIImageOperationsTests {
             orientation: 6
         )
 
-        let result = try WIImageIO.read(data).thumbnail(
-            options: WIImageIO.ThumbnailOptions(maximumPixelSize: 10)
+        let result = try ImageReader(data).thumbnail(
+            options: ImageThumbnailOptions(maximumPixelSize: 10)
         )
 
         #expect(result.image.width == 5)
@@ -203,7 +203,7 @@ struct WIImageOperationsTests {
             hasGPS: true
         )
 
-        let transcodedData = try WIImageIO.read(data).transcode(as: .jpeg)
+        let transcodedData = try ImageReader(data).transcode(as: .jpeg)
         let properties = try Self.properties(in: transcodedData)
 
         #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
@@ -219,24 +219,24 @@ struct WIImageOperationsTests {
             orientation: 6,
             hasGPS: true
         )
-        let metadata = WIImageMetadataOptions.preserve.subtracting(.gps)
+        let metadata = ImageMetadataOptions.preserve.subtracting(.gps)
 
-        let transcodedData = try WIImageIO.read(data).transcode(
+        let transcodedData = try ImageReader(data).transcode(
             as: .jpeg,
-            options: WIImageIO.TranscodeOptions(metadata: metadata)
+            options: ImageTranscodeOptions(metadata: metadata)
         )
         let properties = try Self.properties(in: transcodedData)
 
         #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
         #expect(properties[kCGImagePropertyGPSDictionary] == nil)
 
-        let incompatibleOptions = WIImageIO.TranscodeOptions(
+        let incompatibleOptions = ImageTranscodeOptions(
             maximumPixelSize: 10,
             metadata: metadata
         )
-        let reader = try WIImageIO.read(data)
+        let reader = try ImageReader(data)
         #expect(!reader.canTranscode(as: .jpeg, options: incompatibleOptions))
-        #expect(throws: WIImageIO.Error.metadataTranscodeUnsupported(.jpeg)) {
+        #expect(throws: ImageIOError.metadataTranscodeUnsupported(.jpeg)) {
             try reader.transcode(as: .jpeg, options: incompatibleOptions)
         }
     }
@@ -249,17 +249,17 @@ struct WIImageOperationsTests {
             typeIdentifier: UTType.png.identifier,
             pngAuthor: "WICompress"
         )
-        let reader = try WIImageIO.read(data)
+        let reader = try ImageReader(data)
         let descriptor = reader.descriptor
 
         #expect(descriptor.hasUnmodeledMetadata)
         #expect(!reader.canTranscode(
             as: .png,
-            options: WIImageIO.TranscodeOptions(metadata: .strip)
+            options: ImageTranscodeOptions(metadata: .strip)
         ))
         #expect(reader.canTranscode(
             as: .png,
-            options: WIImageIO.TranscodeOptions(metadata: .preserve)
+            options: ImageTranscodeOptions(metadata: .preserve)
         ))
     }
 
@@ -273,12 +273,12 @@ struct WIImageOperationsTests {
             hasGPS: true,
             hasTIFFOrientation: true
         )
-        let decodedFrame = try WIImageIO.read(data).thumbnail()
+        let decodedFrame = try ImageReader(data).thumbnail()
 
         let strippedData = try decodedFrame.encode(as: .jpeg)
         let preservedData = try decodedFrame.encode(
             as: .jpeg,
-            options: WIImageIO.EncodeOptions(metadata: .preserve)
+            options: ImageEncodeOptions(metadata: .preserve)
         )
         let strippedProperties = try Self.properties(in: strippedData)
         let preservedProperties = try Self.properties(in: preservedData)
@@ -292,7 +292,7 @@ struct WIImageOperationsTests {
         #expect(tiff?.intValue(for: kCGImagePropertyTIFFOrientation) != 6)
     }
 
-    @Test("Decoded frames snapshot metadata without retaining their Reader")
+    @Test("Decoded frames snapshot metadata without retaining their reader")
     func frameMetadataLifetime() throws {
         let data = try Self.encodedImage(
             width: 40,
@@ -302,10 +302,10 @@ struct WIImageOperationsTests {
             hasGPS: true
         )
 
-        weak var releasedReader: WIImageIO.Reader?
-        let frame: WIImageIO.Frame
+        weak var releasedReader: ImageReader?
+        let frame: ImageFrame
         do {
-            let reader = try WIImageIO.read(data)
+            let reader = try ImageReader(data)
             releasedReader = reader
             frame = try reader.thumbnail()
         }
@@ -314,7 +314,7 @@ struct WIImageOperationsTests {
 
         let encoded = try frame.encode(
             as: .jpeg,
-            options: WIImageIO.EncodeOptions(metadata: .preserve)
+            options: ImageEncodeOptions(metadata: .preserve)
         )
         let properties = try Self.properties(in: encoded)
         #expect(properties[kCGImagePropertyGPSDictionary] != nil)
@@ -330,7 +330,7 @@ struct WIImageOperationsTests {
             orientation: 6
         )
 
-        let frame = try WIImageIO.read(data).image()
+        let frame = try ImageReader(data).image()
         let output = try frame.encode(as: .jpeg)
         let properties = try Self.properties(in: output)
 
@@ -352,12 +352,12 @@ struct WIImageOperationsTests {
             ]
         ]
 
-        let options = WIImageIO.metadataOptions(in: properties)
-        let exifOnly = WIImageIO.metadataProperties(
+        let options = ImageReader.metadataOptions(in: properties)
+        let exifOnly = ImageReader.metadataProperties(
             in: properties,
             keeping: .exif
         )
-        let makerNotesOnly = WIImageIO.metadataProperties(
+        let makerNotesOnly = ImageReader.metadataProperties(
             in: properties,
             keeping: .makerNotes
         )
@@ -406,7 +406,7 @@ struct WIImageOperationsTests {
             ]
         ]
 
-        let options = WIImageIO.metadataOptions(in: properties)
+        let options = ImageReader.metadataOptions(in: properties)
 
         #expect(options == .makerNotes)
     }
@@ -420,15 +420,15 @@ struct WIImageOperationsTests {
         )
         let type = UTType(exportedAs: "com.wicompress.unsupported")
 
-        #expect(throws: WIImageIO.Error.imageEncodeFailed(type)) {
-            try WIImageIO.read(data).transcode(as: type)
+        #expect(throws: ImageIOError.imageEncodeFailed(type)) {
+            try ImageReader(data).transcode(as: type)
         }
     }
 
     @Test("Invalid encoded bytes fail explicitly")
     func invalidDataFails() {
-        #expect(throws: WIImageIO.Error.invalidImageData) {
-            try WIImageIO.inspect(Data([0x00, 0x01, 0x02]))
+        #expect(throws: ImageIOError.invalidImageData) {
+            try ImageReader.inspect(Data([0x00, 0x01, 0x02]))
         }
     }
 
@@ -438,8 +438,8 @@ struct WIImageOperationsTests {
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("png")
 
-        #expect(throws: WIImageIO.Error.fileReadFailed(url)) {
-            try WIImageIO.inspect(contentsOf: url)
+        #expect(throws: ImageIOError.fileReadFailed(url)) {
+            try ImageReader.inspect(contentsOf: url)
         }
     }
 

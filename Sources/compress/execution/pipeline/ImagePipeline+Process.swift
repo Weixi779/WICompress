@@ -123,7 +123,7 @@ extension ImagePipeline {
             )
             && reader.canTranscode(
                 as: output.destinationType,
-                options: WIImageIO.TranscodeOptions(
+                options: ImageTranscodeOptions(
                     compressionQuality: quality,
                     metadata: process.output.metadata
                 )

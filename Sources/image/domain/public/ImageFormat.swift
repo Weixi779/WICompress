@@ -1,5 +1,5 @@
 //
-//  WIImageFormat.swift
+//  ImageFormat.swift
 //  WIImageDomain
 //
 //  Created by weixi on 2026/7/31.
@@ -9,7 +9,7 @@
 import UniformTypeIdentifiers
 
 /// Recognized image container families.
-public enum WIImageFormat: Sendable, Equatable {
+public enum ImageFormat: Sendable, Equatable {
     /// JPEG image data.
     case jpeg
     /// PNG image data.

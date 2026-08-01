@@ -1,5 +1,5 @@
 //
-//  WIImageFormatTests.swift
+//  ImageFormatTests.swift
 //  WIImageIOTests
 //
 //  Created by weixi on 2026/6/22.
@@ -13,12 +13,12 @@ import Testing
 import UniformTypeIdentifiers
 @testable import WIImageIO
 
-@Suite("WIImageFormat Detection")
-struct WIImageFormatTests {
+@Suite("ImageFormat Detection")
+struct ImageFormatTests {
 
     struct FormatCase: CustomTestStringConvertible, Sendable {
         let type: UTType
-        let expected: WIImageFormat
+        let expected: ImageFormat
         let testDescription: String
     }
 
@@ -57,15 +57,15 @@ struct WIImageFormatTests {
     @Test("Known image data is detected from its container type", arguments: knownFormatCases)
     func knownImageDataDetected(_ formatCase: FormatCase) throws {
         let data = try #require(Self.makeImageData(type: formatCase.type))
-        let descriptor = try WIImageIO.inspect(data)
+        let descriptor = try ImageReader.inspect(data)
 
         #expect(descriptor.format == formatCase.expected)
     }
 
     @Test("Empty data cannot produce an inspected format")
     func emptyDataHasNoFormat() {
-        #expect(throws: WIImageIO.Error.invalidImageData) {
-            try WIImageIO.inspect(Data())
+        #expect(throws: ImageIOError.invalidImageData) {
+            try ImageReader.inspect(Data())
         }
     }
 
@@ -73,8 +73,8 @@ struct WIImageFormatTests {
     func randomBytesHaveNoFormat() {
         let data = Data([0x00, 0x01, 0x02, 0x03, 0x04])
 
-        #expect(throws: WIImageIO.Error.invalidImageData) {
-            try WIImageIO.inspect(data)
+        #expect(throws: ImageIOError.invalidImageData) {
+            try ImageReader.inspect(data)
         }
     }
 
@@ -82,9 +82,9 @@ struct WIImageFormatTests {
 
     @Test("isHEIF is true only for .heif")
     func isHEIFFlag() {
-        #expect(WIImageFormat.heif.isHEIF == true)
-        #expect(WIImageFormat.jpeg.isHEIF == false)
-        #expect(WIImageFormat.png.isHEIF == false)
-        #expect(WIImageFormat.unknown.isHEIF == false)
+        #expect(ImageFormat.heif.isHEIF == true)
+        #expect(ImageFormat.jpeg.isHEIF == false)
+        #expect(ImageFormat.png.isHEIF == false)
+        #expect(ImageFormat.unknown.isHEIF == false)
     }
 }

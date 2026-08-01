@@ -27,7 +27,7 @@ struct ImageDestination: Sendable, Equatable {
     let colorSpace: DestinationColorSpace
     let isWritable: Bool
 
-    var destinationFormat: WIImageFormat {
+    var destinationFormat: ImageFormat {
         .detected(from: destinationType)
     }
 }
@@ -40,7 +40,7 @@ extension ImagePipeline {
             for: output.representation
         )
         let colorSpace = try outputColorSpace(output.colorSpace)
-        let isWritable = WIImageIO.canEncode(destination.type)
+        let isWritable = ImageReader.canEncode(destination.type)
 
         return ImageDestination(
             destinationType: destination.type,

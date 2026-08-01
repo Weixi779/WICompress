@@ -247,7 +247,7 @@ struct WIImageProcessTests {
                 quality: 0.7
             )
         )
-        let outputDescriptor = try WIImageIO.inspect(result.data)
+        let outputDescriptor = try ImageReader.inspect(result.data)
 
         #expect(result.pixelSize == WIPixelSize(width: 320, height: 180))
         #expect(result.format == .jpeg)
@@ -275,7 +275,7 @@ struct WIImageProcessTests {
                 output: WIImageOutput(representation: .png)
             )
         ).data
-        let outputDescriptor = try WIImageIO.inspect(output)
+        let outputDescriptor = try ImageReader.inspect(output)
 
         #expect(outputDescriptor.orientedPixelSize.width == 512)
         #expect(outputDescriptor.orientedPixelSize.height == 512)
@@ -361,7 +361,7 @@ struct WIImageProcessTests {
             )
         ).data
 
-        #expect(try WIImageIO.inspect(output).format == .png)
+        #expect(try ImageReader.inspect(output).format == .png)
     }
 
     @Test("Transparent sources require an explicit JPEG background")
@@ -407,7 +407,7 @@ struct WIImageProcessTests {
             "real_heic_4032x3024_o6_gps_hdr",
             extension: "heic"
         )
-        let inputDescriptor = try WIImageIO.inspect(data)
+        let inputDescriptor = try ImageReader.inspect(data)
         let output = try WICompressor.process(
             data,
             using: WIImageProcess(
@@ -417,7 +417,7 @@ struct WIImageProcessTests {
                 output: WIImageOutput(metadata: .preserve)
             )
         ).data
-        let resultDescriptor = try WIImageIO.inspect(output)
+        let resultDescriptor = try ImageReader.inspect(output)
 
         #expect(inputDescriptor.orientation != .up)
         #expect(resultDescriptor.orientation == .up)
@@ -443,7 +443,7 @@ struct WIImageProcessTests {
                 )
             )
         ).data
-        let outputDescriptor = try WIImageIO.inspect(output)
+        let outputDescriptor = try ImageReader.inspect(output)
 
         #expect(outputDescriptor.metadata.contains(.gps))
         #expect(outputDescriptor.orientation == .up)
@@ -469,7 +469,7 @@ struct WIImageProcessTests {
                 )
             )
         ).data
-        #expect(try WIImageIO.read(output).colorSpace() == .sRGB)
+        #expect(try ImageReader(output).colorSpace() == .sRGB)
     }
 
     @Test("Data and file Process terminals have equivalent behavior")

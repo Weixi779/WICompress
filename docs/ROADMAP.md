@@ -20,7 +20,7 @@ The 1.x-to-2.0 source migration is tracked in
 
 The ImageIO boundary is tracked in
 [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md). It freezes the public `WIImageIO`
-product, typed `Reader → Frame → encode` chain, synchronous primitive model, and
+product, typed `ImageReader → ImageFrame → encode` chain, synchronous primitive model, and
 static-image scope without exposing raw ImageIO implementation details.
 
 The internal Core Graphics raster boundary is tracked in
@@ -36,7 +36,7 @@ The 2.0 product and infrastructure boundaries are conceptually complete.
 Implementation status:
 
 - Completed: Swift 6.2 package baseline and public `WIImageIO` product.
-- Completed: typed Reader inspection, Frame decode/thumbnail, source transcode,
+- Completed: typed ImageReader inspection, ImageFrame decode/thumbnail, source transcode,
   chained encode, runtime capabilities, and Pipeline error mapping.
 - Completed: removal of the temporary `CGImageSource` migration bridge; the
   `WICompress` target no longer owns raw ImageIO source/destination operations.
@@ -55,9 +55,9 @@ Implementation status:
   pipeline without architecture-level Resolver, ExecutionPlan, Executor, or
   Solver types. `WICompressor` calls the package-only Pipeline terminals
   directly; the public `WICompress` target remains an umbrella facade.
-- Completed: `WIImageFormat` is a shared Image Domain fact and
+- Completed: `ImageFormat` is a shared Image Domain fact and
   `WICompressError` belongs to Compress Domain. ImageIO owns format detection
-  and exposes `WIImageIO.Error`; the Pipeline maps it to the terminal error.
+  and exposes `ImageIOError`; the Pipeline maps it to the terminal error.
 - Completed: synchronous `WIImageProcess` vertical slice with public
   `WIPixelSize`, resizing slot and built-ins, aspect-ratio crop, shared Output
   values, pure geometry calculation, and direct pipeline execution.
@@ -93,11 +93,11 @@ conflicting evidence.
 
 ## Metadata Control
 
-The 2.0 metadata model is complete. `WIImageMetadataOptions` is an `OptionSet`
+The 2.0 metadata model is complete. `ImageMetadataOptions` is an `OptionSet`
 covering Exif, location, IPTC, TIFF, and maker-note categories:
 
 ```swift
-let uploadMetadata = WIImageMetadataOptions.preserve
+let uploadMetadata = ImageMetadataOptions.preserve
     .subtracting(.gps)
 ```
 

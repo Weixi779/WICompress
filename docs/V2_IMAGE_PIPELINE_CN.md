@@ -31,7 +31,7 @@ Data / file URL + Process / Target
          -> validate source-independent input
          -> create ImageIO source when needed
          -> inspect original input at most once
-         -> hold Descriptor
+         -> hold ImageDescriptor
          -> choose and execute operations
          -> encoded Data
          -> WIResult
@@ -40,7 +40,7 @@ Data / file URL + Process / Target
 `ImagePipeline` 是本次请求唯一的状态和编排所有者。它知道：
 
 - 原始 encoded input。
-- ImageIO inspection 产生的 `Descriptor`。
+- ImageIO inspection 产生的 `ImageDescriptor`。
 - 外部传入的 Process 或 Target。
 - 当前是否需要 decode、Raster、source transcode 或重新 encode。
 - Target 搜索当前使用的 geometry、quality 和候选结果。
@@ -48,15 +48,15 @@ Data / file URL + Process / Target
 
 它不公开，不提供扩展节点，也不要求外部理解内部阶段。
 
-## Inspect 是动作，Descriptor 是事实
+## Inspect 是动作，ImageDescriptor 是事实
 
 ImageIO inspection 的概念合同是：
 
 ```swift
-inspect(input) -> Descriptor
+inspect(input) -> ImageDescriptor
 ```
 
-`Inspect` 是一个同步动作，不建立长期存在的 `Inspector` 对象。`Descriptor` 是该动作
+`Inspect` 是一个同步动作，不建立长期存在的 `Inspector` 对象。`ImageDescriptor` 是该动作
 产生的稳定值，至少承载：
 
 - container format 与 type identifier。
@@ -65,16 +65,16 @@ inspect(input) -> Descriptor
 - frame count。
 - Alpha、metadata 和 gain-map 等已经落地的 source facts。
 
-Color 不属于必须提前读取的 Descriptor 字段。只有 output 决策需要比较 source color
+Color 不属于必须提前读取的 ImageDescriptor 字段。只有 output 决策需要比较 source color
 时，Pipeline 才通过 ImageIO source 按需读取。
 
 Decode/encode capability 属于当前运行环境和具体 `UTType`；source transcode capability
 还取决于 source、destination 与 transcode options。它们都由 Pipeline 在相关决定具体后
-查询 ImageIO，不复制进 Descriptor。
+查询 ImageIO，不复制进 ImageDescriptor。
 
 Pipeline 可以先完成不依赖 source 的配置校验，再创建 ImageIO source。进入
 source-dependent 阶段后，原始输入至多 inspect 一次，并在整个调用期间持有该
-`Descriptor`。最终 encoded data 为了构造 `WIResult` 所做的结果检查不算重复检查原始
+`ImageDescriptor`。最终 encoded data 为了构造 `WIResult` 所做的结果检查不算重复检查原始
 输入。
 
 ## 两种算法，一个 Pipeline
@@ -87,7 +87,7 @@ source-dependent 阶段后，原始输入至多 inspect 一次，并在整个调
 Process 是一次确定性算法：
 
 ```text
-Descriptor + WIImageProcess
+ImageDescriptor + WIImageProcess
     -> validate declared intent
     -> calculate concrete geometry and output
     -> choose return-original / source-transcode / render
@@ -103,7 +103,7 @@ Descriptor + WIImageProcess
 Target 是一次带反馈的压缩算法：
 
 ```text
-Descriptor + WICompressionTarget
+ImageDescriptor + WICompressionTarget
     -> validate hard contract
     -> calculate fixed crop and base size
     -> try return-original when fully satisfied
@@ -167,15 +167,15 @@ Pipeline 可以按真实成本复用中间像素：
 ImageIO 模块拥有 encoded representation 的固有能力：
 
 ```text
-inspect  encoded input -> Descriptor
+inspect  encoded input -> ImageDescriptor
 decode   encoded input -> CGImage
 transcode encoded input -> Data
 encode   CGImage       -> Data
 ```
 
-Pipeline 自己持有请求级原始 `Data` / file URL，并通过 `WIImageIO.Reader` 使用 encoded
+Pipeline 自己持有请求级原始 `Data` / file URL，并通过 `ImageReader` 使用 encoded
 source。ImageIO 模块内部使用 `CGImageSource`、`CGImageDestination` 和 typed options；
-file-backed Reader 仍应避免无条件把完整文件读入内存。
+file-backed ImageReader 仍应避免无条件把完整文件读入内存。
 
 ImageIO 不知道：
 
@@ -228,7 +228,7 @@ pixel rewrite:
 ### Inspector
 
 **Reject。** 没有独立生命周期或可替换实现。一个 inspect function 和一个
-`Descriptor` 已经完整表达边界。
+`ImageDescriptor` 已经完整表达边界。
 
 ### Process Resolver / Target Resolver
 
@@ -283,7 +283,7 @@ Pipeline 本身完全封闭：
 - 不使用 `WI` 公共品牌前缀。
 - 不提供 stage protocol、processor registry 或插件。
 - 不允许调用方插入任意 decode、Raster 或 encode 节点。
-- 不公开 working `CGImage`、Pipeline 内部 Reader 或 Pipeline 生命周期。
+- 不公开 working `CGImage`、Pipeline 内部 ImageReader 或 Pipeline 生命周期。
 
 外部扩展发生在已经冻结的 Domain 插槽，例如 `WIImageResizing`：
 
@@ -312,7 +312,7 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 - `ImagePipeline` 是一次 terminal 调用唯一的状态与编排所有者。
 - Data、file URL 与已经建立自身不变量的外部意图直接进入 Pipeline。
 - Inspect 是函数；每次请求至多 inspect 原始输入一次，并由 Pipeline 持有输出的
-  `Descriptor`。
+  `ImageDescriptor`。
 - Process 与 Target 是同一个 Pipeline 内的两种算法。
 - ImageIO 与 Raster 是独立基础能力，不拥有产品执行顺序。
 - Target 候选始终从原始输入派生，encoded candidate 不回灌为下一轮输入。

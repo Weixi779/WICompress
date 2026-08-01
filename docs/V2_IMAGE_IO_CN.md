@@ -52,7 +52,7 @@ import WIImageIO
 ```
 
 `WIImageDomain` 保存两条产品线共同使用的事实。`WIImageIO` 直接 re-export
-`WIPixelSize`、`WIImageFormat`、`WIImageOrientation`、`WIImageMetadataOptions` 与
+`WIPixelSize`、`ImageFormat`、`WIImageOrientation`、`ImageMetadataOptions` 与
 `WIColorSpace`；使用者无需另外 import 基础 target，也不创建第二套 scoped aliases。
 
 ## Public API
@@ -60,8 +60,7 @@ import WIImageIO
 典型像素链：
 
 ```swift
-let data = try WIImageIO
-    .read(sourceData)
+let data = try ImageReader(sourceData)
     .thumbnail(
         options: .init(maximumPixelSize: 1_280)
     )
@@ -77,7 +76,7 @@ let data = try WIImageIO
 File URL 不会预先 materialize 完整 Data：
 
 ```swift
-let reader = try WIImageIO.read(contentsOf: fileURL)
+let reader = try ImageReader(contentsOf: fileURL)
 let descriptor = reader.descriptor
 ```
 
@@ -93,36 +92,39 @@ let data = try reader.transcode(
 公共入口保持很窄：
 
 ```text
-WIImageIO.read(Data) / read(contentsOf: URL) -> Reader
-Reader.descriptor                             -> Descriptor
-Reader.image(options:)                       -> Frame
-Reader.thumbnail(options:)                   -> Frame
-Reader.transcode(as:options:)                -> Data
-Frame.encode(as:options:)                    -> Data
-WIImageIO.inspect(...)                       -> Descriptor
-WIImageIO.canDecode / canEncode              -> Bool
+ImageReader(Data) / ImageReader(contentsOf: URL) -> ImageReader
+ImageReader.descriptor                           -> ImageDescriptor
+ImageReader.image(options:)                     -> ImageFrame
+ImageReader.thumbnail(options:)                 -> ImageFrame
+ImageReader.transcode(as:options:)              -> Data
+ImageFrame.encode(as:options:)                  -> Data
+ImageReader.inspect(...)                        -> ImageDescriptor
+ImageReader.canDecode / ImageReader.canEncode   -> Bool
 ```
 
 这里的链不是通用 Builder。每个节点都拥有真实状态或不变量，不允许任意 Stage、插件、
 Registry 或跨请求 mutable session。
 
-## Reader
+公共类型刻意采用扁平命名，不再添加人工 namespace。若同时导入其他也声明 `ImageReader`
+的模块，调用方使用 `WIImageIO.ImageReader` 消除歧义；这是 2.0 接受的模块命名成本。
 
-`Reader` 是同步、只读、请求级 ImageIO source：
+## ImageReader
+
+`ImageReader` 是同步、只读、请求级 ImageIO source：
 
 - 持有一个未公开的 `CGImageSource`。
-- 初始化时只 inspect 一次并缓存 `Descriptor`。
+- 初始化时只 inspect 一次并缓存 `ImageDescriptor`。
 - Data reader 只保留 ImageIO source 所需的输入生命周期。
 - File reader 直接从 URL 创建 source，不负责产品层的原始字节 passthrough。
-- 不声明 `Sendable`；调用方不应跨并发域共享同一个 Reader。
+- 不声明 `Sendable`；调用方不应跨并发域共享同一个 ImageReader。
 
-`Reader` 不是 Pipeline、Domain container 或业务扩展点。纯尺寸算法、Raster 与候选搜索
-只接收自己需要的值，不接收 Reader。原始 `Data` / file URL 与 return-original 生命周期
-由产品 Pipeline 持有，不进入 ImageIO Reader。
+`ImageReader` 不是 Pipeline、Domain container 或业务扩展点。纯尺寸算法、Raster 与候选搜索
+只接收自己需要的值，不接收 ImageReader。原始 `Data` / file URL 与 return-original 生命周期
+由产品 Pipeline 持有，不进入 ImageReader。
 
-## Descriptor
+## ImageDescriptor
 
-`Descriptor` 是 `Sendable` 的 source facts：
+`ImageDescriptor` 是 `Sendable` 的 source facts：
 
 | Fact | 含义 |
 | --- | --- |
@@ -137,12 +139,12 @@ Registry 或跨请求 mutable session。
 | `hasUnmodeledMetadata`（package-only） | 是否存在不能安全选择的 metadata |
 | `hasGainMap` | 是否存在 HDR gain map auxiliary data |
 
-颜色空间仍按需通过 `Reader.colorSpace()` 读取，不在 inspection 时强制完整 decode。
+颜色空间仍按需通过 `ImageReader.colorSpace()` 读取，不在 inspection 时强制完整 decode。
 
-## Frame 与 orientation
+## ImageFrame 与 orientation
 
 裸 `CGImage` 不能表达 pixels 是否已经按 EXIF orientation 转正，也不能表达 metadata
-来自哪里。`Frame` 因此同时持有：
+来自哪里。`ImageFrame` 因此同时持有：
 
 ```text
 CGImage + orientation + optional source metadata provenance
@@ -150,12 +152,12 @@ CGImage + orientation + optional source metadata provenance
 
 状态合同：
 
-| 产生方式 | Frame orientation | Encode 行为 |
+| 产生方式 | ImageFrame orientation | Encode 行为 |
 | --- | --- | --- |
-| `Reader.image()` | source orientation | 写回原 orientation |
-| `Reader.thumbnail()` 默认 transform | `.up` | 写入 orientation 1 |
+| `ImageReader.image()` | source orientation | 写回原 orientation |
+| `ImageReader.thumbnail()` 默认 transform | `.up` | 写入 orientation 1 |
 | `thumbnail(appliesOrientationTransform: false)` | source orientation | 保留 source orientation |
-| `Frame(image:)` | 默认 `.up` | 不伪造 source metadata |
+| `ImageFrame(image:)` | 默认 `.up` | 不伪造 source metadata |
 | Pipeline Raster 输出 | `.up` | 保留被选择的 source metadata，方向写 1 |
 
 这避免两类常见错误：raw pixels 被错误标记为 `.up`，或已经转正的 thumbnail/rendered
@@ -163,9 +165,9 @@ pixels 又被旧 orientation 旋转一次。
 
 ## Metadata provenance
 
-Reader 产生的 Frame 保留 source provenance。`Frame.encode` 根据 `EncodeOptions.metadata`
-从创建 Frame 时截取的 metadata snapshot 中选择字段。Frame 不强引用 Reader、原始
-Data 或 `CGImageSource`；调用方自己创建的 `Frame(image:)` 没有 source provenance，
+ImageReader 产生的 ImageFrame 保留 source provenance。`ImageFrame.encode` 根据 `ImageEncodeOptions.metadata`
+从创建 ImageFrame 时截取的 metadata snapshot 中选择字段。ImageFrame 不强引用 ImageReader、原始
+Data 或 `CGImageSource`；调用方自己创建的 `ImageFrame(image:)` 没有 source provenance，
 因此 `.preserve` 不会凭空产生 metadata。
 
 当前建模类别：
@@ -185,37 +187,37 @@ source-copy 机制，不需要 decode pixels。HDR gain map 当前只 inspect，
 三条 primitive 路径不可混成一个含糊操作：
 
 ```text
-Reader -> image / thumbnail -> Frame -> encode -> Data
-Reader -> transcode                           -> Data
-Reader -> descriptor                         -> facts
+ImageReader -> image / thumbnail -> ImageFrame -> encode -> Data
+ImageReader -> transcode                           -> Data
+ImageReader -> descriptor                         -> facts
 ```
 
 - `image` 返回 stored pixels 与 source orientation。
 - `thumbnail` 使用 ImageIO downsample，并可在 decode 时转正方向。
 - `transcode` 让 ImageIO 从 encoded source 写入 destination，适合不解码像素的格式、
   quality 与 metadata 改写；满足条件时可使用底层 source-copy 机制。
-- `encode` 消费 Frame，写入 quality、选择后的 metadata 与 Frame orientation。
+- `encode` 消费 ImageFrame，写入 quality、选择后的 metadata 与 ImageFrame orientation。
 
 crop、canvas placement、Alpha flatten、output color conversion 与采样风格属于 Raster；
 ImageIO 不重复提供另一套像素编辑 API。
 
 ## Options 与 runtime capability
 
-公开 options 均为 `WIImageIO` scoped value：
+公开 options 是带有图片语义的扁平值，不再依赖人工 namespace：
 
-- `DecodeOptions`
-- `ThumbnailOptions`
-- `TranscodeOptions`
-- `EncodeOptions`
+- `ImageDecodeOptions`
+- `ImageThumbnailOptions`
+- `ImageTranscodeOptions`
+- `ImageEncodeOptions`
 
 Options 是构造后不可变的值。`maximumPixelSize` 有值时至少归一为 `1`；有限的
 `compressionQuality` 限制在 `0...1`，NaN 与无穷值归一为 `nil`，表示不覆盖
 ImageIO 默认值。
 
 首版仍直接使用 `UTType` 表达 source/destination type。可写能力必须通过
-`WIImageIO.canEncode(_:)` 查询，不能由 enum case 静态假定；可读能力同理。
-package-only `Reader.canTranscode(as:options:)` 接收与 `transcode` 相同的完整
-`TranscodeOptions`，并同时检查静态图片、destination capability 与 metadata-transcode
+`ImageReader.canEncode(_:)` 查询，不能由 enum case 静态假定；可读能力同理。
+package-only `ImageReader.canTranscode(as:options:)` 接收与 `transcode` 相同的完整
+`ImageTranscodeOptions`，并同时检查静态图片、destination capability 与 metadata-transcode
 限制；它不能对随后必然失败的请求返回 `true`，也不扩大为公共 capability API。
 
 不公开：
@@ -227,7 +229,7 @@ package-only `Reader.canTranscode(as:options:)` 接收与 `transcode` 相同的�
 
 ## Error 边界
 
-独立 product 抛出 `WIImageIO.Error`：
+独立 product 抛出 `ImageIOError`：
 
 - file read failed。
 - invalid image data / inspection unavailable。
@@ -245,29 +247,29 @@ ImageIO primitives 保持同步：
 
 - 不创建 queue、actor 或全局 executor。
 - 不在内部静默切线程。
-- 不共享跨请求 Reader/destination。
+- 不共享跨请求 ImageReader/destination。
 
 同步调用方自行决定所在执行上下文。未来 `WICompressor` async terminal 负责让完整
 `ImagePipeline` 不阻塞 caller actor，并处理 priority、cancellation 与 executor 选择；
-同步与异步 terminal 复用相同 Reader、Raster 与编码语义。
+同步与异步 terminal 复用相同 ImageReader、Raster 与编码语义。
 
 ## ImagePipeline 集成
 
-`ImagePipeline` 持有一次请求的 Reader，并直接使用其 Descriptor。Process 与 Target
+`ImagePipeline` 持有一次请求的 ImageReader，并直接使用其 ImageDescriptor。Process 与 Target
 仍是 Pipeline 内的两种算法：
 
 ```text
 Data / URL
-  -> WIImageIO.Reader
-  -> Descriptor
+  -> ImageReader
+  -> ImageDescriptor
   -> Process or Target decisions
-  -> Reader.image / thumbnail / transcode
+  -> ImageReader.image / thumbnail / transcode
   -> optional WIImageRaster
-  -> Frame.encode
+  -> ImageFrame.encode
   -> WIResult
 ```
 
-Reader 不会进入纯 geometry、resizing 或 candidate ranking 函数。Target 在固定几何的
+ImageReader 不会进入纯 geometry、resizing 或 candidate ranking 函数。Target 在固定几何的
 quality search 中复用 rendered pixels；ImageIO chain 不拥有 byte-budget feedback。
 
 ## 首版边界
@@ -286,8 +288,8 @@ quality search 中复用 rendered pixels；ImageIO chain 不拥有 byte-budget f
 
 ## 验证合同
 
-- Data/file Reader 的 descriptor、decode、thumbnail 与 transcode 行为一致。
-- File Reader 不预读完整 bytes；产品 Pipeline 只在 return-original 时读取原始文件。
+- Data/file ImageReader 的 descriptor、decode、thumbnail 与 transcode 行为一致。
+- File ImageReader 不预读完整 bytes；产品 Pipeline 只在 return-original 时读取原始文件。
 - raw decode → encode 保留 source orientation。
 - transformed thumbnail/rendered frame → encode 写 orientation 1。
 - selected metadata 与 MakerNote 独立性正确。

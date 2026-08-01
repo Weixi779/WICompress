@@ -33,14 +33,14 @@ public enum WICompressError: Swift.Error, Sendable, Equatable {
     /// The target compression request is not valid.
     case invalidTarget
     /// Transparent source data needs an explicit background before JPEG encoding.
-    case transparentSourceRequiresBackground(WIImageFormat)
+    case transparentSourceRequiresBackground(ImageFormat)
     /// JPEG background colors must be fully opaque.
     case nonOpaqueJPEGBackground
 
     // MARK: - Capability
 
     /// The current platform cannot write the requested destination format.
-    case unsupportedDestinationFormat(WIImageFormat)
+    case unsupportedDestinationFormat(ImageFormat)
     /// The requested color space is not available on the current platform.
     case unsupportedColorSpace
     /// The supplied ICC profile could not create a color space.
@@ -53,7 +53,7 @@ public enum WICompressError: Swift.Error, Sendable, Equatable {
     /// Image pixels could not be rendered as requested.
     case imageRenderingFailed
     /// Image data could not be encoded in the requested format.
-    case imageEncodeFailed(WIImageFormat)
+    case imageEncodeFailed(ImageFormat)
 
     // MARK: - Target Search
 

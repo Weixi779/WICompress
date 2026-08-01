@@ -197,7 +197,7 @@ thumbnailing, source transcoding, and encoding without exposing `CGImageSource`,
 ```swift
 import WIImageIO
 
-let reader = try WIImageIO.read(originalData)
+let reader = try ImageReader(originalData)
 let descriptor = reader.descriptor
 
 let encoded = try reader
@@ -209,8 +209,11 @@ let encoded = try reader
 ```
 
 The chain preserves source metadata provenance and orientation where the chosen
-options allow it. It throws `WIImageIO.Error`; scheduling and actor hops remain
+options allow it. It throws `ImageIOError`; scheduling and actor hops remain
 the caller's responsibility.
+
+See [Getting Started with WIImageIO](Sources/image/io/WIImageIO.docc/WIImageIO.md)
+for the complete lower-level flow.
 
 ## Working With UIKit or AppKit
 
@@ -259,7 +262,7 @@ and color space (`preserve` / `convert`). Metadata defaults to `.strip`;
 operations can select a subset:
 
 ```swift
-let metadata = WIImageMetadataOptions.preserve.subtracting(.gps)
+let metadata = ImageMetadataOptions.preserve.subtracting(.gps)
 ```
 
 Quality is a fixed `0...1` value for lossy output, or `nil` to omit an explicit

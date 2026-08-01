@@ -21,9 +21,9 @@ package final class ImagePipeline {
     }
 
     let input: Input
-    let reader: WIImageIO.Reader
+    let reader: ImageReader
 
-    var descriptor: WIImageIO.Descriptor {
+    var descriptor: ImageDescriptor {
         reader.descriptor
     }
 
@@ -34,8 +34,8 @@ package final class ImagePipeline {
     convenience init(data: Data) throws(WICompressError) {
         try self.init(
             input: .data(data),
-            reader: Self.imageIO { () throws(WIImageIO.Error) in
-                try WIImageIO.read(data)
+            reader: Self.imageIO { () throws(ImageIOError) in
+                try ImageReader(data)
             }
         )
     }
@@ -43,15 +43,15 @@ package final class ImagePipeline {
     convenience init(contentsOf url: URL) throws(WICompressError) {
         try self.init(
             input: .file(url),
-            reader: Self.imageIO { () throws(WIImageIO.Error) in
-                try WIImageIO.read(contentsOf: url)
+            reader: Self.imageIO { () throws(ImageIOError) in
+                try ImageReader(contentsOf: url)
             }
         )
     }
 
     private init(
         input: Input,
-        reader: WIImageIO.Reader
+        reader: ImageReader
     ) throws(WICompressError) {
         guard reader.descriptor.frameCount == 1 else {
             throw .animatedSourceUnsupported(
@@ -77,7 +77,7 @@ package final class ImagePipeline {
     }
 
     func sourceColorSpace() throws(WICompressError) -> WIColorSpace? {
-        try Self.imageIO { () throws(WIImageIO.Error) in
+        try Self.imageIO { () throws(ImageIOError) in
             try reader.colorSpace()
         }
     }
@@ -93,8 +93,8 @@ package final class ImagePipeline {
     func result(
         for data: Data
     ) throws(WICompressError) -> WIResult {
-        let outputDescriptor = try Self.imageIO { () throws(WIImageIO.Error) in
-            try WIImageIO.read(data).descriptor
+        let outputDescriptor = try Self.imageIO { () throws(ImageIOError) in
+            try ImageReader(data).descriptor
         }
 
         guard outputDescriptor.frameCount == 1 else {
@@ -117,7 +117,7 @@ package final class ImagePipeline {
 
     func transcodeSource(
         output: ImageDestination,
-        metadata: WIImageMetadataOptions,
+        metadata: ImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
         try transcodeSource(
@@ -130,7 +130,7 @@ package final class ImagePipeline {
     func renderAndEncode(
         geometry: RenderGeometry,
         output: ImageDestination,
-        metadata: WIImageMetadataOptions,
+        metadata: ImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
         let image = try render(
@@ -160,7 +160,7 @@ package final class ImagePipeline {
     func encodeRendered(
         _ image: CGImage,
         output: ImageDestination,
-        metadata: WIImageMetadataOptions,
+        metadata: ImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
         try encodeRendered(
@@ -173,14 +173,14 @@ package final class ImagePipeline {
 
     private func transcodeSource(
         as destinationType: UTType,
-        metadata: WIImageMetadataOptions,
+        metadata: ImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
-        let options = WIImageIO.TranscodeOptions(
+        let options = ImageTranscodeOptions(
             compressionQuality: quality,
             metadata: metadata
         )
-        return try Self.imageIO { () throws(WIImageIO.Error) in
+        return try Self.imageIO { () throws(ImageIOError) in
             try reader.transcode(
                 as: destinationType,
                 options: options
@@ -191,14 +191,14 @@ package final class ImagePipeline {
     private func encodeRendered(
         _ image: CGImage,
         as destinationType: UTType,
-        metadata: WIImageMetadataOptions,
+        metadata: ImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
-        let options = WIImageIO.EncodeOptions(
+        let options = ImageEncodeOptions(
             compressionQuality: quality,
             metadata: metadata
         )
-        return try Self.imageIO { () throws(WIImageIO.Error) in
+        return try Self.imageIO { () throws(ImageIOError) in
             try reader
                 .frame(image)
                 .encode(
@@ -210,7 +210,7 @@ package final class ImagePipeline {
 
     private func render(
         geometry: RenderGeometry,
-        destinationFormat: WIImageFormat,
+        destinationFormat: ImageFormat,
         jpegBackground: WIJPEGBackground?,
         outputColorSpace: DestinationColorSpace
     ) throws(WICompressError) -> CGImage {
@@ -260,7 +260,7 @@ package final class ImagePipeline {
     }
 
     private func decodedImage() throws(WICompressError) -> CGImage {
-        try Self.imageIO { () throws(WIImageIO.Error) in
+        try Self.imageIO { () throws(ImageIOError) in
             try reader.image().image
         }
     }
@@ -268,10 +268,10 @@ package final class ImagePipeline {
     private func decodedThumbnail(
         maximumPixelSize: Int
     ) throws(WICompressError) -> CGImage {
-        let options = WIImageIO.ThumbnailOptions(
+        let options = ImageThumbnailOptions(
             maximumPixelSize: maximumPixelSize
         )
-        return try Self.imageIO { () throws(WIImageIO.Error) in
+        return try Self.imageIO { () throws(ImageIOError) in
             try reader.thumbnail(options: options).image
         }
     }
@@ -329,7 +329,7 @@ package final class ImagePipeline {
     }
 
     private func rasterAlphaMode(
-        destinationFormat: WIImageFormat
+        destinationFormat: ImageFormat
     ) -> WIImageRaster.AlphaMode {
         destinationFormat == .jpeg ? .opaque : .preserve
     }
@@ -383,7 +383,7 @@ package final class ImagePipeline {
     }
 
     private static func imageIO<Value>(
-        _ operation: () throws(WIImageIO.Error) -> Value
+        _ operation: () throws(ImageIOError) -> Value
     ) throws(WICompressError) -> Value {
         do {
             return try operation()
@@ -393,7 +393,7 @@ package final class ImagePipeline {
     }
 
     private static func map(
-        _ error: WIImageIO.Error
+        _ error: ImageIOError
     ) -> WICompressError {
         switch error {
         case .fileReadFailed(let url):

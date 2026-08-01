@@ -23,7 +23,7 @@ enum WICompressionSizeEstimation {
         current: Int,
         encodedBytes: Int,
         maxBytes: Int,
-        format: WIImageFormat
+        format: ImageFormat
     ) -> Int? {
         guard current > 1, encodedBytes > maxBytes else {
             return nil
@@ -76,7 +76,7 @@ struct WILossyQualityProfile: Sendable, Equatable {
         self.qEmergency = qEmergency
     }
 
-    init(format: WIImageFormat) {
+    init(format: ImageFormat) {
         switch format {
         case .jpeg:
             self.init(qHigh: 0.82, qAnchor: 0.72, qKnee: 0.45, qEmergency: 0.24)

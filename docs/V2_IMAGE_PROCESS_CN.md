@@ -225,7 +225,7 @@ Output
 Quality 不属于 Output，因为 Target 中的 quality 由 solver 所有。Output 的完整合同和
 两条产品线的默认值见 [`V2_DOMAIN_MODEL_CN.md`](V2_DOMAIN_MODEL_CN.md)。
 
-Metadata 是 `WIImageMetadataOptions` 集合，不是互斥 policy。`.strip` 与 `.preserve`
+Metadata 是 `ImageMetadataOptions` 集合，不是互斥 policy。`.strip` 与 `.preserve`
 分别是空集合和完整集合；调用方可以直接保留全部类别并排除 location：
 
 ```swift

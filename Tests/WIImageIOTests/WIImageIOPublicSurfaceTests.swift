@@ -14,23 +14,23 @@ struct WIImageIOPublicSurfaceTests {
     @Test("Standalone import exposes canonical Image Domain values")
     func standaloneImport() {
         let size = WIPixelSize(width: 12, height: 8)
-        let options = WIImageIO.ThumbnailOptions(maximumPixelSize: 8)
+        let options = ImageThumbnailOptions(maximumPixelSize: 8)
 
         #expect(size.width == 12)
         #expect(options.maximumPixelSize == 8)
-        _ = WIImageIO.canDecode(.jpeg)
-        _ = WIImageIO.canEncode(.png)
+        _ = ImageReader.canDecode(.jpeg)
+        _ = ImageReader.canEncode(.png)
     }
 
     @Test("ImageIO options normalize numeric boundaries")
     func optionNormalization() {
-        let thumbnail = WIImageIO.ThumbnailOptions(maximumPixelSize: 0)
-        let transcode = WIImageIO.TranscodeOptions(
+        let thumbnail = ImageThumbnailOptions(maximumPixelSize: 0)
+        let transcode = ImageTranscodeOptions(
             maximumPixelSize: -1,
             compressionQuality: 2
         )
-        let lowQuality = WIImageIO.EncodeOptions(compressionQuality: -1)
-        let invalidQuality = WIImageIO.EncodeOptions(compressionQuality: .nan)
+        let lowQuality = ImageEncodeOptions(compressionQuality: -1)
+        let invalidQuality = ImageEncodeOptions(compressionQuality: .nan)
 
         #expect(thumbnail.maximumPixelSize == 1)
         #expect(transcode.maximumPixelSize == 1)

@@ -19,7 +19,7 @@ import os
 struct ImageGroup {
     var image: UIImage
     var rawData: Data
-    var imageFormat: WIImageFormat
+    var imageFormat: ImageFormat
     
     // Computed properties for UI display
     var fileSize: String {
@@ -48,7 +48,7 @@ struct ImageGroup {
 }
 
 enum ExampleImageInspector {
-    static func format(of data: Data) -> WIImageFormat {
+    static func format(of data: Data) -> ImageFormat {
         guard
             let source = CGImageSourceCreateWithData(data as CFData, nil),
             let typeIdentifier = CGImageSourceGetType(source) as String?,

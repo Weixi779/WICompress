@@ -10,6 +10,6 @@ import Foundation
 import WIImageDomain
 @testable import WIImageIO
 
-func imageFormat(of data: Data) throws -> WIImageFormat {
-    try WIImageIO.inspect(data).format
+func imageFormat(of data: Data) throws -> ImageFormat {
+    try ImageReader.inspect(data).format
 }
