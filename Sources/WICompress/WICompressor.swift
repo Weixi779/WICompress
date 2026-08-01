@@ -8,9 +8,9 @@
 
 @_exported public import WIImageDomain
 @_exported public import WICompressDomain
-@_exported public import WICompressExecution
 
 import Foundation
+import WICompressExecution
 
 /// ImageIO-backed image processing and compression entry point.
 public enum WICompressor {

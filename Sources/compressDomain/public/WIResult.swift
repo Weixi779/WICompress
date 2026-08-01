@@ -1,6 +1,6 @@
 //
 //  WIResult.swift
-//  WICompressExecution
+//  WICompressDomain
 //
 //  Created by weixi on 2026/6/28.
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.

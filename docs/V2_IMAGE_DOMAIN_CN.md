@@ -60,8 +60,9 @@ Luban 纯尺寸算法与数值规范化留在 `WICompressDomain`，作为请求�
   `WIImageIO`；该 target 同时发布独立 product。
 - bitmap context、orientation render、Alpha surface 和颜色转换属于
   `WIImageRaster`。
-- 请求级 `ImagePipeline`、Target 反馈搜索与公开结果 `WIResult` 属于
-  `WICompressExecution`。
+- `WIResult` 属于 `WICompressDomain`，是 Process 与 Target 共同的公开成功合同。
+- 请求级 `ImagePipeline` 与 Target 反馈搜索属于 `WICompressExecution`；Execution 不拥有
+  public product model。
 - `WICompressor` 属于公开 umbrella `WICompress`。
 
 ## WIPixelSize 合同

@@ -28,12 +28,12 @@ let package = Package(
         .target(
             name: "WIImageDomain",
             dependencies: [],
-            path: "Sources/domain"
+            path: "Sources/imageDomain"
         ),
         .target(
             name: "WICompressDomain",
             dependencies: ["WIImageDomain"],
-            path: "Sources/compress-domain"
+            path: "Sources/compressDomain"
         ),
         .target(
             name: "WIImageIO",

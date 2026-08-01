@@ -40,19 +40,19 @@ an iOS Simulator, and build-only jobs for tvOS/watchOS/visionOS simulators.
 Use capitalized names for Swift/package roots (`Sources`, `Tests`, `Example`)
 and lowercase names for auxiliary repository directories (`docs`, `scripts`).
 The public umbrella source keeps its branded `Sources/WICompress` directory.
-Internal source directories use short lowercase responsibility names and are
+Internal source directories use short responsibility names and are
 mapped to their Swift target names explicitly in `Package.swift`:
 
 ```text
-Sources/domain     -> WIImageDomain
-Sources/compress-domain -> WICompressDomain
-Sources/imageio    -> WIImageIO
-Sources/raster     -> WIImageRaster
-Sources/execution  -> WICompressExecution
+Sources/imageDomain    -> WIImageDomain
+Sources/compressDomain -> WICompressDomain
+Sources/imageio        -> WIImageIO
+Sources/raster         -> WIImageRaster
+Sources/execution      -> WICompressExecution
 ```
 
 Nested organizational directories are also lowercase. For example,
-`Sources/domain/public`, `Sources/compress-domain/public`,
+`Sources/imageDomain/public`, `Sources/compressDomain/public`,
 `Sources/execution/algorithm`, and `Sources/execution/pipeline`. Target names
 remain the module identity; physical directory names do not repeat the `WI`
 brand unless the directory is the public umbrella.
@@ -95,13 +95,14 @@ five supporting targets:
                      WICompress
 ```
 
-`WIImageDomain` owns shared image facts: pixel size, color, format, metadata,
-orientation, and geometry. `WICompressDomain` owns Process, Target, Output,
-crop, resizing, Luban, and `WICompressError`. There are no mirrored Core models.
+`WIImageDomain` is the shared image vocabulary and owns pixel size, color,
+format, metadata, orientation, and geometry. `WICompressDomain` owns the public
+Process, Target, Output, crop, resizing, result, and error contracts plus Luban.
+There are no mirrored Core models.
 `WIImageIO` is an independent synchronous product with `Reader`, `Descriptor`,
 `Frame`, scoped options, and `WIImageIO.Error`. `WICompressExecution` owns the
-request-scoped `ImagePipeline`, pure Process/Target calculations, ImageIO/Raster
-error mapping, and `WIResult`.
+request-scoped `ImagePipeline`, pure Process/Target calculations, and
+ImageIO/Raster error mapping; it publishes no product models.
 `WICompress` re-exports the public contracts and contains only
 `WICompressor`, whose terminals call the package-only `ImagePipeline` directly.
 
