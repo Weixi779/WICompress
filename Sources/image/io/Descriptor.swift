@@ -15,21 +15,21 @@ extension WIImageIO {
     public struct Descriptor: Sendable, Equatable {
         public let type: UTType?
         public let byteCount: Int
-        public let pixelSize: PixelSize
-        public let orientation: Orientation
+        public let pixelSize: WIPixelSize
+        public let orientation: WIImageOrientation
         public let frameCount: Int
         public let hasAlpha: Bool?
-        public let metadata: MetadataOptions
-        public let hasUnmodeledMetadata: Bool
+        public let metadata: WIImageMetadataOptions
+        package let hasUnmodeledMetadata: Bool
         public let hasGainMap: Bool
 
-        public var format: Format {
+        public var format: WIImageFormat {
             .detected(from: type)
         }
 
-        public var orientedPixelSize: PixelSize {
+        public var orientedPixelSize: WIPixelSize {
             orientation.swapsDimensions
-                ? PixelSize(
+                ? WIPixelSize(
                     validWidth: pixelSize.height,
                     height: pixelSize.width
                 )

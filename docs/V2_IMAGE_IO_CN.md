@@ -51,9 +51,9 @@ import WIImageIO
                      WICompress
 ```
 
-`WIImageDomain` 保存两条产品线共同使用的事实。`WIImageIO` 通过 scoped typealias
-提供 `PixelSize`、`Format`、`Orientation`、`MetadataOptions` 与 `ColorSpace`，使用者
-无需另外 import 基础 target，也不会出现第二套影子模型。
+`WIImageDomain` 保存两条产品线共同使用的事实。`WIImageIO` 直接 re-export
+`WIPixelSize`、`WIImageFormat`、`WIImageOrientation`、`WIImageMetadataOptions` 与
+`WIColorSpace`；使用者无需另外 import 基础 target，也不创建第二套 scoped aliases。
 
 ## Public API
 
@@ -134,7 +134,7 @@ Registry 或跨请求 mutable session。
 | `frameCount` | source frame 数量 |
 | `hasAlpha` | ImageIO 可确认时的 Alpha 事实 |
 | `metadata` | 已建模 metadata 类别 |
-| `hasUnmodeledMetadata` | 是否存在不能安全选择的 metadata |
+| `hasUnmodeledMetadata`（package-only） | 是否存在不能安全选择的 metadata |
 | `hasGainMap` | 是否存在 HDR gain map auxiliary data |
 
 颜色空间仍按需通过 `Reader.colorSpace()` 读取，不在 inspection 时强制完整 decode。
@@ -207,6 +207,10 @@ ImageIO 不重复提供另一套像素编辑 API。
 - `ThumbnailOptions`
 - `TranscodeOptions`
 - `EncodeOptions`
+
+Options 是构造后不可变的值。`maximumPixelSize` 有值时至少归一为 `1`；有限的
+`compressionQuality` 限制在 `0...1`，NaN 与无穷值归一为 `nil`，表示不覆盖
+ImageIO 默认值。
 
 首版仍直接使用 `UTType` 表达 source/destination type。可写能力必须通过
 `WIImageIO.canEncode(_:)` 查询，不能由 enum case 静态假定；可读能力同理。

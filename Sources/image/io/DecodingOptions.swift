@@ -9,7 +9,7 @@
 extension WIImageIO {
     /// Pixel decoding behavior for a full image frame.
     public struct DecodeOptions: Hashable, Sendable {
-        public var cacheImmediately: Bool
+        public let cacheImmediately: Bool
 
         public init(cacheImmediately: Bool = true) {
             self.cacheImmediately = cacheImmediately
@@ -18,16 +18,16 @@ extension WIImageIO {
 
     /// ImageIO thumbnail decoding behavior.
     public struct ThumbnailOptions: Hashable, Sendable {
-        public var maximumPixelSize: Int?
-        public var appliesOrientationTransform: Bool
-        public var cacheImmediately: Bool
+        public let maximumPixelSize: Int?
+        public let appliesOrientationTransform: Bool
+        public let cacheImmediately: Bool
 
         public init(
             maximumPixelSize: Int? = nil,
             appliesOrientationTransform: Bool = true,
             cacheImmediately: Bool = true
         ) {
-            self.maximumPixelSize = maximumPixelSize
+            self.maximumPixelSize = maximumPixelSize.map { max(1, $0) }
             self.appliesOrientationTransform = appliesOrientationTransform
             self.cacheImmediately = cacheImmediately
         }

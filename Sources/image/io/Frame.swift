@@ -15,18 +15,18 @@ extension WIImageIO {
     /// Decoded pixels with explicit orientation and optional source metadata provenance.
     public struct Frame {
         public let image: CGImage
-        public let orientation: Orientation
+        public let orientation: WIImageOrientation
 
         private let metadataProvenance: MetadataProvenance?
 
-        public var pixelSize: PixelSize {
-            PixelSize(width: image.width, height: image.height)
+        public var pixelSize: WIPixelSize {
+            WIPixelSize(width: image.width, height: image.height)
         }
 
         /// Wraps caller-owned pixels without source metadata provenance.
         public init(
             image: CGImage,
-            orientation: Orientation = .up
+            orientation: WIImageOrientation = .up
         ) {
             self.image = image
             self.orientation = orientation
@@ -35,7 +35,7 @@ extension WIImageIO {
 
         init(
             image: CGImage,
-            orientation: Orientation,
+            orientation: WIImageOrientation,
             metadataProvenance: MetadataProvenance?
         ) {
             self.image = image
@@ -62,16 +62,4 @@ extension WIImageIO {
         }
     }
 
-    struct MetadataProvenance {
-        let sourceProperties: [CFString: Any]
-
-        func properties(
-            keeping options: MetadataOptions
-        ) -> [CFString: Any] {
-            WIImageIO.metadataProperties(
-                in: sourceProperties,
-                keeping: options
-            )
-        }
-    }
 }

@@ -28,7 +28,7 @@ extension WIImageIO {
         }
 
         /// Reads the source color space when it can be represented by WIImageIO.
-        public func colorSpace() throws(WIImageIO.Error) -> ColorSpace? {
+        public func colorSpace() throws(WIImageIO.Error) -> WIColorSpace? {
             try WIImageIO.colorSpace(source)
         }
 
@@ -82,7 +82,7 @@ extension WIImageIO {
 
         package func frame(
             _ image: CGImage,
-            orientation: Orientation = .up
+            orientation: WIImageOrientation = .up
         ) -> Frame {
             Frame(
                 image: image,

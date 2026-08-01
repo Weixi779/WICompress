@@ -18,7 +18,7 @@ struct WIImageFormatTests {
 
     struct FormatCase: CustomTestStringConvertible, Sendable {
         let type: UTType
-        let expected: WIImageIO.Format
+        let expected: WIImageFormat
         let testDescription: String
     }
 
@@ -82,9 +82,9 @@ struct WIImageFormatTests {
 
     @Test("isHEIF is true only for .heif")
     func isHEIFFlag() {
-        #expect(WIImageIO.Format.heif.isHEIF == true)
-        #expect(WIImageIO.Format.jpeg.isHEIF == false)
-        #expect(WIImageIO.Format.png.isHEIF == false)
-        #expect(WIImageIO.Format.unknown.isHEIF == false)
+        #expect(WIImageFormat.heif.isHEIF == true)
+        #expect(WIImageFormat.jpeg.isHEIF == false)
+        #expect(WIImageFormat.png.isHEIF == false)
+        #expect(WIImageFormat.unknown.isHEIF == false)
     }
 }

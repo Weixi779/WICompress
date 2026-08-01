@@ -52,8 +52,8 @@ Luban 纯尺寸算法与数值规范化留在 `WICompressDomain`，作为请求�
 
 ## 不属于 Domain 的事实
 
-- encoded data 与 `UTType` 的格式检测属于 `WIImageIO`；检测结果使用 Domain 的
-  `WIImageFormat` 表达。
+- 从 encoded data 读取 `UTType` 属于 `WIImageIO`；将 `UTType` 映射为稳定容器家族
+  属于 `WIImageFormat`，由 Domain 统一表达。
 - `WIImageMetadataOptions` 属于共享 Output Domain；ImageIO Descriptor 直接使用它
   表达源图实际存在的受支持 metadata 类别。
 - `Reader`、Descriptor、Frame、thumbnail、encode 和 runtime capability 属于

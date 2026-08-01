@@ -219,7 +219,7 @@ struct WIImageOperationsTests {
             orientation: 6,
             hasGPS: true
         )
-        let metadata = WIImageIO.MetadataOptions.preserve.subtracting(.gps)
+        let metadata = WIImageMetadataOptions.preserve.subtracting(.gps)
 
         let transcodedData = try WIImageIO.read(data).transcode(
             as: .jpeg,
@@ -335,7 +335,7 @@ struct WIImageOperationsTests {
         let properties = try Self.properties(in: output)
 
         #expect(frame.orientation == .right)
-        #expect(frame.pixelSize == WIImageIO.PixelSize(width: 40, height: 20))
+        #expect(frame.pixelSize == WIPixelSize(width: 40, height: 20))
         #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
     }
 

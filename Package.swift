@@ -28,22 +28,22 @@ let package = Package(
         .target(
             name: "WIImageDomain",
             dependencies: [],
-            path: "Sources/imageDomain"
+            path: "Sources/image/domain"
         ),
         .target(
             name: "WICompressDomain",
             dependencies: ["WIImageDomain"],
-            path: "Sources/compressDomain"
+            path: "Sources/compress/domain"
         ),
         .target(
             name: "WIImageIO",
             dependencies: ["WIImageDomain"],
-            path: "Sources/imageio"
+            path: "Sources/image/io"
         ),
         .target(
             name: "WIImageRaster",
             dependencies: ["WIImageDomain"],
-            path: "Sources/raster"
+            path: "Sources/image/raster"
         ),
         .target(
             name: "WICompressExecution",
@@ -53,7 +53,7 @@ let package = Package(
                 "WIImageIO",
                 "WIImageRaster"
             ],
-            path: "Sources/execution"
+            path: "Sources/compress/execution"
         ),
         .target(
             name: "WICompress",
