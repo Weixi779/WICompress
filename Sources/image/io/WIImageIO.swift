@@ -250,27 +250,24 @@ extension WIImageIO {
 // MARK: - Transcoding
 
 extension WIImageIO {
+    private enum TranscodeMethod {
+        case addImageFromSource
+        case copyImageSourceExcludingGPS
+    }
+
     static func canTranscode(
         _ descriptor: Descriptor,
         `as` type: UTType,
         options: TranscodeOptions
     ) -> Bool {
-        guard
-            descriptor.frameCount == 1,
-            canEncode(type),
-            !descriptor.hasUnmodeledMetadata
-                || options.metadata.preservesUnmodeledMetadata
-        else {
+        guard descriptor.frameCount == 1 else {
+            return false
+        }
+        guard canEncode(type) else {
             return false
         }
 
-        let removedMetadata = descriptor.metadata.subtracting(options.metadata)
-        if removedMetadata.isEmpty {
-            return true
-        }
-
-        return removedMetadata == .gps
-            && canCopyExcludingGPS(descriptor, as: type, options: options)
+        return transcodeMethod(for: descriptor, as: type, options: options) != nil
     }
 
     static func transcode(
@@ -281,23 +278,55 @@ extension WIImageIO {
     ) throws(WIImageIO.Error) -> Data {
         try validateStaticImage(source)
 
-        let removedMetadata = descriptor.metadata.subtracting(options.metadata)
-        guard
-            !descriptor.hasUnmodeledMetadata
-                || options.metadata.preservesUnmodeledMetadata
-        else {
-            throw .metadataTranscodeUnsupported(type)
-        }
-        if removedMetadata == .gps {
-            guard canCopyExcludingGPS(descriptor, as: type, options: options) else {
-                throw .metadataTranscodeUnsupported(type)
-            }
-            return try copyExcludingGPS(source, as: type)
-        }
-        guard removedMetadata.isEmpty else {
+        guard let method = transcodeMethod(for: descriptor, as: type, options: options) else {
             throw .metadataTranscodeUnsupported(type)
         }
 
+        switch method {
+        case .addImageFromSource:
+            return try addImageFromSource(source, as: type, options: options)
+        case .copyImageSourceExcludingGPS:
+            return try copyImageSourceExcludingGPS(source, as: type)
+        }
+    }
+
+    private static func transcodeMethod(
+        for descriptor: Descriptor,
+        as type: UTType,
+        options: TranscodeOptions
+    ) -> TranscodeMethod? {
+        let containsUnmodeledMetadata = descriptor.hasUnmodeledMetadata
+        let preservesUnmodeledMetadata = options.metadata.preservesUnmodeledMetadata
+        guard !containsUnmodeledMetadata || preservesUnmodeledMetadata else {
+            return nil
+        }
+
+        let removedMetadata = descriptor.metadata.subtracting(options.metadata)
+        if removedMetadata.isEmpty {
+            return .addImageFromSource
+        }
+
+        guard removedMetadata == .gps else {
+            return nil
+        }
+        guard options.maximumPixelSize == nil else {
+            return nil
+        }
+        guard options.compressionQuality == nil else {
+            return nil
+        }
+        guard descriptor.type == type else {
+            return nil
+        }
+
+        return .copyImageSourceExcludingGPS
+    }
+
+    private static func addImageFromSource(
+        _ source: CGImageSource,
+        as type: UTType,
+        options: TranscodeOptions
+    ) throws(WIImageIO.Error) -> Data {
         var properties: [CFString: Any] = [:]
         if let maximumPixelSize = options.maximumPixelSize {
             properties[kCGImageDestinationImageMaxPixelSize] = maximumPixelSize
@@ -307,26 +336,15 @@ extension WIImageIO {
         }
 
         return try encodedData(as: type) { destination in
-            CGImageDestinationAddImageFromSource(
-                destination,
-                source,
-                0,
-                properties as CFDictionary
+            destination.addImage(
+                from: source,
+                at: 0,
+                properties: properties
             )
         }
     }
 
-    private static func canCopyExcludingGPS(
-        _ descriptor: Descriptor,
-        as type: UTType,
-        options: TranscodeOptions
-    ) -> Bool {
-        options.maximumPixelSize == nil
-            && options.compressionQuality == nil
-            && descriptor.type == type
-    }
-
-    private static func copyExcludingGPS(
+    private static func copyImageSourceExcludingGPS(
         _ source: CGImageSource,
         as type: UTType
     ) throws(WIImageIO.Error) -> Data {
@@ -342,14 +360,7 @@ extension WIImageIO {
             kCGImageDestinationMergeMetadata: true,
             kCGImageMetadataShouldExcludeGPS: true,
         ]
-        guard
-            CGImageDestinationCopyImageSource(
-                destination,
-                source,
-                options as CFDictionary,
-                nil
-            )
-        else {
+        guard destination.copyImageSource(source, options: options) else {
             throw .imageEncodeFailed(type)
         }
         return outputData as Data
@@ -373,11 +384,7 @@ extension WIImageIO {
 
         properties[kCGImagePropertyOrientation] = orientation.rawValue
         return try encodedData(as: type) { destination in
-            CGImageDestinationAddImage(
-                destination,
-                image,
-                properties as CFDictionary
-            )
+            destination.addImage(image, properties: properties)
         }
     }
 }
@@ -400,7 +407,7 @@ extension WIImageIO {
         let destination = try destination(as: type, writingTo: outputData)
         addingImage(destination)
 
-        guard CGImageDestinationFinalize(destination) else {
+        guard destination.finalize() else {
             throw .imageEncodeFailed(type)
         }
         return outputData as Data
@@ -421,6 +428,40 @@ extension WIImageIO {
             throw .imageEncodeFailed(type)
         }
         return destination
+    }
+}
+
+// MARK: - CGImageDestination
+
+private extension CGImageDestination {
+    func addImage(_ image: CGImage, properties: [CFString: Any]) {
+        CGImageDestinationAddImage(self, image, properties as CFDictionary)
+    }
+
+    func addImage(
+        from source: CGImageSource,
+        at index: Int,
+        properties: [CFString: Any]
+    ) {
+        CGImageDestinationAddImageFromSource(
+            self,
+            source,
+            index,
+            properties as CFDictionary
+        )
+    }
+
+    func copyImageSource(_ source: CGImageSource, options: [CFString: Any]) -> Bool {
+        CGImageDestinationCopyImageSource(
+            self,
+            source,
+            options as CFDictionary,
+            nil
+        )
+    }
+
+    func finalize() -> Bool {
+        CGImageDestinationFinalize(self)
     }
 }
 
