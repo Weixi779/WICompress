@@ -1,47 +1,33 @@
 # AGENTS.md
 
 This file is the single source of truth for coding-agent guidance in this
-repository. Other agent-specific entry files should point here instead of
-duplicating the same instructions.
+repository. Keep execution constraints here; keep evolving design rationale and
+complete architecture documentation under `docs/`.
 
-## Project Overview
+## Project
 
-WICompress is a lightweight ImageIO-based image compression library for JPEG,
-PNG, and HEIC/HEIF data. It uses the Luban resize strategy, preserves the source
-container format by default, supports explicit JPEG/PNG/HEIC output control, and
-exposes a UIKit/AppKit-free core API. The package targets iOS 14+, macOS 11+,
-Mac Catalyst 14+, tvOS 14+, watchOS 7+, and visionOS 1+.
+WICompress is a Swift 6.2 ImageIO-based image processing and compression
+package. It publishes the high-level `WICompress` product and the lower-level
+`WIImageIO` product. The core is UIKit/AppKit-free and supports iOS 14+, macOS
+11+, Mac Catalyst 14+, tvOS 14+, watchOS 7+, and visionOS 1+.
 
-## Development Commands
+## Commands
 
-### Building
 ```bash
 swift build
-```
-
-### Testing
-```bash
 swift test
-```
-
-### Package Resolution
-```bash
 swift package resolve
 ```
 
-### Continuous Integration
-
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on
-pull requests: `swift build` + `swift test` on macOS, the package test suite on
-an iOS Simulator, and build-only jobs for tvOS/watchOS/visionOS simulators.
+GitHub Actions runs macOS build/tests, iOS Simulator package tests, and
+build-only gates for the remaining supported Apple platforms.
 
 ## Repository Layout
 
 Use capitalized names for Swift/package roots (`Sources`, `Tests`, `Example`)
-and lowercase names for auxiliary repository directories (`docs`, `scripts`).
-The public umbrella source keeps its branded `Sources/WICompress` directory.
-Internal source directories are grouped first by image or compression context,
-then mapped to their Swift target names explicitly in `Package.swift`:
+and lowercase names for auxiliary directories (`docs`, `scripts`). The public
+umbrella keeps its branded `Sources/WICompress` path. Supporting source paths
+are grouped by product context and mapped to target names in `Package.swift`:
 
 ```text
 Sources/image/domain       -> WIImageDomain
@@ -49,42 +35,13 @@ Sources/image/io           -> WIImageIO
 Sources/image/raster       -> WIImageRaster
 Sources/compress/domain    -> WICompressDomain
 Sources/compress/execution -> WICompressExecution
+Sources/WICompress         -> WICompress
 ```
 
-Nested organizational directories are also lowercase. For example,
-`Sources/image/domain/public`, `Sources/compress/domain/public`,
-`Sources/compress/execution/algorithm`, and
-`Sources/compress/execution/pipeline`. Target names remain the module identity;
-physical directory names do not repeat the `WI` brand unless the directory is
-the public umbrella.
+Nested organizational directories are lowercase. Target names are the module
+identity; physical paths do not repeat the `WI` brand.
 
-## CodeGraph
-
-This repository is initialized for CodeGraph. The `.codegraph/` directory is a
-local index and is ignored by git.
-
-Use CodeGraph for structural questions:
-
-| Question | Tool |
-|---|---|
-| Where is a symbol defined? | `codegraph_search` |
-| What calls a symbol? | `codegraph_callers` |
-| What does a symbol call? | `codegraph_callees` |
-| How does one symbol reach another? | `codegraph_trace` |
-| What changes if this symbol changes? | `codegraph_impact` |
-| Show symbol signature/source/context | `codegraph_node`, `codegraph_context`, `codegraph_explore` |
-| What files exist under a path? | `codegraph_files` |
-
-Prefer `codegraph_context` first for architecture, feature, or bug-context
-questions. Prefer `codegraph_trace` for flow questions. Use `rg` for literal
-text, comments, log messages, or string contents. If CodeGraph reports pending
-sync for edited files, read those specific files directly before relying on the
-stale snippets.
-
-## Architecture
-
-The package exposes `WICompress` and the lower-level `WIImageIO` product over
-five supporting targets:
+## Architecture Boundaries
 
 ```text
                     WIImageDomain
@@ -96,173 +53,79 @@ five supporting targets:
                      WICompress
 ```
 
-`WIImageDomain` is the shared image vocabulary and owns pixel size, color,
-format, metadata, orientation, and geometry. `WICompressDomain` owns the public
-Process, Target, Output, crop, resizing, result, and error contracts plus Luban.
-There are no mirrored Core models.
-`WIImageIO` is an independent synchronous product with `Reader`, `Descriptor`,
-`Frame`, scoped options, and `WIImageIO.Error`. `WICompressExecution` owns the
-request-scoped `ImagePipeline`, pure Process/Target calculations, and
-ImageIO/Raster error mapping; it publishes no product models.
-`WICompress` re-exports the public contracts and contains only
-`WICompressor`, whose terminals call the package-only `ImagePipeline` directly.
+- `WIImageDomain` owns shared image vocabulary and no execution lifecycle.
+- `WIImageIO` owns synchronous inspection, decode, transcode, and encode. It
+  re-exports canonical Image Domain values instead of defining aliases.
+- `WIImageRaster` owns package-only pixel rendering primitives until a public
+  Raster API is explicitly designed.
+- `WICompressDomain` owns public Process, Target, Output, Result, and compression
+  error contracts.
+- `WICompressExecution` owns the request-scoped `ImagePipeline`, calculations,
+  and lower-level error mapping. It publishes no product models.
+- `WICompress` is the public umbrella and terminal surface.
 
-Process is the deterministic `Data`/`URL` in, `WIResult` out path:
+Keep dependencies one-way. Do not introduce mirrored Core models, global
+registries, public Pipeline stages, or a second execution owner. `ImagePipeline`
+is internal orchestration; pure helpers receive only the values they need.
 
-```text
-Data / URL + WIImageProcess
-  -> ImagePipeline
-       inspect source
-       crop -> WIImageResizing -> concrete geometry
-       resolve output and choose return-original / source-transcode / render
-       no crop shrink -> two-axis-safe ImageIO thumbnail
-       axis upscaling -> full source
-       crop -> oriented source + WIImageRaster
-       encode -> WIImageIO
-       encoded Data -> result inspection -> WIResult
-```
-
-The Process file terminal keeps a file-backed `WIImageIO.Reader`. It reads the
-complete original bytes only when a return-original operation needs them.
-
-Target-based `compress(_:to:)` declares an output contract (`maxBytes` plus
-sizing/output) and returns a `WIResult`:
-
-```text
-Data / URL + WICompressionTarget
-  -> ImagePipeline
-       inspect source and resolve fixed crop/base size/output
-       passthrough when the original already satisfies every requirement
-       otherwise run feedback search: shrink (outer) + quality (inner)
-       reuse one rendered image while searching quality at fixed geometry
-       use Algorithm/ math for size estimation and candidate ranking
-       hard byte check: never return data above maxBytes
-       encoded Data -> result inspection -> WIResult
-```
-
-Key types:
-
-1. **WICompressor** - public Process `process(_:using:)` and Target
-   `compress(_:to:)` terminals for `Data` and file `URL`.
-2. **WIImageProcess** - immutable forward-processing description with sizing,
-   optional aspect-ratio crop, fixed lossy quality, and `WIImageOutput`.
-3. **WIImageResizing** / **WIImageResize** - complete pixel-size decision slot
-   and built-in Luban, boundary, scale, and exact-size implementations.
-4. **WIImageOutput** - shared representation, composable
-   `WIImageMetadataOptions`, and color-space requirements used by both Process
-   and Target.
-5. **ImagePipeline** - request-scoped owner of one `WIImageIO.Reader`, its
-   `Descriptor`, original-byte lifecycle, and
-   Process/Target decisions, Target candidate search, and ImageIO/Raster
-   execution. Its package terminals are called directly by `WICompressor`;
-   there is no second terminal forwarding type.
-6. **WIImageFormat** - public Domain value (JPEG/PNG/HEIF/unknown); ImageIO owns
-   detection from encoded sources and platform type identifiers.
-7. **WILuban** - internal `WICompressDomain` ratio math
-   (`ratio(width:height:)`, `ensureEven`).
-8. **WICompressError** - public compression failure model (`LocalizedError`);
-   the only error thrown by construction, resizing, and compressor terminals.
-   `WIImageIO` exposes its own typed `WIImageIO.Error`, which Execution maps at
-   the product boundary.
-9. **Target compression** - `compress(_:to:)` with `WICompressionTarget`
-   (`maxBytes` / `WICompressionSizing` / shared `WIImageOutput`) returning
-   `WIResult`. A throwing Target initializer establishes its hard byte invariant;
-   `ImagePipeline` owns passthrough and the
-   byte-budget feedback search, and performs the final hard-limit check.
-   Pure math lives in `Algorithm/`: Process/Target geometry (fixed crop + base
-   candidate), `WICompressionSizeEstimation` (shrink + quality
-   profile), and `WICompressionRanking` (internal deterministic candidate
-   selection).
-
-## Key Implementation Details
-
-- **Resolved operations**: `transcodeSource` preserves metadata/orientation tags
-  and can remove location metadata without decoding pixels;
-  `render` bakes orientation, crop, sizing, color conversion, and backgrounds
-  into pixels; `returnOriginal` is used only when every observable requirement
-  already holds.
-- **Explicit format conversion**: JPEG/PNG/HEIC output always rewrites the
-  image. JPEG conversion rejects transparent sources by default; callers choose
-  `.jpeg(background: .white/.black)` to flatten alpha intentionally.
-- **UIKit-free / cross-platform core**: no `#if os(iOS)`, no UIKit/CoreImage.
-  Builds and is fully tested on macOS via `swift test`.
-- **Typed throws**: compressor terminals and request construction use
-  `throws(WICompressError)`; the standalone ImageIO product uses
-  `throws(WIImageIO.Error)`. Builds cleanly under Swift 6 language mode and
-  strict concurrency; cross-task public values are `Sendable`.
-- **Image resizing**: Luban ratio is computed from EXIF-oriented display
-  dimensions. The default long-image branch constrains the short side
-  (`ceil(shortSide / 1280)`), matching original Luban. Dividing the long side
-  over-shrinks panoramas and long screenshots. `maximumPixelSize(_:)` caps the
-  longest display side and never upscales.
-- **Format/quality coupling**: quality is only written for lossy destinations
-  (JPEG/HEIC). PNG ignores it. Writability is checked at runtime via
-  `CGImageDestinationCopyTypeIdentifiers()`.
-- **Passthrough**: never returns the original if it would violate Process or
-  Target output requirements.
-- **Error handling**: neither public surface returns optional/nil for failures;
-  Execution maps `WIImageIO.Error` to `WICompressError` at the Pipeline boundary.
+Current V2 decisions live in `docs/V2_*`. Update the relevant decision document
+when a frozen contract changes. Do not duplicate complete Process/Target flows
+or algorithm details in this file; a consolidated architecture document will
+replace the evolving design set after the refactor is complete.
 
 ## Code Style
 
-Comments are minimalist:
+Start Swift source files with this header. Skip it in `Package.swift`, where the
+Swift tools version must remain first.
 
-- Start Swift source files with the standard repository header:
-  filename, code scope, `Created by weixi on YYYY/M/D.`, and a one-line
-  copyright + Apache-2.0 license notice. Skip this header in `Package.swift`,
-  where `// swift-tools-version` must stay first. Use this shape:
-
-  ```swift
-  //
-  //  SomeFile.swift
-  //  WICompress
-  //
-  //  Created by weixi on 2026/6/22.
-  //  Copyright © 2024 weixi. Licensed under Apache-2.0.
-  //
-  ```
-
-- Document public API with a single-sentence `///` summary. Skip it when the
-  signature is already self-explanatory.
-- Do not add `- Parameter` / `- Returns` / `- Throws` boilerplate unless it states
-  something the signature does not.
-- Comment the non-obvious *why* (rationale, platform quirks, gotchas), never the
-  *what*. If a comment just restates the code, delete it or rename the code.
-- No decorative ASCII banners, extra dates, or changelog comments in source.
-- Prefer a clearer name over a comment.
-
-## Testing Framework
-
-Uses Swift Testing framework, not XCTest. Tests are located in
-`Tests/WICompressTests/`.
-
-### Test Organization
-
-Tests are organized by `@Suite` and filtered by `@Tag`:
-
-| Tag | Scope |
-|---|---|
-| `.luban` | Luban algorithm logic (`WILuban.ratio`, `WILuban.ensureEven`) |
-| `.compression` | Process and Target behavior (`WICompressor` public API) |
-| `.imageIOCore` | ImageIO core: execution resolution, encoder, real-image contracts |
-| `.publicAPI` | Public surface: defaults, error mapping, entry points |
-| `.edgeCase` | Boundary values and edge inputs |
-| `.algorithm` | Pure target-search math (`WICompressionSizeEstimation`, `WICompressionRanking`) |
-
-Tag definitions live in `Tests/WICompressTests/Support/Tags.swift`.
-
-### Running Tests
-
-The core is UIKit-free, so the entire suite runs on `swift test` on macOS,
-including the real-image fixture tests. This is the fastest daily gate:
-
-```bash
-swift test
+```swift
+//
+//  SomeFile.swift
+//  WICompress
+//
+//  Created by weixi on 2026/6/22.
+//  Copyright © 2024 weixi. Licensed under Apache-2.0.
+//
 ```
 
-Keep an iOS Simulator package test as the platform behavior gate before commits
-that touch the core, fixtures, Package manifest, or public API. Do not hardcode
-simulator names or OS versions; discover devices first and use the UDID:
+- Document public API with a concise `///` summary when the signature does not
+  already explain itself.
+- Avoid `- Parameter`, `- Returns`, and `- Throws` boilerplate unless it adds
+  information absent from the signature.
+- Comment the non-obvious reason, platform quirk, or invariant. Never restate
+  the code; prefer a clearer name.
+- Do not add decorative banners, changelog comments, or extra source dates.
+- Prefer immutable public configuration values and construction-time
+  normalization when invalid numeric states do not need to interrupt execution.
+
+### Line Wrapping
+
+- Treat 100 characters as a soft limit and 120 as a hard limit. Long indivisible
+  strings may exceed it.
+- Keep a complete declaration, call, or other semantic unit on one line when it
+  fits and remains readable. Do not wrap merely because it has parameters.
+- Keep single-argument calls on one line unless the argument is itself multiline
+  or a closure.
+- When a declaration or call must wrap, put one parameter or argument per line
+  and place the closing delimiter consistently on its own line.
+- Keep short ternary expressions on one line. Prefer Swift `if`/`switch`
+  expressions when a branch requires multiline formatting.
+- Break fluent transformations before the leading dot when the chain communicates
+  distinct steps.
+
+## Testing
+
+Tests use Swift Testing, not XCTest. Keep tests with the target they validate and
+load package fixtures through `Bundle.module`.
+
+The daily macOS gate is:
+
+```bash
+swift test -Xswiftc -warnings-as-errors
+```
+
+Before commits that touch core behavior, fixtures, `Package.swift`, or public
+API, discover an available simulator and run the package gate by UDID:
 
 ```bash
 xcrun simctl list devices available
@@ -272,18 +135,10 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Run `xcodebuild` from the package root; it resolves SPM packages directly, so no
-`-workspace` argument is needed (`.swiftpm/` is untracked local state). If the
-scheme changes, inspect it instead of guessing:
+Do not hardcode simulator names, OS versions, or UDIDs. Run `xcodebuild` from the
+package root and inspect `xcodebuild -list` if the scheme changes.
 
-```bash
-xcodebuild -list
-```
-
-`CODE_SIGNING_ALLOWED=NO` is required when testing SPM packages directly through
-`xcodebuild` to avoid CodeSign failures.
-
-For the example app, use a generic simulator build destination:
+When public API or package integration changes, also build the example:
 
 ```bash
 xcodebuild build \
@@ -292,24 +147,3 @@ xcodebuild build \
   -destination 'generic/platform=iOS Simulator' \
   CODE_SIGNING_ALLOWED=NO
 ```
-
-### Test Categories
-
-All suites run under `swift test` on macOS; none depend on UIKit:
-
-- `WIImageDomainTests` - shared pixel, orientation, and metadata facts
-- `WICompressDomainTests` - request normalization and construction invariants
-- `LubanRatioTests` - Luban switch branches and `WILuban.ensureEven` edge cases
-- `WIImageFormatTests` - `UTType`-based format detection (JPEG, PNG, unknown)
-- `WICompressorPublicSurfaceTests` - defaults, passthrough, and error mapping
-- `WICompressImageIOCoreTests` - write-path behavior on real fixtures: GPS strip
-  vs preserve, orientation baking, PNG alpha, gain-map drop in `.preserve`,
-  animated rejection, size-guard correctness
-- `WICompressDataCharacterizationTests` - auto-discovers `Resources/` images and
-  pins the format + display-dimension contract
-
-### Test Resources
-
-`Tests/WICompressTests/Resources/` is registered in `Package.swift` for real
-image assets. Load fixtures via `Bundle.module.url(forResource:withExtension:)`
-in tests.
