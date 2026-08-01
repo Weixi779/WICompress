@@ -84,7 +84,7 @@ let result = try WICompressor.process(contentsOf: url, using: process)
 ```
 
 文件 terminal 直接建立 file-backed ImageIO source，不在入口处读取完整 `Data`。
-只有 passthrough 需要返回原始 bytes 时，才按需读取文件；decode、thumbnail、copy 和
+只有 passthrough 需要返回原始 bytes 时，才按需读取文件；decode、thumbnail、transcode 和
 encode 路径继续由 URL source 驱动。
 
 `WIImageResize` 提供 `.luban`、`.maximumPixelSize(_:)`、
@@ -232,7 +232,7 @@ Metadata 是 `WIImageMetadataOptions` 集合，不是互斥 policy。`.strip` �
 metadata: .preserve.subtracting(.gps)
 ```
 
-类别选择由 ImageIO encode/source-copy 边界执行，不进入 Raster Domain。
+类别选择由 ImageIO encode/transcode 边界执行，不进入 Raster Domain。
 
 通用 canvas/background 不进入 Process。只有 representation 明确要求 Alpha flatten
 时，opaque background 才作为该输出语义的一部分进入最终 raster plan。

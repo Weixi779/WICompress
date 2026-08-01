@@ -1,7 +1,7 @@
 # WIImageIO 2.0
 
 状态：同步 public product、typed chain、Data/file reader、静态图片 decode、thumbnail、
-source copy、pixel encode、metadata 与 runtime capability 已实现。异步调度仍属于
+source transcode、pixel encode、metadata 与 runtime capability 已实现。异步调度仍属于
 `WICompressor` terminal，不进入 ImageIO。
 
 相关边界：
@@ -81,10 +81,10 @@ let reader = try WIImageIO.read(contentsOf: fileURL)
 let descriptor = reader.descriptor
 ```
 
-无需 decode pixels 的 source copy：
+无需 decode pixels 的 source transcode：
 
 ```swift
-let data = try reader.copy(
+let data = try reader.transcode(
     as: .jpeg,
     options: .init(metadata: .preserve)
 )
@@ -97,7 +97,7 @@ WIImageIO.read(Data) / read(contentsOf: URL) -> Reader
 Reader.descriptor                             -> Descriptor
 Reader.image(options:)                       -> Frame
 Reader.thumbnail(options:)                   -> Frame
-Reader.copy(as:options:)                     -> Data
+Reader.transcode(as:options:)                -> Data
 Frame.encode(as:options:)                    -> Data
 WIImageIO.inspect(...)                       -> Descriptor
 WIImageIO.canDecode / canEncode              -> Bool
@@ -176,22 +176,24 @@ Data 或 `CGImageSource`；调用方自己创建的 `Frame(image:)` 没有 sourc
 - TIFF（排除 display orientation）。
 - MakerNote（包括 Exif dictionary 内嵌 MakerNote）。
 
-未建模 metadata 不会被误判为可选择子集。GPS-only 删除可以使用 ImageIO source copy，
-不需要 decode pixels。HDR gain map 当前只 inspect，不承诺在重新编码后保留。
+未建模 metadata 不会被误判为可选择子集。GPS-only transcode 可以使用 ImageIO 底层的
+source-copy 机制，不需要 decode pixels。HDR gain map 当前只 inspect，不承诺在重新编码后
+保留。
 
-## Decode、Copy 与 Encode
+## Decode、Transcode 与 Encode
 
 三条 primitive 路径不可混成一个含糊操作：
 
 ```text
 Reader -> image / thumbnail -> Frame -> encode -> Data
-Reader -> source copy                         -> Data
+Reader -> transcode                           -> Data
 Reader -> descriptor                         -> facts
 ```
 
 - `image` 返回 stored pixels 与 source orientation。
 - `thumbnail` 使用 ImageIO downsample，并可在 decode 时转正方向。
-- `copy` 让 ImageIO 从 source 复制，适合无损 metadata/orientation 路径。
+- `transcode` 让 ImageIO 从 encoded source 写入 destination，适合不解码像素的格式、
+  quality 与 metadata 改写；满足条件时可使用底层 source-copy 机制。
 - `encode` 消费 Frame，写入 quality、选择后的 metadata 与 Frame orientation。
 
 crop、canvas placement、Alpha flatten、output color conversion 与采样风格属于 Raster；
@@ -203,14 +205,14 @@ ImageIO 不重复提供另一套像素编辑 API。
 
 - `DecodeOptions`
 - `ThumbnailOptions`
-- `CopyOptions`
+- `TranscodeOptions`
 - `EncodeOptions`
 
 首版仍直接使用 `UTType` 表达 source/destination type。可写能力必须通过
 `WIImageIO.canEncode(_:)` 查询，不能由 enum case 静态假定；可读能力同理。
-`Reader.canCopy(as:options:)` 接收与 `copy` 相同的完整 `CopyOptions`，并同时检查
-静态图片、destination capability 与 metadata-copy 限制；它不能对随后必然失败的
-请求返回 `true`。
+package-only `Reader.canTranscode(as:options:)` 接收与 `transcode` 相同的完整
+`TranscodeOptions`，并同时检查静态图片、destination capability 与 metadata-transcode
+限制；它不能对随后必然失败的请求返回 `true`，也不扩大为公共 capability API。
 
 不公开：
 
@@ -227,7 +229,7 @@ ImageIO 不重复提供另一套像素编辑 API。
 - invalid image data / inspection unavailable。
 - animated source unsupported。
 - pixel decode failed。
-- metadata source-copy unsupported。
+- metadata transcode unsupported。
 - encode failed for destination `UTType`。
 
 `WICompressExecution` 在唯一边界映射为 `WICompressError`。ImageIO 不依赖压缩 Domain，
@@ -255,7 +257,7 @@ Data / URL
   -> WIImageIO.Reader
   -> Descriptor
   -> Process or Target decisions
-  -> Reader.image / thumbnail / copy
+  -> Reader.image / thumbnail / transcode
   -> optional WIImageRaster
   -> Frame.encode
   -> WIResult
@@ -275,16 +277,16 @@ quality search 中复用 rendered pixels；ImageIO chain 不拥有 byte-budget f
 - crop、resize policy、Raster chain、Target search。
 - HDR/EDR tone mapping 或 gain-map preservation contract。
 
-多帧 source 可以 inspection，但 `image`、`thumbnail` 与 `copy` 明确抛
+多帧 source 可以 inspection，但 `image`、`thumbnail` 与 `transcode` 明确抛
 `animatedSourceUnsupported`，不会静默只处理 index 0。
 
 ## 验证合同
 
-- Data/file Reader 的 descriptor、decode、thumbnail 与 copy 行为一致。
+- Data/file Reader 的 descriptor、decode、thumbnail 与 transcode 行为一致。
 - File Reader 不预读完整 bytes；产品 Pipeline 只在 return-original 时读取原始文件。
 - raw decode → encode 保留 source orientation。
 - transformed thumbnail/rendered frame → encode 写 orientation 1。
 - selected metadata 与 MakerNote 独立性正确。
-- GPS-only source copy 不 decode pixels。
+- GPS-only transcode 使用底层 source-copy 机制，不 decode pixels。
 - invalid、animated 与 unsupported destination 产生 typed error。
 - `WIImageIOTests` 只依赖 `WIImageIO` target，不需要直接依赖 `WIImageDomain`。

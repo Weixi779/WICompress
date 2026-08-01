@@ -10,7 +10,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 extension WIImageIO {
-    /// Failures produced by ImageIO inspection, decoding, copying, and encoding.
+    /// Failures produced by ImageIO inspection, decoding, transcoding, and encoding.
     public enum Error: Swift.Error, Sendable, Equatable {
         /// The file URL could not be read.
         case fileReadFailed(URL)
@@ -22,8 +22,8 @@ extension WIImageIO {
         case animatedSourceUnsupported(frameCount: Int)
         /// Source pixels could not be decoded.
         case imageDecodeFailed
-        /// The requested metadata cannot be preserved by a source-copy operation.
-        case metadataCopyUnsupported(UTType)
+        /// The requested metadata cannot be preserved by a source transcode.
+        case metadataTranscodeUnsupported(UTType)
         /// Image data could not be encoded as the requested type.
         case imageEncodeFailed(UTType)
     }
@@ -42,8 +42,8 @@ extension WIImageIO.Error: LocalizedError {
             return "Static ImageIO operations do not support \(frameCount) frames."
         case .imageDecodeFailed:
             return "Could not decode source pixels."
-        case .metadataCopyUnsupported(let type):
-            return "The requested metadata cannot be preserved while copying as \(type.identifier)."
+        case .metadataTranscodeUnsupported(let type):
+            return "The requested metadata cannot be preserved while transcoding as \(type.identifier)."
         case .imageEncodeFailed(let type):
             return "Could not encode image data as \(type.identifier)."
         }

@@ -440,7 +440,7 @@ extension ImagePipeline {
             )
         }
 
-        return try copyFromSource(
+        return try transcodeSource(
             output: output,
             metadata: target.output.metadata,
             quality: quality
@@ -454,7 +454,7 @@ extension ImagePipeline {
         pixelSize: WIPixelSize,
         quality: Double?
     ) throws(WICompressError) -> CGImage? {
-        if canCopyFromSource(
+        if canTranscodeFromSource(
             target: target,
             sizing: sizing,
             output: output,
@@ -473,7 +473,7 @@ extension ImagePipeline {
         )
     }
 
-    private func canCopyFromSource(
+    private func canTranscodeFromSource(
         target: WICompressionTarget,
         sizing: TargetGeometry,
         output: ImageDestination,
@@ -488,9 +488,9 @@ extension ImagePipeline {
                 target.output.metadata != .strip
                     || descriptor.orientation == .up
             )
-            && reader.canCopy(
+            && reader.canTranscode(
                 as: output.destinationType,
-                options: WIImageIO.CopyOptions(
+                options: WIImageIO.TranscodeOptions(
                     compressionQuality: quality,
                     metadata: target.output.metadata
                 )

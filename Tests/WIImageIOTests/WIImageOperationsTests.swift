@@ -98,7 +98,7 @@ struct WIImageOperationsTests {
 
         #expect(descriptor.frameCount == 2)
         #expect(descriptor.format == .unknown)
-        #expect(!reader.canCopy(as: .png))
+        #expect(!reader.canTranscode(as: .png))
         #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
             try WIImageIO.read(data).image()
         }
@@ -106,11 +106,11 @@ struct WIImageOperationsTests {
             try WIImageIO.read(data).thumbnail()
         }
         #expect(throws: WIImageIO.Error.animatedSourceUnsupported(frameCount: 2)) {
-            try WIImageIO.read(data).copy(as: .png)
+            try WIImageIO.read(data).transcode(as: .png)
         }
     }
 
-    @Test("Data and file inputs have equivalent decode and copy semantics")
+    @Test("Data and file inputs have equivalent decode and transcode semantics")
     func dataAndFileParity() throws {
         let data = try Self.encodedImage(
             width: 40,
@@ -139,9 +139,11 @@ struct WIImageOperationsTests {
         let fileThumbnail = try fileReader.thumbnail(
             options: thumbnailOptions
         ).image
-        let dataCopy = try WIImageIO.inspect(dataReader.copy(as: .jpeg))
-        let fileCopy = try WIImageIO.inspect(
-            fileReader.copy(as: .jpeg)
+        let dataTranscode = try WIImageIO.inspect(
+            dataReader.transcode(as: .jpeg)
+        )
+        let fileTranscode = try WIImageIO.inspect(
+            fileReader.transcode(as: .jpeg)
         )
 
         #expect(dataDescriptor == fileDescriptor)
@@ -149,11 +151,11 @@ struct WIImageOperationsTests {
         #expect(dataImage.height == fileImage.height)
         #expect(dataThumbnail.width == fileThumbnail.width)
         #expect(dataThumbnail.height == fileThumbnail.height)
-        #expect(dataCopy.format == fileCopy.format)
-        #expect(dataCopy.pixelSize == fileCopy.pixelSize)
-        #expect(dataCopy.orientedPixelSize == fileCopy.orientedPixelSize)
-        #expect(dataCopy.orientation == fileCopy.orientation)
-        #expect(dataCopy.metadata == fileCopy.metadata)
+        #expect(dataTranscode.format == fileTranscode.format)
+        #expect(dataTranscode.pixelSize == fileTranscode.pixelSize)
+        #expect(dataTranscode.orientedPixelSize == fileTranscode.orientedPixelSize)
+        #expect(dataTranscode.orientation == fileTranscode.orientation)
+        #expect(dataTranscode.metadata == fileTranscode.metadata)
     }
 
     @Test("Image decode returns source pixel dimensions")
@@ -191,8 +193,8 @@ struct WIImageOperationsTests {
         #expect(result.orientation == .up)
     }
 
-    @Test("Copy preserves metadata and orientation coupling")
-    func copiedMetadata() throws {
+    @Test("Transcode preserves metadata and orientation coupling")
+    func transcodedMetadata() throws {
         let data = try Self.encodedImage(
             width: 40,
             height: 20,
@@ -201,15 +203,15 @@ struct WIImageOperationsTests {
             hasGPS: true
         )
 
-        let copiedData = try WIImageIO.read(data).copy(as: .jpeg)
-        let properties = try Self.properties(in: copiedData)
+        let transcodedData = try WIImageIO.read(data).transcode(as: .jpeg)
+        let properties = try Self.properties(in: transcodedData)
 
         #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
         #expect(properties[kCGImagePropertyGPSDictionary] != nil)
     }
 
-    @Test("Copy can remove GPS metadata without decoding pixels")
-    func copyExcludingGPS() throws {
+    @Test("Transcode can remove GPS metadata without decoding pixels")
+    func transcodeExcludingGPS() throws {
         let data = try Self.encodedImage(
             width: 40,
             height: 20,
@@ -219,23 +221,23 @@ struct WIImageOperationsTests {
         )
         let metadata = WIImageIO.MetadataOptions.preserve.subtracting(.gps)
 
-        let copiedData = try WIImageIO.read(data).copy(
+        let transcodedData = try WIImageIO.read(data).transcode(
             as: .jpeg,
-            options: WIImageIO.CopyOptions(metadata: metadata)
+            options: WIImageIO.TranscodeOptions(metadata: metadata)
         )
-        let properties = try Self.properties(in: copiedData)
+        let properties = try Self.properties(in: transcodedData)
 
         #expect(properties.intValue(for: kCGImagePropertyOrientation) == 6)
         #expect(properties[kCGImagePropertyGPSDictionary] == nil)
 
-        let incompatibleOptions = WIImageIO.CopyOptions(
+        let incompatibleOptions = WIImageIO.TranscodeOptions(
             maximumPixelSize: 10,
             metadata: metadata
         )
         let reader = try WIImageIO.read(data)
-        #expect(!reader.canCopy(as: .jpeg, options: incompatibleOptions))
-        #expect(throws: WIImageIO.Error.metadataCopyUnsupported(.jpeg)) {
-            try reader.copy(as: .jpeg, options: incompatibleOptions)
+        #expect(!reader.canTranscode(as: .jpeg, options: incompatibleOptions))
+        #expect(throws: WIImageIO.Error.metadataTranscodeUnsupported(.jpeg)) {
+            try reader.transcode(as: .jpeg, options: incompatibleOptions)
         }
     }
 
@@ -251,13 +253,13 @@ struct WIImageOperationsTests {
         let descriptor = reader.descriptor
 
         #expect(descriptor.hasUnmodeledMetadata)
-        #expect(!reader.canCopy(
+        #expect(!reader.canTranscode(
             as: .png,
-            options: WIImageIO.CopyOptions(metadata: .strip)
+            options: WIImageIO.TranscodeOptions(metadata: .strip)
         ))
-        #expect(reader.canCopy(
+        #expect(reader.canTranscode(
             as: .png,
-            options: WIImageIO.CopyOptions(metadata: .preserve)
+            options: WIImageIO.TranscodeOptions(metadata: .preserve)
         ))
     }
 
@@ -419,7 +421,7 @@ struct WIImageOperationsTests {
         let type = UTType(exportedAs: "com.wicompress.unsupported")
 
         #expect(throws: WIImageIO.Error.imageEncodeFailed(type)) {
-            try WIImageIO.read(data).copy(as: type)
+            try WIImageIO.read(data).transcode(as: type)
         }
     }
 

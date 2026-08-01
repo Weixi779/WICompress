@@ -9,8 +9,8 @@
 import WIImageDomain
 
 extension WIImageIO {
-    /// Source-copy encoding behavior that avoids pixel decoding when supported.
-    public struct CopyOptions: Hashable, Sendable {
+    /// Source transcoding behavior that avoids pixel decoding when supported.
+    public struct TranscodeOptions: Hashable, Sendable {
         public var maximumPixelSize: Int?
         public var compressionQuality: Double?
         public var metadata: MetadataOptions

@@ -17,7 +17,7 @@ resolver、solver、Execution Plan 和 Execution Core 仅属于历史迁移背�
 - [`V2_IMAGE_PROCESS_CN.md`](V2_IMAGE_PROCESS_CN.md)：crop 与 resizing 的公共合同。
 - [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md)：Target 固定裁切与
   反馈搜索边界。
-- [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md)：inspect、decode、encode 与 source copy。
+- [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md)：inspect、decode、transcode 与 encode。
 
 ## 为什么独立封装
 
@@ -258,7 +258,7 @@ Data / file URL + Process / Target
               ▼
        request ImagePipeline
           │             │
-          │             └── WIImageIO source copy / original passthrough
+          │             └── WIImageIO transcode / original passthrough
           ▼
    WIImageIO image / thumbnail
           │

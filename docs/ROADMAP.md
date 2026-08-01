@@ -36,7 +36,7 @@ The 2.0 product and infrastructure boundaries are conceptually complete.
 Implementation status:
 
 - Completed: Swift 6.2 package baseline and public `WIImageIO` product.
-- Completed: typed Reader inspection, Frame decode/thumbnail, source copy,
+- Completed: typed Reader inspection, Frame decode/thumbnail, source transcode,
   chained encode, runtime capabilities, and Pipeline error mapping.
 - Completed: removal of the temporary `CGImageSource` migration bridge; the
   `WICompress` target no longer owns raw ImageIO source/destination operations.

@@ -115,12 +115,12 @@ package final class ImagePipeline {
         )
     }
 
-    func copyFromSource(
+    func transcodeSource(
         output: ImageDestination,
         metadata: WIImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
-        try copyFromSource(
+        try transcodeSource(
             as: output.destinationType,
             metadata: metadata,
             quality: quality
@@ -171,17 +171,17 @@ package final class ImagePipeline {
         )
     }
 
-    private func copyFromSource(
+    private func transcodeSource(
         as destinationType: UTType,
         metadata: WIImageMetadataOptions,
         quality: Double?
     ) throws(WICompressError) -> Data {
-        let options = WIImageIO.CopyOptions(
+        let options = WIImageIO.TranscodeOptions(
             compressionQuality: quality,
             metadata: metadata
         )
         return try Self.imageIO { () throws(WIImageIO.Error) in
-            try reader.copy(
+            try reader.transcode(
                 as: destinationType,
                 options: options
             )
@@ -406,7 +406,7 @@ package final class ImagePipeline {
             return .animatedSourceUnsupported(frameCount: frameCount)
         case .imageDecodeFailed:
             return .imageDecodeFailed
-        case .metadataCopyUnsupported(let type),
+        case .metadataTranscodeUnsupported(let type),
              .imageEncodeFailed(let type):
             return .imageEncodeFailed(.detected(from: type))
         }

@@ -57,13 +57,13 @@ extension ImagePipeline {
         }
 
         let data: Data
-        if canCopyFromSource(
+        if canTranscodeFromSource(
             process: process,
             geometry: geometry,
             quality: quality,
             output: output
         ) {
-            data = try copyFromSource(
+            data = try transcodeSource(
                 output: output,
                 metadata: process.output.metadata,
                 quality: quality
@@ -107,7 +107,7 @@ extension ImagePipeline {
             )
     }
 
-    private func canCopyFromSource(
+    private func canTranscodeFromSource(
         process: WIImageProcess,
         geometry: ProcessGeometry,
         quality: Double?,
@@ -121,9 +121,9 @@ extension ImagePipeline {
                 process.output.metadata != .strip
                     || descriptor.orientation == .up
             )
-            && reader.canCopy(
+            && reader.canTranscode(
                 as: output.destinationType,
-                options: WIImageIO.CopyOptions(
+                options: WIImageIO.TranscodeOptions(
                     compressionQuality: quality,
                     metadata: process.output.metadata
                 )

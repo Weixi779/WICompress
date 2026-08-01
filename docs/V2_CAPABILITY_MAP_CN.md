@@ -438,7 +438,7 @@ flowchart LR
 | 路径 | 作用 | 关键语义 |
 |---|---|---|
 | `returnOriginal` | 原图直通 | 所有可观察要求已经满足 |
-| `copyFromSource` | ImageIO 从 source 写入 destination | 适合保持容器和尽可能保留 metadata/orientation |
+| `transcodeSource` | ImageIO 从 source 写入 destination | 适合保持容器和尽可能保留 metadata/orientation |
 | `redrawBitmap` | thumbnail/downsample 后重新渲染编码 | 负责 resize、方向烘焙、Alpha 和颜色转换 |
 | `redrawCanvas` | 解码后绘制到固定 canvas | 负责 fill、crop、fit、stretch 和背景 |
 

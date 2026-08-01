@@ -56,12 +56,12 @@ extension WIImageIO {
             )
         }
 
-        /// Copies the encoded source without decoding pixels when the options allow it.
-        public func copy(
+        /// Transcodes the encoded source without decoding pixels when the options allow it.
+        public func transcode(
             as type: UTType,
-            options: CopyOptions = .init()
+            options: TranscodeOptions = .init()
         ) throws(WIImageIO.Error) -> Data {
-            try WIImageIO.copy(
+            try WIImageIO.transcode(
                 source,
                 descriptor: descriptor,
                 as: type,
@@ -69,12 +69,11 @@ extension WIImageIO {
             )
         }
 
-        /// Whether source-copy can satisfy the requested type and options.
-        public func canCopy(
+        package func canTranscode(
             as type: UTType,
-            options: CopyOptions = .init()
+            options: TranscodeOptions = .init()
         ) -> Bool {
-            WIImageIO.canCopy(
+            WIImageIO.canTranscode(
                 descriptor,
                 as: type,
                 options: options

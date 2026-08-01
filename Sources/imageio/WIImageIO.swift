@@ -12,7 +12,7 @@ import ImageIO
 import UniformTypeIdentifiers
 import WIImageDomain
 
-/// ImageIO-backed inspection, decoding, copying, and encoding operations.
+/// ImageIO-backed inspection, decoding, transcoding, and encoding operations.
 public enum WIImageIO {}
 
 // MARK: - Capabilities
@@ -543,13 +543,13 @@ extension Dictionary where Key == CFString, Value == Any {
     }
 }
 
-// MARK: - Copying
+// MARK: - Transcoding
 
 extension WIImageIO {
-    static func canCopy(
+    static func canTranscode(
         _ descriptor: Descriptor,
         `as` type: UTType,
-        options: CopyOptions
+        options: TranscodeOptions
     ) -> Bool {
         guard
             descriptor.frameCount == 1,
@@ -571,11 +571,11 @@ extension WIImageIO {
             && descriptor.type == type
     }
 
-    static func copy(
+    static func transcode(
         _ source: CGImageSource,
         descriptor: Descriptor,
         as type: UTType,
-        options: CopyOptions
+        options: TranscodeOptions
     ) throws(WIImageIO.Error) -> Data {
         try validateStaticImage(source)
 
@@ -584,7 +584,7 @@ extension WIImageIO {
             !descriptor.hasUnmodeledMetadata
                 || options.metadata.preservesUnmodeledMetadata
         else {
-            throw .metadataCopyUnsupported(type)
+            throw .metadataTranscodeUnsupported(type)
         }
         guard removedMetadata.isEmpty else {
             guard
@@ -593,7 +593,7 @@ extension WIImageIO {
                 options.compressionQuality == nil,
                 descriptor.type == type
             else {
-                throw .metadataCopyUnsupported(type)
+                throw .metadataTranscodeUnsupported(type)
             }
             return try copyExcludingGPS(source, as: type)
         }

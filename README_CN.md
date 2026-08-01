@@ -177,7 +177,7 @@ print(thumbnail.pixelSize)
 
 ## 底层 ImageIO 能力
 
-`WIImageIO` 是独立的同步 product，提供 inspect、decode、thumbnail、source copy 和
+`WIImageIO` 是独立的同步 product，提供 inspect、decode、thumbnail、source transcode 和
 encode，同时不暴露 `CGImageSource`、`CGImageDestination` 与 properties 字典：
 
 ```swift

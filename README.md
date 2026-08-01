@@ -191,7 +191,7 @@ print(thumbnail.pixelSize)
 ## Lower-Level ImageIO
 
 `WIImageIO` is a separate synchronous product for inspection, decoding,
-thumbnailing, source copy, and encoding without exposing `CGImageSource`,
+thumbnailing, source transcoding, and encoding without exposing `CGImageSource`,
 `CGImageDestination`, or property dictionaries:
 
 ```swift

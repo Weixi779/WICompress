@@ -214,7 +214,7 @@ source facts
     -> inspect
     -> ImageIO image / thumbnail
     -> ImageRaster.image when pixels must change
-    -> ImageIO encode / source copy
+    -> ImageIO encode / transcode
     -> encoded result
 ```
 

@@ -112,7 +112,7 @@ Data / URL + WIImageProcess
   -> ImagePipeline
        inspect source
        crop -> WIImageResizing -> concrete geometry
-       resolve output and choose return-original / source-copy / render
+       resolve output and choose return-original / source-transcode / render
        no crop shrink -> two-axis-safe ImageIO thumbnail
        axis upscaling -> full source
        crop -> oriented source + WIImageRaster
@@ -174,7 +174,7 @@ Key types:
 
 ## Key Implementation Details
 
-- **Resolved operations**: `copyFromSource` preserves metadata/orientation tags
+- **Resolved operations**: `transcodeSource` preserves metadata/orientation tags
   and can remove location metadata without decoding pixels;
   `render` bakes orientation, crop, sizing, color conversion, and backgrounds
   into pixels; `returnOriginal` is used only when every observable requirement

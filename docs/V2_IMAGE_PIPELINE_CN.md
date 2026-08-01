@@ -42,7 +42,7 @@ Data / file URL + Process / Target
 - 原始 encoded input。
 - ImageIO inspection 产生的 `Descriptor`。
 - 外部传入的 Process 或 Target。
-- 当前是否需要 decode、Raster、source copy 或重新 encode。
+- 当前是否需要 decode、Raster、source transcode 或重新 encode。
 - Target 搜索当前使用的 geometry、quality 和候选结果。
 - 哪个工作 `CGImage` 可以在后续编码尝试中安全复用。
 
@@ -68,8 +68,8 @@ inspect(input) -> Descriptor
 Color 不属于必须提前读取的 Descriptor 字段。只有 output 决策需要比较 source color
 时，Pipeline 才通过 ImageIO source 按需读取。
 
-Decode/encode capability 属于当前运行环境和具体 `UTType`；source copy capability 还
-取决于 source、destination 与 copy options。它们都由 Pipeline 在相关决定已经具体后
+Decode/encode capability 属于当前运行环境和具体 `UTType`；source transcode capability
+还取决于 source、destination 与 transcode options。它们都由 Pipeline 在相关决定具体后
 查询 ImageIO，不复制进 Descriptor。
 
 Pipeline 可以先完成不依赖 source 的配置校验，再创建 ImageIO source。进入
@@ -90,7 +90,7 @@ Process 是一次确定性算法：
 Descriptor + WIImageProcess
     -> validate declared intent
     -> calculate concrete geometry and output
-    -> choose return-original / source-copy / render
+    -> choose return-original / source-transcode / render
     -> execute once
     -> WIResult
 ```
@@ -152,7 +152,7 @@ Pipeline 可以按真实成本复用中间像素：
 
 - 只有 quality 变化时，复用相同 geometry 的 working `CGImage` 再次 encode。
 - geometry 变化时，从原始 source 重新 decode/rasterize。
-- return-original 与 source-copy 不创建 working image。
+- return-original 与 source-transcode 不创建 working image。
 - working image 只属于当前 Pipeline，不跨 terminal、Task 或调用方共享。
 
 是否以属性、局部值或小型私有缓存表达，由实现复杂度决定；它不升级为公共
@@ -169,7 +169,7 @@ ImageIO 模块拥有 encoded representation 的固有能力：
 ```text
 inspect  encoded input -> Descriptor
 decode   encoded input -> CGImage
-copy     encoded input -> Data
+transcode encoded input -> Data
 encode   CGImage       -> Data
 ```
 
@@ -213,8 +213,8 @@ Inspect -> Decode -> Raster -> Encode
 return original:
     Inspect -> original Data
 
-source copy:
-    Inspect -> ImageIO copy -> Data
+source transcode:
+    Inspect -> ImageIO transcode -> Data
 
 pixel rewrite:
     Inspect -> Decode -> Raster -> Encode -> Data
@@ -364,7 +364,7 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 - 不公开 Pipeline 或中间图片资源。
 - 不建立通用图片工作流框架。
 - 不用架构重构顺带升级 Target 搜索算法。
-- 不要求 return-original、source-copy 和 pixel rewrite 经过同一组形式化 Stage。
+- 不要求 return-original、source-transcode 和 pixel rewrite 经过同一组形式化 Stage。
 - 不为了目录对称保留空 Service、Manager、Resolver、Executor 或 protocol。
 
 ## 重新打开条件
