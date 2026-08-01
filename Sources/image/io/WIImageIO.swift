@@ -28,21 +28,17 @@ extension WIImageIO {
         writableTypes.contains(type)
     }
 
-    private static let readableTypes: Set<UTType> = {
-        guard let identifiers = CGImageSourceCopyTypeIdentifiers() as? [String] else {
+    private static let readableTypes = supportedTypes(CGImageSourceCopyTypeIdentifiers())
+
+    private static let writableTypes = supportedTypes(CGImageDestinationCopyTypeIdentifiers())
+
+    private static func supportedTypes(_ identifiers: CFArray) -> Set<UTType> {
+        guard let identifiers = identifiers as? [String] else {
             return []
         }
 
         return Set(identifiers.compactMap(UTType.init))
-    }()
-
-    private static let writableTypes: Set<UTType> = {
-        guard let identifiers = CGImageDestinationCopyTypeIdentifiers() as? [String] else {
-            return []
-        }
-
-        return Set(identifiers.compactMap(UTType.init))
-    }()
+    }
 }
 
 // MARK: - Inspection
@@ -59,7 +55,7 @@ extension WIImageIO {
 
     /// Opens an encoded image file without loading its complete bytes.
     public static func read(contentsOf url: URL) throws(WIImageIO.Error) -> Reader {
-        let (source, byteCount) = try fileImageSource(contentsOf: url)
+        let (source, byteCount) = try imageSource(contentsOf: url)
         return Reader(
             source: source,
             descriptor: try descriptor(source, byteCount: byteCount)
@@ -76,14 +72,14 @@ extension WIImageIO {
         try read(contentsOf: url).descriptor
     }
 
-    static func imageSource(_ data: Data) throws(WIImageIO.Error) -> CGImageSource {
+    private static func imageSource(_ data: Data) throws(WIImageIO.Error) -> CGImageSource {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw .invalidImageData
         }
         return source
     }
 
-    static func fileImageSource(
+    private static func imageSource(
         contentsOf url: URL
     ) throws(WIImageIO.Error) -> (source: CGImageSource, byteCount: Int) {
         let byteCount = try fileByteCount(for: url)
@@ -93,56 +89,34 @@ extension WIImageIO {
         return (source, byteCount)
     }
 
-    static func validateStaticImage(_ source: CGImageSource) throws(WIImageIO.Error) {
-        let frameCount = CGImageSourceGetCount(source)
-        guard frameCount == 1 else {
-            throw .animatedSourceUnsupported(frameCount: frameCount)
-        }
-    }
-
-    static func descriptor(
+    private static func descriptor(
         _ source: CGImageSource,
         byteCount: Int
     ) throws(WIImageIO.Error) -> Descriptor {
-        let frameCount = CGImageSourceGetCount(source)
+        let frameCount = source.frameCount
         guard frameCount > 0 else {
             throw .invalidImageData
         }
 
+        guard let properties = source.properties(at: 0) else {
+            throw .imageInfoUnavailable
+        }
+
         guard
-            let properties = CGImageSourceCopyPropertiesAtIndex(
-                source,
-                0,
-                nil
-            ) as? [CFString: Any],
-            let pixelWidth = properties.intValue(
-                for: kCGImagePropertyPixelWidth
-            ),
-            let pixelHeight = properties.intValue(
-                for: kCGImagePropertyPixelHeight
-            )
+            let pixelWidth = properties.intValue(for: kCGImagePropertyPixelWidth),
+            let pixelHeight = properties.intValue(for: kCGImagePropertyPixelHeight)
         else {
             throw .imageInfoUnavailable
         }
 
-        let pixelSize = try pixelSize(
-            width: pixelWidth,
-            height: pixelHeight
-        )
-        guard
-            let orientation = WIImageOrientation(
-                rawValue: properties.intValue(
-                    for: kCGImagePropertyOrientation
-                ) ?? WIImageOrientation.up.rawValue
-            )
-        else {
+        let pixelSize = try pixelSize(width: pixelWidth, height: pixelHeight)
+        let orientationValue = properties.intValue(for: kCGImagePropertyOrientation) ?? WIImageOrientation.up.rawValue
+        guard let orientation = WIImageOrientation(rawValue: orientationValue) else {
             throw .imageInfoUnavailable
         }
-        let type = (CGImageSourceGetType(source) as String?)
-            .flatMap(UTType.init)
 
         return Descriptor(
-            type: type,
+            type: source.type,
             byteCount: byteCount,
             pixelSize: pixelSize,
             orientation: orientation,
@@ -205,55 +179,34 @@ extension WIImageIO {
     }
 }
 
-extension Dictionary where Key == CFString, Value == Any {
-    fileprivate func intValue(for key: CFString) -> Int? {
-        if let value = self[key] as? Int {
-            return value
-        }
-        if let value = self[key] as? NSNumber {
-            return value.intValue
-        }
-        return nil
-    }
-
-    fileprivate func boolValue(for key: CFString) -> Bool? {
-        if let value = self[key] as? Bool {
-            return value
-        }
-        if let value = self[key] as? NSNumber {
-            return value.boolValue
-        }
-        return nil
-    }
-}
-
 // MARK: - Decoding
 
 extension WIImageIO {
     static func colorSpace(
         _ source: CGImageSource
     ) throws(WIImageIO.Error) -> WIColorSpace? {
-        guard let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+        guard let image = source.image(at: 0) else {
             throw .imageInfoUnavailable
         }
 
         guard let colorSpace = image.colorSpace else {
             return nil
         }
-        if let name = colorSpace.name as String? {
-            if name == CGColorSpace.sRGB as String {
-                return .sRGB
-            }
-            if name == CGColorSpace.displayP3 as String {
-                return .displayP3
-            }
+
+        if colorSpace.name == CGColorSpace.sRGB {
+            return .sRGB
+        }
+        if colorSpace.name == CGColorSpace.displayP3 {
+            return .displayP3
         }
 
-        guard colorSpace.model == .rgb,
-            let iccData = colorSpace.copyICCData()
-        else {
+        guard colorSpace.model == .rgb else {
             return nil
         }
+        guard let iccData = colorSpace.copyICCData() else {
+            return nil
+        }
+
         return .iccProfile(iccData as Data)
     }
 
@@ -266,13 +219,7 @@ extension WIImageIO {
         let properties: [CFString: Any] = [
             kCGImageSourceShouldCacheImmediately: options.cacheImmediately
         ]
-        guard
-            let image = CGImageSourceCreateImageAtIndex(
-                source,
-                0,
-                properties as CFDictionary
-            )
-        else {
+        guard let image = source.image(at: 0, options: properties) else {
             throw .imageDecodeFailed
         }
         return image
@@ -293,13 +240,7 @@ extension WIImageIO {
             properties[kCGImageSourceThumbnailMaxPixelSize] = maximumPixelSize
         }
 
-        guard
-            let image = CGImageSourceCreateThumbnailAtIndex(
-                source,
-                0,
-                properties as CFDictionary
-            )
-        else {
+        guard let image = source.thumbnail(at: 0, options: properties) else {
             throw .imageDecodeFailed
         }
         return image
@@ -329,9 +270,7 @@ extension WIImageIO {
         }
 
         return removedMetadata == .gps
-            && options.maximumPixelSize == nil
-            && options.compressionQuality == nil
-            && descriptor.type == type
+            && canCopyExcludingGPS(descriptor, as: type, options: options)
     }
 
     static func transcode(
@@ -349,16 +288,14 @@ extension WIImageIO {
         else {
             throw .metadataTranscodeUnsupported(type)
         }
-        guard removedMetadata.isEmpty else {
-            guard
-                removedMetadata == .gps,
-                options.maximumPixelSize == nil,
-                options.compressionQuality == nil,
-                descriptor.type == type
-            else {
+        if removedMetadata == .gps {
+            guard canCopyExcludingGPS(descriptor, as: type, options: options) else {
                 throw .metadataTranscodeUnsupported(type)
             }
             return try copyExcludingGPS(source, as: type)
+        }
+        guard removedMetadata.isEmpty else {
+            throw .metadataTranscodeUnsupported(type)
         }
 
         var properties: [CFString: Any] = [:]
@@ -379,17 +316,21 @@ extension WIImageIO {
         }
     }
 
+    private static func canCopyExcludingGPS(
+        _ descriptor: Descriptor,
+        as type: UTType,
+        options: TranscodeOptions
+    ) -> Bool {
+        options.maximumPixelSize == nil
+            && options.compressionQuality == nil
+            && descriptor.type == type
+    }
+
     private static func copyExcludingGPS(
         _ source: CGImageSource,
         as type: UTType
     ) throws(WIImageIO.Error) -> Data {
-        guard
-            let metadata = CGImageSourceCopyMetadataAtIndex(
-                source,
-                0,
-                nil
-            )
-        else {
+        guard let metadata = source.metadata(at: 0) else {
             throw .imageInfoUnavailable
         }
 
@@ -444,6 +385,13 @@ extension WIImageIO {
 // MARK: - Private Helpers
 
 extension WIImageIO {
+    private static func validateStaticImage(_ source: CGImageSource) throws(WIImageIO.Error) {
+        let frameCount = source.frameCount
+        guard frameCount == 1 else {
+            throw .animatedSourceUnsupported(frameCount: frameCount)
+        }
+    }
+
     private static func encodedData(
         as type: UTType,
         addingImage: (CGImageDestination) -> Void
@@ -473,5 +421,67 @@ extension WIImageIO {
             throw .imageEncodeFailed(type)
         }
         return destination
+    }
+}
+
+// MARK: - CGImageSource
+
+private extension CGImageSource {
+    var frameCount: Int {
+        CGImageSourceGetCount(self)
+    }
+
+    var type: UTType? {
+        (CGImageSourceGetType(self) as String?).flatMap(UTType.init)
+    }
+
+    func properties(at index: Int) -> [CFString: Any]? {
+        CGImageSourceCopyPropertiesAtIndex(self, index, nil) as? [CFString: Any]
+    }
+
+    func metadata(at index: Int) -> CGImageMetadata? {
+        CGImageSourceCopyMetadataAtIndex(self, index, nil)
+    }
+
+    func image(at index: Int, options: [CFString: Any]? = nil) -> CGImage? {
+        CGImageSourceCreateImageAtIndex(
+            self,
+            index,
+            options.map { $0 as CFDictionary }
+        )
+    }
+
+    func thumbnail(at index: Int, options: [CFString: Any]) -> CGImage? {
+        CGImageSourceCreateThumbnailAtIndex(
+            self,
+            index,
+            options as CFDictionary
+        )
+    }
+}
+
+// MARK: - CFString Dictionary
+
+extension Dictionary where Key == CFString, Value == Any {
+    fileprivate func intValue(for key: CFString) -> Int? {
+        switch self[key] {
+        case let value as Int:
+            return value
+        case let value as NSNumber:
+            return value.intValue
+        default:
+            return nil
+        }
+    }
+
+    fileprivate func boolValue(for key: CFString) -> Bool? {
+        switch self[key] {
+        case let value as Bool:
+            return value
+        case let value as NSNumber:
+            return value.boolValue
+        default:
+            return nil
+        }
     }
 }
