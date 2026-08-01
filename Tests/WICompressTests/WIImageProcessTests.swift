@@ -497,8 +497,8 @@ struct WIImageProcessTests {
         try data.write(to: url)
 
         let pipeline = try ImagePipeline(contentsOf: url)
-        guard case .file(let backingURL) = pipeline.reader.input else {
-            Issue.record("The file terminal must keep a file-backed source")
+        guard case .file(let backingURL) = pipeline.input else {
+            Issue.record("The Pipeline must own the file-backed input")
             return
         }
         #expect(backingURL == url)

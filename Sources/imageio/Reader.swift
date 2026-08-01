@@ -15,23 +15,15 @@ import WIImageDomain
 extension WIImageIO {
     /// A read-only ImageIO source with one cached inspection result.
     public final class Reader {
-        enum Input {
-            case data(Data)
-            case file(URL)
-        }
-
         let source: CGImageSource
-        let input: Input
 
         public let descriptor: Descriptor
 
         init(
             source: CGImageSource,
-            input: Input,
             descriptor: Descriptor
         ) {
             self.source = source
-            self.input = input
             self.descriptor = descriptor
         }
 
@@ -87,19 +79,6 @@ extension WIImageIO {
                 as: type,
                 options: options
             )
-        }
-
-        package func originalData() throws(WIImageIO.Error) -> Data {
-            switch input {
-            case .data(let data):
-                return data
-            case .file(let url):
-                do {
-                    return try Data(contentsOf: url)
-                } catch {
-                    throw .fileReadFailed(url)
-                }
-            }
         }
 
         package func frame(

@@ -53,7 +53,6 @@ extension WIImageIO {
         let source = try imageSource(data)
         return Reader(
             source: source,
-            input: .data(data),
             descriptor: try descriptor(source, byteCount: data.count)
         )
     }
@@ -63,7 +62,6 @@ extension WIImageIO {
         let (source, byteCount) = try fileImageSource(contentsOf: url)
         return Reader(
             source: source,
-            input: .file(url),
             descriptor: try descriptor(source, byteCount: byteCount)
         )
     }

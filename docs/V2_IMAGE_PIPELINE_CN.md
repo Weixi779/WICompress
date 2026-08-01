@@ -173,9 +173,9 @@ copy     encoded input -> Data
 encode   CGImage       -> Data
 ```
 
-它通过 `WIImageIO.Reader` 持有请求级 encoded input，并在模块内部使用
-`CGImageSource`、`CGImageDestination` 和 typed options。特别是 file-backed Reader
-仍应避免无条件把完整文件读入内存。
+Pipeline 自己持有请求级原始 `Data` / file URL，并通过 `WIImageIO.Reader` 使用 encoded
+source。ImageIO 模块内部使用 `CGImageSource`、`CGImageDestination` 和 typed options；
+file-backed Reader 仍应避免无条件把完整文件读入内存。
 
 ImageIO 不知道：
 

@@ -15,6 +15,12 @@ import WIImageIO
 import WIImageRaster
 
 package final class ImagePipeline {
+    enum Input {
+        case data(Data)
+        case file(URL)
+    }
+
+    let input: Input
     let reader: WIImageIO.Reader
 
     var descriptor: WIImageIO.Descriptor {
@@ -27,6 +33,7 @@ package final class ImagePipeline {
 
     convenience init(data: Data) throws(WICompressError) {
         try self.init(
+            input: .data(data),
             reader: Self.imageIO { () throws(WIImageIO.Error) in
                 try WIImageIO.read(data)
             }
@@ -35,6 +42,7 @@ package final class ImagePipeline {
 
     convenience init(contentsOf url: URL) throws(WICompressError) {
         try self.init(
+            input: .file(url),
             reader: Self.imageIO { () throws(WIImageIO.Error) in
                 try WIImageIO.read(contentsOf: url)
             }
@@ -42,6 +50,7 @@ package final class ImagePipeline {
     }
 
     private init(
+        input: Input,
         reader: WIImageIO.Reader
     ) throws(WICompressError) {
         guard reader.descriptor.frameCount == 1 else {
@@ -50,12 +59,20 @@ package final class ImagePipeline {
             )
         }
 
+        self.input = input
         self.reader = reader
     }
 
     func originalData() throws(WICompressError) -> Data {
-        try Self.imageIO { () throws(WIImageIO.Error) in
-            try reader.originalData()
+        switch input {
+        case .data(let data):
+            return data
+        case .file(let url):
+            do {
+                return try Data(contentsOf: url)
+            } catch {
+                throw .fileReadFailed(url)
+            }
         }
     }
 

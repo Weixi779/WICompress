@@ -112,12 +112,13 @@ Registry 或跨请求 mutable session。
 
 - 持有一个未公开的 `CGImageSource`。
 - 初始化时只 inspect 一次并缓存 `Descriptor`。
-- Data reader 保留输入 bytes。
-- File reader 直接从 URL 创建 source；只有 return-original 路径才按需读取完整 Data。
+- Data reader 只保留 ImageIO source 所需的输入生命周期。
+- File reader 直接从 URL 创建 source，不负责产品层的原始字节 passthrough。
 - 不声明 `Sendable`；调用方不应跨并发域共享同一个 Reader。
 
 `Reader` 不是 Pipeline、Domain container 或业务扩展点。纯尺寸算法、Raster 与候选搜索
-只接收自己需要的值，不接收 Reader。
+只接收自己需要的值，不接收 Reader。原始 `Data` / file URL 与 return-original 生命周期
+由产品 Pipeline 持有，不进入 ImageIO Reader。
 
 ## Descriptor
 
@@ -280,7 +281,7 @@ quality search 中复用 rendered pixels；ImageIO chain 不拥有 byte-budget f
 ## 验证合同
 
 - Data/file Reader 的 descriptor、decode、thumbnail 与 copy 行为一致。
-- File Reader 不预读完整 bytes，return-original 时才读取。
+- File Reader 不预读完整 bytes；产品 Pipeline 只在 return-original 时读取原始文件。
 - raw decode → encode 保留 source orientation。
 - transformed thumbnail/rendered frame → encode 写 orientation 1。
 - selected metadata 与 MakerNote 独立性正确。
