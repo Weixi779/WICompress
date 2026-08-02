@@ -12,7 +12,7 @@ import UniformTypeIdentifiers
 import WICompressDomain
 import WIImageDomain
 import WIImageIO
-import WIImageRaster
+import WIImageRendering
 
 package final class ImagePipeline {
     enum Input {
@@ -242,21 +242,26 @@ package final class ImagePipeline {
             orientation = descriptor.orientation
         }
 
-        return try rasterImage(
-            sourceImage,
-            plan: WIImageRaster.Plan(
-                canvasSize: geometry.canvasSize,
-                sourceRect: sourceRect,
-                destinationRect: geometry.destinationRect,
-                orientation: orientation,
-                alphaMode: rasterAlphaMode(
-                    destinationFormat: destinationFormat
-                ),
-                canvasBackground: geometry.canvasBackground,
-                imageBackground: rasterJPEGBackground(from: jpegBackground),
-                colorSpace: rasterColorSpace(from: outputColorSpace)
-            )
+        let request = ImageRenderRequest(
+            canvasSize: geometry.canvasSize,
+            sourceRect: sourceRect,
+            destinationRect: geometry.destinationRect,
+            orientation: orientation,
+            alphaMode: renderAlphaMode(
+                destinationFormat: destinationFormat
+            ),
+            canvasBackground: geometry.canvasBackground,
+            imageBackground: renderJPEGBackground(
+                from: jpegBackground
+            ),
+            colorSpace: renderColorSpace(from: outputColorSpace)
         )
+        return try Self.rendering { () throws(ImageRenderingError) -> CGImage in
+            try ImageRenderer.render(
+                sourceImage,
+                request: request
+            )
+        }
     }
 
     private func decodedImage() throws(WICompressError) -> CGImage {
@@ -317,24 +322,23 @@ package final class ImagePipeline {
         )
     }
 
-    private func rasterImage(
-        _ image: CGImage,
-        plan: WIImageRaster.Plan
-    ) throws(WICompressError) -> CGImage {
+    private static func rendering<Value>(
+        _ operation: () throws(ImageRenderingError) -> Value
+    ) throws(WICompressError) -> Value {
         do {
-            return try WIImageRaster.image(image, plan: plan)
+            return try operation()
         } catch {
-            throw Self.map(error)
+            throw map(error)
         }
     }
 
-    private func rasterAlphaMode(
+    private func renderAlphaMode(
         destinationFormat: ImageFormat
-    ) -> WIImageRaster.AlphaMode {
+    ) -> ImageAlphaMode {
         destinationFormat == .jpeg ? .opaque : .preserve
     }
 
-    private func rasterJPEGBackground(
+    private func renderJPEGBackground(
         from background: WIJPEGBackground?
     ) -> WIColor? {
         switch background {
@@ -349,9 +353,9 @@ package final class ImagePipeline {
         }
     }
 
-    private func rasterColorSpace(
+    private func renderColorSpace(
         from colorSpace: DestinationColorSpace
-    ) -> WIImageRaster.OutputColorSpace {
+    ) -> ImageRenderColorSpace {
         guard let target = colorSpace.target else {
             return .source
         }
@@ -360,7 +364,7 @@ package final class ImagePipeline {
     }
 
     private static func map(
-        _ error: WIImageRaster.Error
+        _ error: ImageRenderingError
     ) -> WICompressError {
         switch error {
         case .invalidSourceRect,

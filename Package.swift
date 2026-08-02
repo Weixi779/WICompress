@@ -41,9 +41,9 @@ let package = Package(
             path: "Sources/image/io"
         ),
         .target(
-            name: "WIImageRaster",
+            name: "WIImageRendering",
             dependencies: ["WIImageDomain"],
-            path: "Sources/image/raster"
+            path: "Sources/image/rendering"
         ),
         .target(
             name: "WICompressExecution",
@@ -51,7 +51,7 @@ let package = Package(
                 "WIImageDomain",
                 "WICompressDomain",
                 "WIImageIO",
-                "WIImageRaster"
+                "WIImageRendering"
             ],
             path: "Sources/compress/execution"
         ),
@@ -80,9 +80,9 @@ let package = Package(
             path: "Tests/WIImageIOTests"
         ),
         .testTarget(
-            name: "WIImageRasterTests",
-            dependencies: ["WIImageDomain", "WIImageRaster"],
-            path: "Tests/WIImageRasterTests"
+            name: "WIImageRenderingTests",
+            dependencies: ["WIImageDomain", "WIImageRendering"],
+            path: "Tests/WIImageRenderingTests"
         ),
         .testTarget(
             name: "WICompressTests",

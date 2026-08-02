@@ -23,8 +23,8 @@ The ImageIO boundary is tracked in
 product, typed `ImageReader → ImageFrame → encode` chain, synchronous primitive model, and
 static-image scope without exposing raw ImageIO implementation details.
 
-The internal Core Graphics raster boundary is tracked in
-[`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md). It freezes the package-only
+The internal Core Graphics rendering boundary is tracked in
+[`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md). It freezes the package-only
 target, resolved-geometry input, one-pass crop/resize rendering, hidden bitmap
 surface, pixel-only coordinates, and synchronous primitive model.
 
@@ -40,16 +40,16 @@ Implementation status:
   chained encode, runtime capabilities, and Pipeline error mapping.
 - Completed: removal of the temporary `CGImageSource` migration bridge; the
   `WICompress` target no longer owns raw ImageIO source/destination operations.
-- Completed: package-only `WIImageRaster` target with one resolved-plan entry;
+- Completed: package-only `WIImageRendering` target with one resolved-request entry;
   bitmap rendering, orientation normalization, crop/resize, two-layer
   backgrounds, alpha flattening, and color conversion no longer live in
   `WIImageExecutor`.
 - Completed: `WIImageDomain` owns shared pixel-size, color, format, metadata,
   orientation, and geometry facts. `WICompressDomain` owns Process, Target,
-  Output, crop, resizing, and Luban request semantics. ImageIO, Raster, and
+  Output, crop, resizing, and Luban request semantics. ImageIO, Rendering, and
   Execution consume the shared facts without mirrored Core values or
   product-boundary field conversions.
-- Completed: request-scoped `ImagePipeline` owns source and ImageIO/Raster
+- Completed: request-scoped `ImagePipeline` owns source and ImageIO/Rendering
   execution. Process and Target validation, decision ownership, Target feedback
   search, working-image reuse, and result checks now live directly in the
   pipeline without architecture-level Resolver, ExecutionPlan, Executor, or
@@ -62,7 +62,7 @@ Implementation status:
   `WIPixelSize`, resizing slot and built-ins, aspect-ratio crop, shared Output
   values, pure geometry calculation, and direct pipeline execution.
 - Completed: file-backed Process URL execution, on-demand original-byte reads,
-  two-axis-safe thumbnail sampling, and overflow validation before Raster.
+  two-axis-safe thumbnail sampling, and overflow validation before Rendering.
 - Completed: Target now uses the shared `WIImageOutput`; its frozen default is
   Alpha-aware PNG/JPEG, stripped metadata, and conversion to sRGB. The duplicate
   public `WICompressionOutput` has been removed.

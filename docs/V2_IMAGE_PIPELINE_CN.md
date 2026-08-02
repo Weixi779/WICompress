@@ -8,7 +8,7 @@
 
 本文替代其他文档中关于 `Resolver`、`Solver`、`WIExecutionPlan`、
 `WIImageExecutor` 和独立 Execution Core 的目标架构描述。其他文档中的公共 Domain、
-ImageIO、Raster、输出合同和当前实施状态仍然有效。
+ImageIO、Rendering、输出合同和当前实施状态仍然有效。
 
 相关文档：
 
@@ -18,7 +18,7 @@ ImageIO、Raster、输出合同和当前实施状态仍然有效。
 - [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md)：硬字节上限与候选搜索
   合同。
 - [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md)：encoded representation 基础能力。
-- [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)：像素绘制基础能力。
+- [`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md)：像素绘制基础能力。
 
 ## 核心结论
 
@@ -42,7 +42,7 @@ Data / file URL + Process / Target
 - 原始 encoded input。
 - ImageIO inspection 产生的 `ImageDescriptor`。
 - 外部传入的 Process 或 Target。
-- 当前是否需要 decode、Raster、source transcode 或重新 encode。
+- 当前是否需要 decode、Rendering、source transcode 或重新 encode。
 - Target 搜索当前使用的 geometry、quality 和候选结果。
 - 哪个工作 `CGImage` 可以在后续编码尝试中安全复用。
 
@@ -160,7 +160,7 @@ Pipeline 可以按真实成本复用中间像素：
 
 ## 基础能力边界
 
-抽出 ImageIO 与 Raster 后，Pipeline 不再自己处理底层框架细节。
+抽出 ImageIO 与 Rendering 后，Pipeline 不再自己处理底层框架细节。
 
 ### ImageIO
 
@@ -185,9 +185,9 @@ ImageIO 不知道：
 - Luban、candidate scale、quality search 或 ranking。
 - 哪一步应当成为本次请求的下一步。
 
-### Raster
+### Rendering
 
-Raster 模块拥有 `CGImage -> CGImage` 的像素执行：
+Rendering 模块拥有 `CGImage -> CGImage` 的像素执行：
 
 - orientation normalization。
 - crop 与 resize。
@@ -195,7 +195,7 @@ Raster 模块拥有 `CGImage -> CGImage` 的像素执行：
 - color-space conversion。
 - sampling 与 bitmap memory safety。
 
-Raster 不解释 Process、Target、resizing intent 或 byte budget。Pipeline 在调用 Raster
+Rendering 不解释 Process、Target、resizing intent 或 byte budget。Pipeline 在调用 Rendering
 前已经计算出 concrete geometry 和 output facts。
 
 ## 执行不是固定直线
@@ -203,7 +203,7 @@ Raster 不解释 Process、Target、resizing intent 或 byte budget。Pipeline �
 完整像素改写的能力顺序是：
 
 ```text
-Inspect -> Decode -> Raster -> Encode
+Inspect -> Decode -> Rendering -> Encode
 ```
 
 但它不是要求所有请求依次经过四个 Stage 的公共或内部 chain。Pipeline 根据合同选择最短
@@ -217,10 +217,10 @@ source transcode:
     Inspect -> ImageIO transcode -> Data
 
 pixel rewrite:
-    Inspect -> Decode -> Raster -> Encode -> Data
+    Inspect -> Decode -> Rendering -> Encode -> Data
 ```
 
-因此不建立 `InspectStage`、`DecodeStage`、`RasterStage` 或 `EncodeStage`。这些名称描述
+因此不建立 `InspectStage`、`DecodeStage`、`RenderingStage` 或 `EncodeStage`。这些名称描述
 能力，不构成需要注册、替换或串联的对象体系。
 
 ## 被删除的架构层
@@ -256,7 +256,7 @@ Executor 会产生两个执行所有者。
 `ImagePipeline.compress(to:)` 内部算法，而不是与 Pipeline 并列的服务。
 
 如果搜索状态复杂到局部变量已经无法清楚表达，可以保留一个私有 search state value。
-它只负责候选状态和数学，不接管 source、ImageIO、Raster 或整个请求生命周期。
+它只负责候选状态和数学，不接管 source、ImageIO、Rendering 或整个请求生命周期。
 
 ## Algorithm 的位置
 
@@ -282,7 +282,7 @@ Pipeline 本身完全封闭：
 - 不 public。
 - 不使用 `WI` 公共品牌前缀。
 - 不提供 stage protocol、processor registry 或插件。
-- 不允许调用方插入任意 decode、Raster 或 encode 节点。
+- 不允许调用方插入任意 decode、Rendering 或 encode 节点。
 - 不公开 working `CGImage`、Pipeline 内部 ImageReader 或 Pipeline 生命周期。
 
 外部扩展发生在已经冻结的 Domain 插槽，例如 `WIImageResizing`：
@@ -300,8 +300,8 @@ ImagePipeline 的基础执行保持同步、有序。同步 terminal 在当前�
 terminal 必须避免让耗时的同步 Pipeline 阻塞 caller actor，并与同步入口保持相同结果
 和错误语义。
 
-Pipeline 内部不把 inspect、decode、Raster 或 encode 设计成多个 public suspension
-point，也不在 ImageIO/Raster 中建立 queue、actor 或 Task。同步与异步入口必须共享
+Pipeline 内部不把 inspect、decode、Rendering 或 encode 设计成多个 public suspension
+point，也不在 ImageIO/Rendering 中建立 queue、actor 或 Task。同步与异步入口必须共享
 完全相同的 Pipeline 语义。异步 terminal 最终使用何种 Task 和 executor、如何映射
 priority、以及在哪里检查和传播 cancellation，尚未冻结。
 
@@ -314,7 +314,7 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 - Inspect 是函数；每次请求至多 inspect 原始输入一次，并由 Pipeline 持有输出的
   `ImageDescriptor`。
 - Process 与 Target 是同一个 Pipeline 内的两种算法。
-- ImageIO 与 Raster 是独立基础能力，不拥有产品执行顺序。
+- ImageIO 与 Rendering 是独立基础能力，不拥有产品执行顺序。
 - Target 候选始终从原始输入派生，encoded candidate 不回灌为下一轮输入。
 - geometry 相同而只有 quality 变化时可以复用 working `CGImage`。
 - 外部扩展只产生 concrete Domain facts，不扩展 Pipeline。
@@ -352,7 +352,10 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
 - working image 是否需要一个按 geometry 标识的私有缓存值。
 - 异步 terminal 的 Task 结构与 custom TaskExecutor 选择。
 - 异步 priority 映射、cancellation 检查点与传播方式。
-- 未来是否发布独立 Raster product。
+- crop 路径的解码采样优化：根据 crop rect 与最终 destination size 计算满足输出采样密度的
+  最小整图 thumbnail，按实际 thumbnail 尺寸映射 source rect 后再交给 Rendering。当前仍完整
+  解码 crop source；本轮 Rendering 重构不改变既有解码与画质语义。
+- 未来是否发布独立 Rendering product。
 - 新的像素 backend、动图和 HDR execution。
 
 这些延后项不影响当前 Pipeline 所有权，也不能作为提前建立抽象的理由。

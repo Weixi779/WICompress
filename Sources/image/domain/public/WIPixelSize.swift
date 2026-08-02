@@ -25,4 +25,12 @@ public struct WIPixelSize: Sendable, Hashable {
         self.width = width
         self.height = height
     }
+
+    package func oriented(by orientation: WIImageOrientation) -> Self {
+        guard orientation.swapsDimensions else {
+            return self
+        }
+
+        return Self(validWidth: height, height: width)
+    }
 }

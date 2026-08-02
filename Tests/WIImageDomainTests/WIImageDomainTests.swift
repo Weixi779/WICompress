@@ -18,13 +18,18 @@ struct WIImageDomainTests {
     }
 
     @Test(
-        "WIImageOrientation identifies display-axis swaps",
+        "WIImageOrientation resolves display pixel dimensions",
         arguments: WIImageOrientation.allCases
     )
     func orientationAxisSwap(_ orientation: WIImageOrientation) {
-        let expected = [5, 6, 7, 8].contains(orientation.rawValue)
+        let storedSize = WIPixelSize(width: 40, height: 20)
+        let swapsDimensions = [5, 6, 7, 8].contains(orientation.rawValue)
+        let expectedSize = swapsDimensions
+            ? WIPixelSize(width: 20, height: 40)
+            : storedSize
 
-        #expect(orientation.swapsDimensions == expected)
+        #expect(orientation.swapsDimensions == swapsDimensions)
+        #expect(storedSize.oriented(by: orientation) == expectedSize)
     }
 
     @Test("Metadata aliases compose as standard OptionSet values")

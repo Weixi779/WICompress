@@ -28,12 +28,7 @@ public struct ImageDescriptor: Sendable, Equatable {
     }
 
     public var orientedPixelSize: WIPixelSize {
-        orientation.swapsDimensions
-            ? WIPixelSize(
-                validWidth: pixelSize.height,
-                height: pixelSize.width
-            )
-            : pixelSize
+        pixelSize.oriented(by: orientation)
     }
 }
 

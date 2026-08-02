@@ -7,7 +7,7 @@ source transcode、pixel encode、metadata 与 runtime capability 已实现。�
 相关边界：
 
 - [`V2_IMAGE_DOMAIN_CN.md`](V2_IMAGE_DOMAIN_CN.md)：共享图片事实与压缩请求领域。
-- [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)：orientation、crop、resize 与颜色渲染。
+- [`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md)：orientation、crop、resize 与颜色渲染。
 - [`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md)：Process/Target 的请求级编排。
 
 ## 目标
@@ -22,7 +22,7 @@ source transcode、pixel encode、metadata 与 runtime capability 已实现。�
 - runtime decode/encode capability。
 
 它不解释 Process、Target、crop、resize、Alpha flatten、颜色转换或 byte-budget 搜索。
-这些仍由 `ImagePipeline` 与 Raster 拥有。
+这些仍由 `ImagePipeline` 与 Rendering 拥有。
 
 ## Product 与依赖
 
@@ -44,7 +44,7 @@ import WIImageIO
 ```text
                     WIImageDomain
                   ↑       ↑       ↑
-         WIImageIO  WIImageRaster  WICompressDomain
+         WIImageIO  WIImageRendering  WICompressDomain
                   ↖      ↑      ↗
                 WICompressExecution
                          ↑
@@ -118,7 +118,7 @@ Registry 或跨请求 mutable session。
 - File reader 直接从 URL 创建 source，不负责产品层的原始字节 passthrough。
 - 不声明 `Sendable`；调用方不应跨并发域共享同一个 ImageReader。
 
-`ImageReader` 不是 Pipeline、Domain container 或业务扩展点。纯尺寸算法、Raster 与候选搜索
+`ImageReader` 不是 Pipeline、Domain container 或业务扩展点。纯尺寸算法、Rendering 与候选搜索
 只接收自己需要的值，不接收 ImageReader。原始 `Data` / file URL 与 return-original 生命周期
 由产品 Pipeline 持有，不进入 ImageReader。
 
@@ -158,7 +158,7 @@ CGImage + orientation + optional source metadata provenance
 | `ImageReader.thumbnail()` 默认 transform | `.up` | 写入 orientation 1 |
 | `thumbnail(appliesOrientationTransform: false)` | source orientation | 保留 source orientation |
 | `ImageFrame(image:)` | 默认 `.up` | 不伪造 source metadata |
-| Pipeline Raster 输出 | `.up` | 保留被选择的 source metadata，方向写 1 |
+| Pipeline Rendering 输出 | `.up` | 保留被选择的 source metadata，方向写 1 |
 
 这避免两类常见错误：raw pixels 被错误标记为 `.up`，或已经转正的 thumbnail/rendered
 pixels 又被旧 orientation 旋转一次。
@@ -198,7 +198,7 @@ ImageReader -> descriptor                         -> facts
   quality 与 metadata 改写；满足条件时可使用底层 source-copy 机制。
 - `encode` 消费 ImageFrame，写入 quality、选择后的 metadata 与 ImageFrame orientation。
 
-crop、canvas placement、Alpha flatten、output color conversion 与采样风格属于 Raster；
+crop、canvas placement、Alpha flatten、output color conversion 与采样风格属于 Rendering；
 ImageIO 不重复提供另一套像素编辑 API。
 
 ## Options 与 runtime capability
@@ -251,7 +251,7 @@ ImageIO primitives 保持同步：
 
 同步调用方自行决定所在执行上下文。未来 `WICompressor` async terminal 负责让完整
 `ImagePipeline` 不阻塞 caller actor，并处理 priority、cancellation 与 executor 选择；
-同步与异步 terminal 复用相同 ImageReader、Raster 与编码语义。
+同步与异步 terminal 复用相同 ImageReader、Rendering 与编码语义。
 
 ## ImagePipeline 集成
 
@@ -264,7 +264,7 @@ Data / URL
   -> ImageDescriptor
   -> Process or Target decisions
   -> ImageReader.image / thumbnail / transcode
-  -> optional WIImageRaster
+  -> optional WIImageRendering
   -> ImageFrame.encode
   -> WIResult
 ```
@@ -280,7 +280,7 @@ quality search 中复用 rendered pixels；ImageIO chain 不拥有 byte-budget f
 - public byte-source protocol、加密随机访问 source。
 - async ImageIO API、queue、actor、TaskExecutor。
 - coder registry、plugin、全局 mutable codec priority。
-- crop、resize policy、Raster chain、Target search。
+- crop、resize policy、Rendering chain、Target search。
 - HDR/EDR tone mapping 或 gain-map preservation contract。
 
 多帧 source 可以 inspection，但 `image`、`thumbnail` 与 `transcode` 明确抛

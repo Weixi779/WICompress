@@ -32,7 +32,7 @@ are grouped by product context and mapped to target names in `Package.swift`:
 ```text
 Sources/image/domain       -> WIImageDomain
 Sources/image/io           -> WIImageIO
-Sources/image/raster       -> WIImageRaster
+Sources/image/rendering    -> WIImageRendering
 Sources/compress/domain    -> WICompressDomain
 Sources/compress/execution -> WICompressExecution
 Sources/WICompress         -> WICompress
@@ -46,7 +46,7 @@ identity; physical paths do not repeat the `WI` brand.
 ```text
                     WIImageDomain
                   ↑       ↑       ↑
-         WIImageIO  WIImageRaster  WICompressDomain
+       WIImageIO  WIImageRendering  WICompressDomain
                   ↖      ↑      ↗
                 WICompressExecution
                          ↑
@@ -56,8 +56,8 @@ identity; physical paths do not repeat the `WI` brand.
 - `WIImageDomain` owns shared image vocabulary and no execution lifecycle.
 - `WIImageIO` owns synchronous inspection, decode, transcode, and encode. It
   re-exports canonical Image Domain values instead of defining aliases.
-- `WIImageRaster` owns package-only pixel rendering primitives until a public
-  Raster API is explicitly designed.
+- `WIImageRendering` owns package-only single-image bitmap rendering until a
+  public Rendering API is explicitly designed.
 - `WICompressDomain` owns public Process, Target, Output, Result, and compression
   error contracts.
 - `WICompressExecution` owns the request-scoped `ImagePipeline`, calculations,

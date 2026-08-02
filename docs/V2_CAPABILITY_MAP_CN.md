@@ -13,7 +13,7 @@
 - [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md)：
   `WICompressionTarget` 的冻结合同。
 - [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md)：ImageIO package target 与同步 primitive。
-- [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)：Core Graphics raster target 与
+- [`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md)：Core Graphics raster target 与
   单次绘制合同。
 
 ## 这份文档回答什么
@@ -224,10 +224,10 @@ alignment Domain。后续设计将 1.x 的中心、四边和四角枚举收敛�
 anchor：默认 `(0.5, 0.5)`，同时允许调用方在 `0...1` 范围内选择裁切偏向。
 
 Process 和 Target 都先根据 concrete ratio 与 anchor 固定 source crop，再进入 resizing
-或 solver；Raster 最终把 crop 与 resize 融合为一次绘制。冻结合同见
+或 solver；Rendering 最终把 crop 与 resize 融合为一次绘制。冻结合同见
 [`V2_IMAGE_PROCESS_CN.md`](V2_IMAGE_PROCESS_CN.md)、
 [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md) 与
-[`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)。
+[`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md)。
 
 ### Kingfisher 与 Nuke 的本地源码证据
 
@@ -265,14 +265,14 @@ ImageIO 原生负责图片源、格式、metadata、thumbnail/downsample 和目�
 
 ```text
 ImageIO inspect/decode or downsample
-    -> ImageRaster crop/resize/orientation/background/color
+    -> ImageRendering crop/resize/orientation/background/color
     -> ImageIO encode
 ```
 
 这里不产生中间编码 `Data`，不是 resize 一次、encode 一次、再 decode/crop/encode 一次。
 
 当前实现已经有 `redrawBitmap` 和 `redrawCanvas` 两条内部 render path，并共享最终
-`encodeRendered`。2.0 将它们收敛到一个 `ImageRaster.image` 入口；低层 bitmap surface
+`encodeRendered`。2.0 将它们收敛到一个 `ImageRenderer.render` 入口；低层 bitmap surface
 保持 target-private，不为 resize 和 crop 各建立 Pipeline 或公共协议。
 
 ### 输出与编码
@@ -499,7 +499,7 @@ flowchart LR
 | `WIImageProcess` 已冻结合同与延后项 | [`V2_IMAGE_PROCESS_CN.md`](V2_IMAGE_PROCESS_CN.md) |
 | `WICompressionTarget` 合同与延后项 | [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md) |
 | ImageIO 内部 target、同步 primitive 与迁移边界 | [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md) |
-| Raster 内部 target、单次绘制与 surface 边界 | [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md) |
+| Rendering 内部 target、单次绘制与 surface 边界 | [`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md) |
 
 后续若新证据改变结论，应更新对应 Domain 文档；能力地图只补充证据和 1.x 对照，不再
 维护第二份决策表。

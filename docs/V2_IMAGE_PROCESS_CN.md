@@ -16,7 +16,7 @@ Resolver、ExecutionPlan 和 Executor 的旧描述仅属于历史迁移背景，
 - [`V2_DOMAIN_MODEL_CN.md`](V2_DOMAIN_MODEL_CN.md)：跨产品线共享 Domain。
 - [`V2_COMPRESSION_TARGET_CN.md`](V2_COMPRESSION_TARGET_CN.md)：反向 byte-budget 求解。
 - [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md)：encoded representation 基础设施。
-- [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)：crop、resize 与颜色绘制基础设施。
+- [`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md)：crop、resize 与颜色绘制基础设施。
 
 ## 产品职责
 
@@ -133,9 +133,9 @@ point 或 Target solver context。
 Domain。压缩向的内置实现默认只缩小；只有名称和调用显式表达允许放大时，才接受大于输入
 的结果。
 
-Execution Core 会验证返回尺寸为正数，并按 Raster 的 64-byte row alignment 规则检查
+Execution Core 会验证返回尺寸为正数，并按 Rendering 的 64-byte row alignment 规则检查
 row bytes 与总 bitmap bytes 的算术溢出。无效尺寸明确失败，不 silent clamp，也不由
-Raster 层再次解释。固定内存预算仍属于后续资源策略，不在这一层暗中引入。
+Rendering 层再次解释。固定内存预算仍属于后续资源策略，不在这一层暗中引入。
 
 ## Cropping
 
@@ -232,7 +232,7 @@ Metadata 是 `ImageMetadataOptions` 集合，不是互斥 policy。`.strip` 与 
 metadata: .preserve.subtracting(.gps)
 ```
 
-类别选择由 ImageIO encode/transcode 边界执行，不进入 Raster Domain。
+类别选择由 ImageIO encode/transcode 边界执行，不进入 Rendering Domain。
 
 通用 canvas/background 不进入 Process。只有 representation 明确要求 Alpha flatten
 时，opaque background 才作为该输出语义的一部分进入最终 raster plan。
@@ -255,7 +255,7 @@ quality，执行层不能用“原图更小”绕过该合同。
 
 ## 同步与异步
 
-同步与异步 terminal 使用同一 Domain、`ImagePipeline`、Raster 和 ImageIO
+同步与异步 terminal 使用同一 Domain、`ImagePipeline`、Rendering 和 ImageIO
 primitive：
 
 ```text
@@ -282,7 +282,7 @@ suspension point。
   `WICompressOptions` 或 Resolver。
 - 无 crop 的缩小复用 ImageIO thumbnail；thumbnail max pixel 由目标宽、高两个轴
   共同反推，不能先把任一目标轴所需的源样本降掉再放大。需要放大任一轴时使用完整
-  source。crop 使用完整 oriented source，并在 Raster 中把
+  source。crop 使用完整 oriented source，并在 Rendering 中把
   crop/resize/color/background 融合成一次绘制。
 - file terminal 保持 file-backed source；只有 return-original passthrough 才按需
   读取完整原始 `Data`。
@@ -314,7 +314,7 @@ suspension point。
 - 让每一步返回或持有 public ImageResource。
 - 使用 `fit`、`fill`、`fitInside` 或 View content mode 作为核心术语。
 - 让 Execution Core 接收单独长边、Luban ratio 或业务 intent。
-- 让 Raster 层重新决定 crop、resizing、output 或 quality。
+- 让 Rendering 层重新决定 crop、resizing、output 或 quality。
 - 为 crop 公开中心、四边和四角枚举。
 - 通过 warning、silent clamp 或隐式 format fallback 掩盖无效合同。
 

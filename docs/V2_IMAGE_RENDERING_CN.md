@@ -1,6 +1,6 @@
-# WICompress 2.0 Image Raster Core
+# WICompress 2.0 Image Rendering Core
 
-状态：独立 `WIImageRaster` target、单次绘制入口以及 Process/Target Pipeline 集成均已
+状态：独立 `WIImageRendering` target、单次绘制入口以及 Process/Target Pipeline 集成均已
 完成。
 
 本文记录 WICompress 2.0 对 Core Graphics 像素绘制能力的内部二次封装。它位于 ImageIO
@@ -41,16 +41,16 @@ DrawingContext、UIKit renderer、processor chain 或 UI placement。
 
 ## Target 与可见性
 
-新增独立、非 product 的 package target，本文概念上称为 `WIImageRaster`：
+新增独立、非 product 的 package target，本文概念上称为 `WIImageRendering`：
 
 ```text
 WIImageDomain ────────┐
                      ▼
 WIImageIO ── decode ──┤
                      ▼
-                 WIImageRaster
+                 WIImageRendering
                      │
-                     └── image
+                     └── render
                            │
                            ▼
 WIImageIO ── encode ◀── CGImage
@@ -62,17 +62,17 @@ WIImageIO ── encode ◀── CGImage
 - 跨 target 只暴露一个 package-level 图片绘制入口。
 - 不依赖 Process、Target、solver、Luban、UIKit 或 AppKit。
 - primitive 保持同步，不拥有 queue、actor、Task 或 cancellation。
-- target 与入口命名确认为 `WIImageRaster`；通用像素事实来自 `WIImageDomain`，
-  Raster 只保留 `Plan`、`AlphaMode` 和 `OutputColorSpace`。
+- target 命名为 `WIImageRendering`，唯一入口为 `ImageRenderer.render`；通用像素事实来自
+  `WIImageDomain`，Rendering 只保留具体的 `ImageRenderRequest` 与 surface 执行选项。
 
 ## 唯一模块入口
 
 调用层只看见一个 terminal pixel operation，概念 API 为：
 
 ```swift
-let image = try WIImageRaster.image(
+let image = try ImageRenderer.render(
     decodedImage,
-    plan: WIImageRaster.Plan(
+    request: ImageRenderRequest(
         canvasSize: resolvedCanvasSize,
         sourceRect: resolvedCropRect,
         destinationRect: resolvedDestinationRect,
@@ -85,10 +85,10 @@ let image = try WIImageRaster.image(
 )
 ```
 
-`Plan` 是 immutable execution value，只包含已经解析完成的事实：
+`ImageRenderRequest` 是 immutable execution value，只包含已经解析完成的事实：
 
 ```text
-raw source image + orientation
+source orientation
 oriented source pixel rect
 final canvas pixel size
 destination pixel rect
@@ -98,6 +98,8 @@ resolved image-area background
 resolved output color space
 ```
 
+原始 `CGImage` 是 `ImageRenderer.render` 的独立输入，不属于 `ImageRenderRequest`。
+
 它不包含：
 
 - `fit`、`fill`、`fitInside` 或 content mode。
@@ -105,32 +107,21 @@ resolved output color space
 - `maxBytes`、quality search、candidate ranking 或 retry。
 - representation、metadata 或编码格式选择。
 
-Raster 不再解释 Domain。上层 `ImagePipeline` 负责把 crop、resizing 和 Output 转换为
-concrete geometry，Raster 只执行。
+Rendering 不再解释 Domain。上层 `ImagePipeline` 负责把 crop、resizing 和 Output 转换为
+concrete geometry，Rendering 只执行。
 
-## Bitmap Surface 是隐藏实现
+## BitmapCanvas 是隐藏实现
 
-首版没有为了一个消费者再建立第二个 package API。`WIImageRaster.image` 内部直接管理
-bitmap surface；如果未来出现第二个真实绘制 primitive，再提取 target-private
-`BitmapSurface`：
+`ImageRenderer` 校验一次完整的 `ImageRenderRequest`，然后建立 request-local
+`BitmapCanvas`。它不是转发层：它持有唯一 `CGContext`，并拥有 surface 从创建、绘制到
+一次性 finalize 的生命周期。
 
-```swift
-private enum BitmapSurface {
-    static func image(
-        pixelSize: RasterPixelSize,
-        background: RasterBackground,
-        colorSpace: RasterColorSpace,
-        draw: (CGContext) throws -> Void
-    ) throws -> CGImage
-}
-```
-
-当前入口已经拥有：
+`BitmapCanvas` 当前拥有：
 
 - checked row-byte 与 total-byte 计算。
 - standard-range bitmap format。
 - 由 Core Graphics 管理的 row alignment 和 buffer allocation。
-- top-left plan 到 Core Graphics 坐标的单点转换。
+- top-left request 到 Core Graphics 坐标的单点转换。
 - transparent clear、canvas fill 与 image-area fill。
 - scoped `CGContext` 生命周期。
 - 一次性 snapshot/finalize。
@@ -140,14 +131,14 @@ surface。
 
 ## 坐标与 Orientation
 
-Raster 接收的 `sourceRect` 使用 oriented image pixel coordinates：
+Rendering 接收的 `sourceRect` 使用 oriented image pixel coordinates：
 
 - 原点在左上。
 - x 向右增加。
 - y 向下增加。
 - rect 必须落在 oriented source 的有效像素范围内。
 
-Raster 内部统一处理原始 `CGImage` pixel storage、EXIF orientation 和 Core Graphics
+Rendering 内部统一处理原始 `CGImage` pixel storage、EXIF orientation 和 Core Graphics
 坐标系。输出总是：
 
 ```text
@@ -161,7 +152,7 @@ coordinate meaning = top-left image coordinates
 
 ## Crop 与 Resize 只绘制一次
 
-Raster 不先创建 crop image 再 resize。它创建最终目标大小的 bitmap surface，计算 source
+Rendering 不先创建 crop image 再 resize。它创建最终目标大小的 bitmap surface，计算 source
 到 destination 的映射并执行一次 `CGContext.draw`；超出最终画布的部分由 clip 丢弃。
 
 例如 `400 × 300` 的 source 需要生成 `100 × 100` 的中心正方形：
@@ -180,7 +171,7 @@ Target 都会继续 resize 或 encode，不需要公开 subimage/materialized-cr
 
 ## Background、Alpha 与 Color
 
-Raster 接收的是 Output resolver 已经完成的结果，不拥有第二套公开 Policy。
+Rendering 接收的是 `ImagePipeline` 已经解释完成的 Output facts，不拥有第二套公开 Policy。
 
 Alpha mode 只有两个互斥状态：
 
@@ -199,8 +190,8 @@ opaque
 - JPEG Alpha flatten 只有在 Output 已显式选择 opaque background 时进入 opaque。
 
 首版 surface 使用 standard-range、8-bit canonical RGB layout。sRGB 是压缩输出的稳定
-基线；preserve、Display P3 或 custom ICC 是否可兑现由 Output resolver 和 ImageIO
-capability 共同决定，再传入 Raster。HDR、EDR 和 tone mapping 不伪装成普通 color 或
+基线；preserve、Display P3 或 custom ICC 是否可兑现由 `ImagePipeline` 结合 ImageIO
+capability 决定，再传入 Rendering。HDR、EDR 和 tone mapping 不伪装成普通 color 或
 quality 选项。
 
 ## Sampling
@@ -240,15 +231,15 @@ Surface 生成 `CGImage` 后不继续绘制同一 context，避免不必要的 c
 
 ## 同步与并发
 
-Raster primitive 同步执行，并只在一次 terminal 调用的当前执行上下文中存在：
+Rendering primitive 同步执行，并只在一次 terminal 调用的当前执行上下文中存在：
 
 ```text
-sync WICompress  -> 当前调用上下文调用 Raster
-async WICompress -> 工作任务调用同一个 Raster
+sync WICompress  -> 当前调用上下文调用 Rendering
+async WICompress -> 工作任务调用同一个 Rendering
 ```
 
 不同顶层调用可以并发创建各自 surface；同一个 context 不跨线程、Task 或 actor 共享。
-Raster target 不建立全局串行队列。
+Rendering target 不建立全局串行队列。
 
 ## 与完整执行链的关系
 
@@ -263,7 +254,7 @@ Data / file URL + Process / Target
    WIImageIO image / thumbnail
           │
           ▼
-    ImageRaster.image
+    ImageRenderer.render
           │
           ▼
      WIImageIO encode
@@ -273,7 +264,7 @@ Data / file URL + Process / Target
 ```
 
 ImageIO 的美感来自 inspect、image、thumbnail、encode 等离散 representation 能力；
-Raster 的美感来自把有状态的 Core Graphics machinery 压缩成一次准确的 `image` 操作。
+Rendering 的美感来自把有状态的 Core Graphics machinery 压缩成一次准确的 `render` 操作。
 两者不强求相同的内部形态。
 
 ## 首版非目标
@@ -302,23 +293,23 @@ Raster 的美感来自把有状态的 Core Graphics machinery 压缩成一次准
   `CGImage`。
 
 async terminal 尚未进入公共 API，因此 sync/async parity 留给 execution phase；实际
-row padding 的观测与固定内存预算留给后续 benchmark，不扩大当前 Raster 返回值。
+row padding 的观测与固定内存预算留给后续 benchmark，不扩大当前 Rendering 返回值。
 
 ## 已冻结与延后
 
 已冻结：
 
-- 独立、非 product 的 Raster target。
-- package 调用层只有 `WIImageRaster.image` 一个入口。
+- 独立、非 product 的 Rendering target。
+- package 调用层只有 `ImageRenderer.render` 一个入口。
 - bitmap surface machinery 不越过该入口。
-- Raster 只消费 resolved geometry/output，不解释 Domain。
+- Rendering 只消费 resolved geometry/output，不解释 Domain。
 - top-left oriented pixel coordinates，输出 orientation 恒为 `.up`。
 - crop + resize + orientation + background + color 单次绘制。
 - pixel-only、同步 primitive、无全局队列。
 
 延后：
 
-- shared cross-module pixel value 是否值得独立归属；当前 Raster value 保持嵌套。
+- 未来是否发布独立 Rendering product 与 public request surface。
 - 内部 interpolation 的 benchmark 结果。
 - async terminal 建立后的 sync/async parity gate。
 - raw mutable bytes、materialized crop、wide-gamut/HDR backend。

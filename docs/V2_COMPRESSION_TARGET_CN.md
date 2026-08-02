@@ -14,7 +14,7 @@ Resolver、Solver 和 ExecutionPlan 的旧描述均已被替代，这些架构�
 外部平台调研和设计取舍证据保留在
 [`V2_CAPABILITY_MAP_CN.md`](V2_CAPABILITY_MAP_CN.md)；本文不重复调研过程。
 Crop 与 resize 的执行合同见
-[`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)。
+[`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md)。
 
 ## 产品职责
 
@@ -35,7 +35,7 @@ source image + target contract
 | `WICompressionTarget` | maxBytes、sizing、immutable output requirements | candidate scale、quality、尝试和选择 | 最终 `byteCount <= maxBytes` |
 
 Target 不继承、不包装 `WIImageProcess`。两条线只共享 internal `ImagePipeline` 及其
-ImageIO/Raster 执行能力。
+ImageIO/Rendering 执行能力。
 
 ## 公共信息分组
 
@@ -250,11 +250,11 @@ Target 保留结构化结果，因为实际输出由反馈搜索决定。结果�
 
 ## 实施依赖
 
-Target、Process、Output、ImageIO 与 Raster 的职责现在都已经冻结。实施仍不能把 Target
+Target、Process、Output、ImageIO 与 Rendering 的职责现在都已经冻结。实施仍不能把 Target
 重新接回 1.x Policy 或旧 geometry path；应由新合同自然导出 execution core：
 
 ```text
-1. 建立 package-only ImageIO 与 Raster primitive
+1. 建立 package-only ImageIO 与 Rendering primitive
    inspect -> resolve -> render -> encode -> encoded result
 
 2. 实现 pure sizing/crop resolution

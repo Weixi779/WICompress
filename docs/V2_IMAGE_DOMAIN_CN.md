@@ -8,7 +8,7 @@
 
 旧结构同时存在公开的 `WIPixelSize`、`WIColorSpace`、`WIColor`、`ImageFormat`
 与 package-only 的 `PixelSize`、`ColorSpace`、`Color`、`ImageFormat`。这些类型描述
-同一事实，却迫使 Source、Resolver、Raster 和 Encoder 不断转换。
+同一事实，却迫使 Source、Resolver、Rendering 和 Encoder 不断转换。
 
 2.0 不再用访问级别制造平行模型。公开值可以直接被 package 内部执行层使用，执行所需
 的校验和平台转换通过 package 方法补充。
@@ -18,7 +18,7 @@
 ```text
                     WIImageDomain
                   ↑       ↑       ↑
-         WIImageIO  WIImageRaster  WICompressDomain
+         WIImageIO  WIImageRendering  WICompressDomain
                   ↖      ↑      ↗
                 WICompressExecution
                          ↑
@@ -29,7 +29,7 @@
 
 ## Domain 所有权
 
-`WIImageDomain` 拥有 ImageIO、Raster、压缩请求与执行层共同理解的图片事实：
+`WIImageDomain` 拥有 ImageIO、Rendering、压缩请求与执行层共同理解的图片事实：
 
 - `WIPixelSize`
 - `WIColor` / `WIColorSpace`
@@ -59,7 +59,7 @@ Luban 纯尺寸算法与数值规范化留在 `WICompressDomain`，作为请求�
 - `ImageReader`、ImageDescriptor、ImageFrame、thumbnail、encode 和 runtime capability 属于
   `WIImageIO`；该 target 同时发布独立 product。
 - bitmap context、orientation render、Alpha surface 和颜色转换属于
-  `WIImageRaster`。
+  `WIImageRendering`。
 - `WIResult` 属于 `WICompressDomain`，是 Process 与 Target 共同的公开成功合同。
 - 请求级 `ImagePipeline` 与 Target 反馈搜索属于 `WICompressExecution`；Execution 不拥有
   public product model。
@@ -73,7 +73,7 @@ Luban 纯尺寸算法与数值规范化留在 `WICompressDomain`，作为请求�
 
 `WICompressDomain` 中的 `WIImageResizing.targetSize(for:)` 使用
 `throws(WICompressError)`；自定义算法失败直接抛
-`.invalidResizing`，不再通过 `(0, 0)` 哨兵值把错误延迟到 Pipeline。Raster 执行前仍会
+`.invalidResizing`，不再通过 `(0, 0)` 哨兵值把错误延迟到 Pipeline。Rendering 执行前仍会
 拒绝 row-byte 或 bitmap-byte overflow；这里不引入“已验证 PixelSize”影子类型。
 
 可以确定最近合法含义的偏好直接规范化：anchor clamp 到 `0...1`，quality clamp 到
@@ -87,7 +87,7 @@ Target hard byte contract 在构造时直接抛 `WICompressError`。
 - 删除 `imageCoreValue` 等逐字段适配。
 - 删除 `WISize`，结构化压缩结果直接使用 `WIPixelSize`。
 - 删除 Execution 对 ImageIO ImageDescriptor 和公开 Result 的逐字段影子值。
-- ImageIO、Raster、Compress Domain 与 Execution 直接消费同一套共享图片事实。
+- ImageIO、Rendering、Compress Domain 与 Execution 直接消费同一套共享图片事实。
 - Process、Target、Output、Crop、Resizing 与 Luban 从共享图片事实中拆到
   `WICompressDomain`，避免独立 ImageIO product 携带整套压缩请求语义。
 - `WICompressError` 归属 `WICompressDomain`；独立产品的底层失败由

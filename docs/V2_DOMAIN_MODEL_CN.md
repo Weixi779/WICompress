@@ -9,7 +9,7 @@
 相关文档：
 
 - [`V2_IMAGE_PIPELINE_CN.md`](V2_IMAGE_PIPELINE_CN.md)：2.0 内部状态、执行决策与
-  ImageIO/Raster 编排的最终边界。
+  ImageIO/Rendering 编排的最终边界。
 - [`V2_CAPABILITY_MAP_CN.md`](V2_CAPABILITY_MAP_CN.md)：1.x 能力盘点、组合证据与外部调研。
 - [`V2_IMAGE_PROCESS_CN.md`](V2_IMAGE_PROCESS_CN.md)：已冻结的 `WIImageProcess`
   合同。
@@ -17,7 +17,7 @@
   `WICompressionTarget` 合同。
 - [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md)：公开 ImageIO product、同步 typed chain
   与执行层迁移边界。
-- [`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)：package-only Raster target、单次
+- [`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md)：package-only Rendering target、单次
   crop/resize 绘制与 bitmap surface 边界。
 
 ## 产品边界
@@ -39,7 +39,7 @@ Photos 权限或平台分享业务。
 WIImageProcess ────────┐
                        ├──> internal ImagePipeline
 WICompressionTarget ───┘       ├──> ImageIO
-                               └──> Raster
+                               └──> Rendering
                                       ↓
                                    WIResult
 ```
@@ -191,16 +191,16 @@ Concrete Color Space 至少支持 sRGB、Display P3 与 custom ICC Profile。最
 | Color Space 只保留 preserve/convert | sRGB、Display P3 和 custom ICC 覆盖当前真实范围 |
 | 内部模块按真实能力解耦 | 不为了组件化建立没有不变量、生命周期或第二实现的空协议 |
 | ImageIO 模块边界已冻结 | 独立公开 product、`ImageReader → ImageFrame → encode` typed chain、同步 primitive |
-| Raster 模块边界已冻结 | 独立 package target、唯一 `image` 入口、隐藏 bitmap surface，不发布 product |
-| ImageIO 与 Raster 实现后置 | 由已冻结的 Process、Output 和 Target 合同反推最终执行层输入 |
+| Rendering 模块边界已冻结 | 独立 package target、唯一 `render` 入口、隐藏 bitmap surface，不发布 product |
+| ImageIO 与 Rendering 实现后置 | 由已冻结的 Process、Output 和 Target 合同反推最终执行层输入 |
 | 静态图片是当前范围 | GIF、其他动图、增量和多帧 session 不属于当前规划 |
 | 2.0 不保持旧 geometry 源码兼容 | 旧工具链和旧语义调用方继续使用 1.x |
 
 ## 执行层边界
 
-ImageIO 与 Raster 是执行机制，不是公共 Domain 的定义者。模块和并发边界详见
+ImageIO 与 Rendering 是执行机制，不是公共 Domain 的定义者。模块和并发边界详见
 [`V2_IMAGE_IO_CN.md`](V2_IMAGE_IO_CN.md) 与
-[`V2_IMAGE_RASTER_CN.md`](V2_IMAGE_RASTER_CN.md)。2.0 不从现有
+[`V2_IMAGE_RENDERING_CN.md`](V2_IMAGE_RENDERING_CN.md)。2.0 不从现有
 `WICompressOptions`、`WIWritePlan` 或四条 write path 反推新 API。
 
 上层冻结后，ImagePipeline 持有 source facts，并把 Domain 意图解释成具体执行参数：
@@ -213,13 +213,13 @@ source facts
 + optional lossy quality
     -> inspect
     -> ImageIO image / thumbnail
-    -> ImageRaster.image when pixels must change
+    -> ImageRenderer.render when pixels must change
     -> ImageIO encode / transcode
     -> encoded result
 ```
 
 Luban、custom resizing、aspect ratio、anchor、Target ranking 和平台限制都由
-Pipeline 内对应算法解释。ImageRaster 只接收 concrete geometry，不重新提供 `fit`、
+Pipeline 内对应算法解释。ImageRendering 只接收 concrete geometry，不重新提供 `fit`、
 `fill` 或第二套 processing policy。
 
 ## 当前非目标

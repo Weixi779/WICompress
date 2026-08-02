@@ -1,6 +1,6 @@
 //
-//  WIImageRasterTests.swift
-//  WIImageRasterTests
+//  WIImageRenderingTests.swift
+//  WIImageRenderingTests
 //
 //  Created by weixi on 2026/7/30.
 //  Copyright © 2024 weixi. Licensed under Apache-2.0.
@@ -11,14 +11,14 @@ import Foundation
 import ImageIO
 import Testing
 @testable import WIImageDomain
-@testable import WIImageRaster
+@testable import WIImageRendering
 
 extension Tag {
-    @Tag static var imageRasterCore: Self
+    @Tag static var imageRenderingCore: Self
 }
 
-@Suite("WIImageRaster", .tags(.imageRasterCore))
-struct WIImageRasterTests {
+@Suite("WIImageRendering", .tags(.imageRenderingCore))
+struct WIImageRenderingTests {
     private struct Pixel: Equatable {
         var red: UInt8
         var green: UInt8
@@ -29,12 +29,12 @@ struct WIImageRasterTests {
     @Test("Invalid and out-of-bounds rects are rejected")
     func invalidRectsAreRejected() throws {
         let image = try #require(Self.verticalBands(width: 4, height: 4))
-        let invalidSource = WIImageRaster.Plan(
+        let invalidSource = ImageRenderRequest(
             canvasSize: WIPixelSize(width: 4, height: 4),
             sourceRect: Rect(x: 0, y: 0, width: 0, height: 4),
             destinationRect: Rect(x: 0, y: 0, width: 4, height: 4)
         )
-        let invalidDestination = WIImageRaster.Plan(
+        let invalidDestination = ImageRenderRequest(
             canvasSize: WIPixelSize(width: 4, height: 4),
             sourceRect: Rect(x: 0, y: 0, width: 4, height: 4),
             destinationRect: Rect(
@@ -44,54 +44,54 @@ struct WIImageRasterTests {
                 height: 4
             )
         )
-        let outOfBoundsSource = WIImageRaster.Plan(
+        let outOfBoundsSource = ImageRenderRequest(
             canvasSize: WIPixelSize(width: 4, height: 4),
             sourceRect: Rect(x: 3, y: 0, width: 2, height: 4),
             destinationRect: Rect(x: 0, y: 0, width: 4, height: 4)
         )
 
-        #expect(throws: WIImageRaster.Error.invalidSourceRect) {
-            try WIImageRaster.image(image, plan: invalidSource)
+        #expect(throws: ImageRenderingError.invalidSourceRect) {
+            try ImageRenderer.render(image, request: invalidSource)
         }
-        #expect(throws: WIImageRaster.Error.invalidDestinationRect) {
-            try WIImageRaster.image(image, plan: invalidDestination)
+        #expect(throws: ImageRenderingError.invalidDestinationRect) {
+            try ImageRenderer.render(image, request: invalidDestination)
         }
-        #expect(throws: WIImageRaster.Error.sourceRectOutOfBounds) {
-            try WIImageRaster.image(image, plan: outOfBoundsSource)
+        #expect(throws: ImageRenderingError.sourceRectOutOfBounds) {
+            try ImageRenderer.render(image, request: outOfBoundsSource)
         }
     }
 
     @Test("Bitmap byte arithmetic rejects overflow")
     func bitmapByteArithmeticRejectsOverflow() throws {
         let image = try #require(Self.verticalBands(width: 1, height: 1))
-        let rowOverflow = WIImageRaster.Plan(
+        let rowOverflow = ImageRenderRequest(
             canvasSize: WIPixelSize(width: .max, height: 1),
             sourceRect: Rect(x: 0, y: 0, width: 1, height: 1),
             destinationRect: Rect(x: 0, y: 0, width: 1, height: 1)
         )
-        let totalOverflow = WIImageRaster.Plan(
+        let totalOverflow = ImageRenderRequest(
             canvasSize: WIPixelSize(width: 1, height: .max),
             sourceRect: Rect(x: 0, y: 0, width: 1, height: 1),
             destinationRect: Rect(x: 0, y: 0, width: 1, height: 1)
         )
 
-        #expect(throws: WIImageRaster.Error.rowByteOverflow(width: .max)) {
-            try WIImageRaster.image(image, plan: rowOverflow)
+        #expect(throws: ImageRenderingError.rowByteOverflow(width: .max)) {
+            try ImageRenderer.render(image, request: rowOverflow)
         }
         #expect(
-            throws: WIImageRaster.Error.bitmapByteCountOverflow(
+            throws: ImageRenderingError.bitmapByteCountOverflow(
                 width: 1,
                 height: .max
             )
         ) {
-            try WIImageRaster.image(image, plan: totalOverflow)
+            try ImageRenderer.render(image, request: totalOverflow)
         }
     }
 
     @Test("Background colors must be opaque")
     func backgroundsMustBeOpaque() throws {
         let image = try #require(Self.verticalBands(width: 1, height: 1))
-        let plan = WIImageRaster.Plan(
+        let request = ImageRenderRequest(
             canvasSize: WIPixelSize(width: 1, height: 1),
             sourceRect: Rect(x: 0, y: 0, width: 1, height: 1),
             destinationRect: Rect(x: 0, y: 0, width: 1, height: 1),
@@ -103,17 +103,17 @@ struct WIImageRasterTests {
             )
         )
 
-        #expect(throws: WIImageRaster.Error.nonOpaqueBackground) {
-            try WIImageRaster.image(image, plan: plan)
+        #expect(throws: ImageRenderingError.nonOpaqueBackground) {
+            try ImageRenderer.render(image, request: request)
         }
     }
 
     @Test("Source crop is resolved in oriented top-left coordinates")
     func sourceCropUsesTopLeftCoordinates() throws {
         let source = try #require(Self.verticalBands(width: 8, height: 4))
-        let output = try WIImageRaster.image(
+        let output = try ImageRenderer.render(
             source,
-            plan: WIImageRaster.Plan(
+            request: ImageRenderRequest(
                 canvasSize: WIPixelSize(width: 4, height: 4),
                 sourceRect: Rect(x: 2, y: 0, width: 4, height: 4),
                 destinationRect: Rect(x: 0, y: 0, width: 4, height: 4)
@@ -127,9 +127,9 @@ struct WIImageRasterTests {
     @Test("Canvas and image backgrounds remain independent")
     func canvasAndImageBackgroundsRemainIndependent() throws {
         let source = try #require(Self.transparentImage(width: 2, height: 2))
-        let output = try WIImageRaster.image(
+        let output = try ImageRenderer.render(
             source,
-            plan: WIImageRaster.Plan(
+            request: ImageRenderRequest(
                 canvasSize: WIPixelSize(width: 4, height: 4),
                 sourceRect: Rect(x: 0, y: 0, width: 2, height: 2),
                 destinationRect: Rect(x: 1, y: 1, width: 2, height: 2),
@@ -153,9 +153,9 @@ struct WIImageRasterTests {
     @Test("Preserve alpha keeps opaque-source padding transparent")
     func preserveAlphaKeepsOpaqueSourcePaddingTransparent() throws {
         let source = try #require(Self.verticalBands(width: 2, height: 2))
-        let output = try WIImageRaster.image(
+        let output = try ImageRenderer.render(
             source,
-            plan: WIImageRaster.Plan(
+            request: ImageRenderRequest(
                 canvasSize: WIPixelSize(width: 4, height: 4),
                 sourceRect: Rect(x: 0, y: 0, width: 2, height: 2),
                 destinationRect: Rect(x: 1, y: 1, width: 2, height: 2),
@@ -195,9 +195,9 @@ struct WIImageRasterTests {
         let swapsDimensions = [5, 6, 7, 8].contains(orientation.rawValue)
         let displayWidth = swapsDimensions ? 4 : 8
         let displayHeight = swapsDimensions ? 8 : 4
-        let output = try WIImageRaster.image(
+        let output = try ImageRenderer.render(
             rawImage,
-            plan: WIImageRaster.Plan(
+            request: ImageRenderRequest(
                 canvasSize: WIPixelSize(
                     width: displayWidth,
                     height: displayHeight
