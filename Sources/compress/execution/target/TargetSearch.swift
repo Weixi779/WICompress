@@ -12,14 +12,15 @@ import WIImageDomain
 
 struct PreparedTargetEncoding {
     let pixelSize: WIPixelSize
-    let encode: (_ quality: Double?) throws(WICompressError) -> Data
+    let encode: (_ quality: Double?) throws -> Data
 }
 
 struct LossyTargetSearch {
     typealias Prepare = (
         _ pixelSize: WIPixelSize,
         _ initialQuality: Double
-    ) throws(WICompressError) -> PreparedTargetEncoding
+    ) throws -> PreparedTargetEncoding
+    typealias CheckCancellation = () throws(CancellationError) -> Void
 
     private static let candidateSearchAttemptCount = 8
 
@@ -27,6 +28,7 @@ struct LossyTargetSearch {
     let format: ImageFormat
     let basePixelSize: WIPixelSize
     let maxEncodeAttempts: Int
+    let checkCancellation: CheckCancellation
     let prepare: Prepare
 
     private var attemptCount = 0
@@ -36,16 +38,18 @@ struct LossyTargetSearch {
         format: ImageFormat,
         basePixelSize: WIPixelSize,
         maxEncodeAttempts: Int,
+        checkCancellation: @escaping CheckCancellation = {},
         prepare: @escaping Prepare
     ) {
         self.maxBytes = maxBytes
         self.format = format
         self.basePixelSize = basePixelSize
         self.maxEncodeAttempts = maxEncodeAttempts
+        self.checkCancellation = checkCancellation
         self.prepare = prepare
     }
 
-    mutating func run() throws(WICompressError) -> Data {
+    mutating func run() throws -> Data {
         let profile = LossyQualityProfile(format: format)
         var currentLongSide = max(basePixelSize.width, basePixelSize.height)
         var longSideOverride: Int?
@@ -54,6 +58,7 @@ struct LossyTargetSearch {
         var candidates: [TargetCandidate] = []
 
         while true {
+            try checkCancellation()
             if shouldReturnBestCandidate(candidates) {
                 return bestCandidate(in: candidates).data
             }
@@ -62,7 +67,9 @@ struct LossyTargetSearch {
                 base: basePixelSize,
                 maxLongSide: longSideOverride
             )
+            try checkCancellation()
             let encoding = try prepare(pixelSize, highQuality)
+            try checkCancellation()
             let outcome: FixedSizeOutcome
             do {
                 outcome = try searchFixedSize(
@@ -74,7 +81,9 @@ struct LossyTargetSearch {
                 guard candidates.isEmpty else {
                     return bestCandidate(in: candidates).data
                 }
-                throw .resourceLimitExceeded(attemptCount: attemptCount)
+                throw WICompressError.resourceLimitExceeded(
+                    attemptCount: attemptCount
+                )
             }
 
             if let candidate = outcome.candidate {
@@ -101,7 +110,9 @@ struct LossyTargetSearch {
                 guard candidates.isEmpty else {
                     return bestCandidate(in: candidates).data
                 }
-                throw .targetUnsatisfiable(smallestByteCount: smallestByteCount)
+                throw WICompressError.targetUnsatisfiable(
+                    smallestByteCount: smallestByteCount
+                )
             }
 
             currentLongSide = nextLongSide
@@ -114,7 +125,7 @@ struct LossyTargetSearch {
         _ encoding: PreparedTargetEncoding,
         profile: LossyQualityProfile,
         highQuality: Double
-    ) throws(WICompressError) -> FixedSizeOutcome {
+    ) throws -> FixedSizeOutcome {
         let highData = try encode(encoding, quality: highQuality)
         if highData.count <= maxBytes {
             return FixedSizeOutcome(
@@ -156,7 +167,7 @@ struct LossyTargetSearch {
         lowQuality: Double,
         highQuality: Double,
         lowData: Data
-    ) throws(WICompressError) -> TargetCandidate {
+    ) throws -> TargetCandidate {
         var lowerBound = lowQuality
         var upperBound = highQuality
         var bestData = lowData
@@ -185,12 +196,17 @@ struct LossyTargetSearch {
     private mutating func encode(
         _ encoding: PreparedTargetEncoding,
         quality: Double
-    ) throws(WICompressError) -> Data {
+    ) throws -> Data {
+        try checkCancellation()
         guard attemptCount < maxEncodeAttempts else {
-            throw .resourceLimitExceeded(attemptCount: attemptCount)
+            throw WICompressError.resourceLimitExceeded(
+                attemptCount: attemptCount
+            )
         }
         attemptCount += 1
-        return try encoding.encode(quality)
+        let data = try encoding.encode(quality)
+        try checkCancellation()
+        return data
     }
 
     private func shouldReturnBestCandidate(_ candidates: [TargetCandidate]) -> Bool {
@@ -212,11 +228,13 @@ struct LossyTargetSearch {
 struct PNGTargetSearch {
     typealias Prepare = (
         _ pixelSize: WIPixelSize
-    ) throws(WICompressError) -> PreparedTargetEncoding
+    ) throws -> PreparedTargetEncoding
+    typealias CheckCancellation = () throws(CancellationError) -> Void
 
     let maxBytes: Int
     let basePixelSize: WIPixelSize
     let maxEncodeAttempts: Int
+    let checkCancellation: CheckCancellation
     let prepare: Prepare
 
     private var attemptCount = 0
@@ -225,25 +243,30 @@ struct PNGTargetSearch {
         maxBytes: Int,
         basePixelSize: WIPixelSize,
         maxEncodeAttempts: Int,
+        checkCancellation: @escaping CheckCancellation = {},
         prepare: @escaping Prepare
     ) {
         self.maxBytes = maxBytes
         self.basePixelSize = basePixelSize
         self.maxEncodeAttempts = maxEncodeAttempts
+        self.checkCancellation = checkCancellation
         self.prepare = prepare
     }
 
-    mutating func run() throws(WICompressError) -> Data {
+    mutating func run() throws -> Data {
         var currentLongSide = max(basePixelSize.width, basePixelSize.height)
         var longSideOverride: Int?
         var smallestByteCount: Int?
 
         while true {
+            try checkCancellation()
             let pixelSize = candidatePixelSize(
                 base: basePixelSize,
                 maxLongSide: longSideOverride
             )
+            try checkCancellation()
             let encoding = try prepare(pixelSize)
+            try checkCancellation()
             let data = try encode(encoding)
             if data.count <= maxBytes {
                 return data
@@ -256,7 +279,9 @@ struct PNGTargetSearch {
                 maxBytes: maxBytes,
                 format: .png
             ) else {
-                throw .targetUnsatisfiable(smallestByteCount: smallestByteCount)
+                throw WICompressError.targetUnsatisfiable(
+                    smallestByteCount: smallestByteCount
+                )
             }
 
             currentLongSide = nextLongSide
@@ -266,12 +291,17 @@ struct PNGTargetSearch {
 
     private mutating func encode(
         _ encoding: PreparedTargetEncoding
-    ) throws(WICompressError) -> Data {
+    ) throws -> Data {
+        try checkCancellation()
         guard attemptCount < maxEncodeAttempts else {
-            throw .resourceLimitExceeded(attemptCount: attemptCount)
+            throw WICompressError.resourceLimitExceeded(
+                attemptCount: attemptCount
+            )
         }
         attemptCount += 1
-        return try encoding.encode(nil)
+        let data = try encoding.encode(nil)
+        try checkCancellation()
+        return data
     }
 }
 

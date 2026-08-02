@@ -47,6 +47,18 @@ struct WICompressorPublicSurfaceTests {
         try resourceData("synthetic_tiny_1x1", extension: "png")
     }
 
+    private static var passthroughProcess: WIImageProcess {
+        WIImageProcess(
+            sizing: .original,
+            quality: nil,
+            output: WIImageOutput(
+                representation: .preserve,
+                metadata: .preserve,
+                colorSpace: .preserve
+            )
+        )
+    }
+
     private static func resourceData(_ name: String, extension ext: String) throws -> Data {
         try Data(contentsOf: resourceURL(name, extension: ext))
     }
@@ -81,21 +93,43 @@ struct WICompressorPublicSurfaceTests {
         let input = try Self.tinyPNGData()
         let result = try WICompressor.process(
             input,
-            using: WIImageProcess(
-                sizing: .original,
-                quality: nil,
-                output: WIImageOutput(
-                    representation: .preserve,
-                    metadata: .preserve,
-                    colorSpace: .preserve
-                )
-            )
+            using: Self.passthroughProcess
         )
 
         #expect(result.data == input)
         #expect(result.format == .png)
         #expect(result.pixelSize == WIPixelSize(width: 1, height: 1))
         #expect(result.byteCount == input.count)
+    }
+
+    @Test("Async Process data and file terminals preserve the synchronous render path")
+    func asyncProcessTerminalsPreserveSemantics() async throws {
+        let url = try Self.resourceURL("synthetic_tiny_1x1", extension: "png")
+        let input = try Data(contentsOf: url)
+        let process = WIImageProcess(
+            sizing: .resize(
+                using: WIImageResize.exact(
+                    WIPixelSize(width: 2, height: 2)
+                )
+            )
+        )
+
+        let dataResult = try await WICompressor.process(
+            input,
+            using: process
+        )
+        let fileResult = try await WICompressor.process(
+            contentsOf: url,
+            using: process
+        )
+        let synchronousResult = try Self.processSynchronously(
+            input,
+            using: process
+        )
+
+        #expect(dataResult.pixelSize == WIPixelSize(width: 2, height: 2))
+        Self.expectEquivalentResults(fileResult, dataResult)
+        Self.expectEquivalentResults(synchronousResult, dataResult)
     }
 
     @Test("Preserve target can return original data")
@@ -117,6 +151,88 @@ struct WICompressorPublicSurfaceTests {
         #expect(result.format == .png)
         #expect(result.pixelSize == WIPixelSize(width: 1, height: 1))
         #expect(result.byteCount == input.count)
+    }
+
+    @Test("Async Target data and file terminals preserve synchronous search semantics")
+    func asyncTargetTerminalsPreserveSemantics() async throws {
+        let url = try Self.resourceURL("real_jpeg_2098x1350_landscape", extension: "jpg")
+        let input = try Data(contentsOf: url)
+        let target = try WICompressionTarget(
+            maxBytes: 64 * 1024,
+            sizing: WICompressionSizing(
+                maximumPixelSize: 320,
+                aspectRatio: .square
+            )
+        )
+
+        let dataResult = try await WICompressor.compress(input, to: target)
+        let fileResult = try await WICompressor.compress(
+            contentsOf: url,
+            to: target
+        )
+        let synchronousResult = try Self.compressSynchronously(
+            input,
+            to: target
+        )
+
+        #expect(dataResult.byteCount <= target.maxBytes)
+        Self.expectEquivalentResults(fileResult, dataResult)
+        Self.expectEquivalentResults(synchronousResult, dataResult)
+    }
+
+    @Test("Async terminals preserve WICompressError failures")
+    func asyncTerminalPreservesCompressionError() async {
+        do {
+            _ = try await WICompressor.process(Data())
+            Issue.record("Expected invalidImageData")
+        } catch let error as WICompressError {
+            #expect(error == .invalidImageData)
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    @Test("Pre-cancelled async terminals throw CancellationError")
+    func preCancelledAsyncTerminalsThrowCancellationError() async throws {
+        let input = try Self.tinyPNGData()
+        let target = try WICompressionTarget(maxBytes: input.count)
+
+        let processTask = Task {
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            return try await WICompressor.process(input)
+        }
+        processTask.cancel()
+        await Self.expectCancellation(from: processTask)
+
+        let targetTask = Task {
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            return try await WICompressor.compress(input, to: target)
+        }
+        targetTask.cancel()
+        await Self.expectCancellation(from: targetTask)
+    }
+
+    @Test("Synchronous terminals ignore surrounding Task cancellation")
+    func synchronousTerminalIgnoresTaskCancellation() async throws {
+        let input = try Self.tinyPNGData()
+        let task = Task {
+            while !Task.isCancelled {
+                await Task.yield()
+            }
+            return try Self.processSynchronously(
+                input,
+                using: Self.passthroughProcess
+            )
+        }
+
+        task.cancel()
+        let result = try await task.value
+
+        #expect(result.data == input)
     }
 
     @Test("Preserve target reports oriented display size when returning original data")
@@ -260,5 +376,42 @@ struct WICompressorPublicSurfaceTests {
             let data = try Self.resourceData("real_jpeg_2098x1350_landscape", extension: "jpg")
             return Data(data.prefix(byteCount))
         }
+    }
+
+    private static func expectCancellation(
+        from task: Task<WIResult, any Error>
+    ) async {
+        do {
+            _ = try await task.value
+            Issue.record("Expected CancellationError")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    private static func expectEquivalentResults(
+        _ lhs: WIResult,
+        _ rhs: WIResult
+    ) {
+        #expect(lhs.data == rhs.data)
+        #expect(lhs.format == rhs.format)
+        #expect(lhs.pixelSize == rhs.pixelSize)
+        #expect(lhs.byteCount == rhs.byteCount)
+    }
+
+    private static func processSynchronously(
+        _ data: Data,
+        using process: WIImageProcess
+    ) throws(WICompressError) -> WIResult {
+        try WICompressor.process(data, using: process)
+    }
+
+    private static func compressSynchronously(
+        _ data: Data,
+        to target: WICompressionTarget
+    ) throws(WICompressError) -> WIResult {
+        try WICompressor.compress(data, to: target)
     }
 }

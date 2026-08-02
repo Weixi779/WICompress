@@ -51,7 +51,10 @@ let uploadData = try WICompressor.process(
 - **透明图转 JPEG 更安全**：必须显式选择白底或黑底，不会偷偷铺底。
 - **方向安全**：基于 ImageIO 读取展示尺寸，redraw path 会把方向烘焙进像素。
 - **核心不依赖 UIKit / AppKit**：可在 iOS App、macOS 工具和 SwiftPM 测试中使用。
-- **强类型错误**：失败通过 `WICompressError` 表达，不再返回可空 `Data?`。
+- **同步与异步并存**：相同 terminal 名称既可同步调用，也可通过 `await` 在不占用
+  caller actor 的情况下执行。
+- **强类型错误**：图片处理失败使用 `WICompressError`；异步 Task 取消保持标准
+  `CancellationError`。
 
 ## 系统要求与安装
 
@@ -114,6 +117,15 @@ let result = try WICompressor.process(originalData)
 ```swift
 let result = try WICompressor.process(contentsOf: imageURL)
 ```
+
+Process 与 Target 都提供同名异步 overload：
+
+```swift
+let result = try await WICompressor.process(originalData)
+```
+
+异步取消是 cooperative 的：Pipeline 会在处理阶段之间和 Target 搜索尝试之间观察取消；
+已经进入 ImageIO 或 Core Graphics 的单次调用可能仍会先执行完成。
 
 显式配置：
 
@@ -210,7 +222,7 @@ guard let originalData = try await photosPickerItem.loadTransferable(type: Data.
     throw MyError.missingImageData
 }
 
-let result = try WICompressor.process(originalData)
+let result = try await WICompressor.process(originalData)
 let previewImage = UIImage(data: result.data)
 ```
 
@@ -290,11 +302,14 @@ WICompress 不内置平台分享 preset。分享 SDK 的限制和推荐值会变
 
 ## 错误处理
 
-public API 使用 `throws`：
+同步压缩 terminal 使用 typed `throws(WICompressError)`。异步 overload 还会把 Task 取消
+原样抛为标准 `CancellationError`，不会把它伪装成压缩失败：
 
 ```swift
 do {
-    let result = try WICompressor.process(data)
+    let result = try await WICompressor.process(data)
+} catch is CancellationError {
+    // 上层 Task 已取消。
 } catch let error as WICompressError {
     print(error)
 }
@@ -326,8 +341,6 @@ WICompress 目前明确不包含：
 
 - `UIImage` / `NSImage` convenience adapter
 - Live Photo 压缩
-- async API
-- 只剥离 GPS 的 metadata 策略
 - HDR gain map preserve
 - 动图写出
 - WebP / JPEG XL 写出

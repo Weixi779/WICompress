@@ -92,14 +92,15 @@ final class WICompressExampleViewModel {
         self.isPresentPicker = true
     }
     
-    func compressImage() {
+    @MainActor
+    func compressImage() async {
         guard let imageGroup = selectedImageGroup else { return }
         
         logger.info("Starting compression...")
         logger.info("Original format: \(imageGroup.format)")
         
         do {
-            let result = try WICompressor.process(
+            let result = try await WICompressor.process(
                 imageGroup.rawData,
                 using: WIImageProcess(quality: 0.7)
             )

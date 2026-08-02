@@ -32,7 +32,8 @@ final class UIKitPickerViewModel {
         self.isShowingImagePicker = true
     }
     
-    func compressImage() {
+    @MainActor
+    func compressImage() async {
         guard let imageGroup = selectedImageGroup else { return }
         
         logger.info("Starting compression...")
@@ -45,7 +46,7 @@ final class UIKitPickerViewModel {
         logger.info("Raw data prefix: \(hexString)")
         
         do {
-            let result = try WICompressor.process(
+            let result = try await WICompressor.process(
                 imageGroup.rawData,
                 using: WIImageProcess(quality: 0.7)
             )

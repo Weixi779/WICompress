@@ -249,9 +249,11 @@ ImageIO primitives 保持同步：
 - 不在内部静默切线程。
 - 不共享跨请求 ImageReader/destination。
 
-同步调用方自行决定所在执行上下文。未来 `WICompressor` async terminal 负责让完整
-`ImagePipeline` 不阻塞 caller actor，并处理 priority、cancellation 与 executor 选择；
-同步与异步 terminal 复用相同 ImageReader、Rendering 与编码语义。
+同步调用方自行决定所在执行上下文。`WICompressor` async terminal 通过 Swift 6.2
+`@concurrent` 让完整 `ImagePipeline` 不占用 caller actor，并在 ImageIO 调用前后观察
+cooperative cancellation。ImageIO 本身仍不持有 Task 或取消句柄；已经开始的同步
+ImageIO 调用可能在取消生效前完成。同步与异步 terminal 复用相同 ImageReader、
+Rendering 与编码语义。
 
 ## ImagePipeline 集成
 

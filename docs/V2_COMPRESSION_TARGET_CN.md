@@ -267,5 +267,6 @@ Target、Process、Output、ImageIO 与 Rendering 的职责现在都已经冻结
    geometry resolver、preference ranking 和对应兼容分支
 ```
 
-以上四步已完成。后续工作是补齐异步 terminal 与对外文档，不重新引入旧 Target
-Domain 或架构级 Resolver/Plan/Solver。
+以上四步与同步/异步 terminal 均已完成。异步入口复用相同 Pipeline 与反馈搜索，并在
+每次搜索尝试之间 cooperative cancellation；不重新引入旧 Target Domain 或架构级
+Resolver/Plan/Solver。

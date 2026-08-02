@@ -19,33 +19,100 @@ extension ImagePipeline {
         _ data: Data,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WIResult {
-        let pipeline = try ImagePipeline(data: data)
-        return try pipeline.compress(target)
+        try withoutTaskCancellation {
+            try self.compress(
+                data,
+                to: target,
+                cancellation: .disabled
+            )
+        }
     }
 
     package static func compress(
         contentsOf url: URL,
         to target: WICompressionTarget
     ) throws(WICompressError) -> WIResult {
-        let pipeline = try ImagePipeline(contentsOf: url)
+        try withoutTaskCancellation {
+            try self.compress(
+                contentsOf: url,
+                to: target,
+                cancellation: .disabled
+            )
+        }
+    }
+
+    package static func compressCancellable(
+        _ data: Data,
+        to target: WICompressionTarget
+    ) throws -> WIResult {
+        try self.compress(
+            data,
+            to: target,
+            cancellation: .task
+        )
+    }
+
+    package static func compressCancellable(
+        contentsOf url: URL,
+        to target: WICompressionTarget
+    ) throws -> WIResult {
+        try self.compress(
+            contentsOf: url,
+            to: target,
+            cancellation: .task
+        )
+    }
+
+    private static func compress(
+        _ data: Data,
+        to target: WICompressionTarget,
+        cancellation: PipelineCancellation
+    ) throws -> WIResult {
+        try cancellation.check()
+        let pipeline = try ImagePipeline(
+            data: data,
+            cancellation: cancellation
+        )
+        return try pipeline.compress(target)
+    }
+
+    private static func compress(
+        contentsOf url: URL,
+        to target: WICompressionTarget,
+        cancellation: PipelineCancellation
+    ) throws -> WIResult {
+        try cancellation.check()
+        let pipeline = try ImagePipeline(
+            contentsOf: url,
+            cancellation: cancellation
+        )
         return try pipeline.compress(target)
     }
 
     func compress(
         _ target: WICompressionTarget,
         maxEncodeAttempts: Int = defaultMaxEncodeAttempts
-    ) throws(WICompressError) -> WIResult {
+    ) throws -> WIResult {
+        try checkCancellation()
+
         guard descriptor.format != .unknown else {
-            throw .unsupportedSourceFormat(descriptor.type?.identifier)
+            throw WICompressError.unsupportedSourceFormat(
+                descriptor.type?.identifier
+            )
         }
 
         let sizing = try target.sizing.geometry(for: descriptor.orientedPixelSize)
         let output = try imageDestination(target.output)
+        try checkCancellation()
         if canReturnOriginal(target: target, sizing: sizing, output: output) {
-            return try originalResult()
+            let result = try originalResult()
+            try checkCancellation()
+            return result
         }
         guard output.isWritable else {
-            throw .unsupportedDestinationFormat(output.destinationFormat)
+            throw WICompressError.unsupportedDestinationFormat(
+                output.destinationFormat
+            )
         }
 
         let data = try compressTargetData(
@@ -54,10 +121,15 @@ extension ImagePipeline {
             output: output,
             maxEncodeAttempts: maxEncodeAttempts
         )
+        try checkCancellation()
         guard data.count <= target.maxBytes else {
-            throw .targetUnsatisfiable(smallestByteCount: data.count)
+            throw WICompressError.targetUnsatisfiable(
+                smallestByteCount: data.count
+            )
         }
-        return try result(for: data)
+        let result = try result(for: data)
+        try checkCancellation()
+        return result
     }
 
     private func compressTargetData(
@@ -65,14 +137,15 @@ extension ImagePipeline {
         sizing: TargetGeometry,
         output: ImageDestination,
         maxEncodeAttempts: Int
-    ) throws(WICompressError) -> Data {
+    ) throws -> Data {
         if output.destinationFormat.supportsLossyQuality {
             var search = LossyTargetSearch(
                 maxBytes: target.maxBytes,
                 format: output.destinationFormat,
                 basePixelSize: sizing.basePixelSize,
-                maxEncodeAttempts: maxEncodeAttempts
-            ) { (pixelSize: WIPixelSize, initialQuality: Double) throws(WICompressError) in
+                maxEncodeAttempts: maxEncodeAttempts,
+                checkCancellation: checkCancellation
+            ) { (pixelSize: WIPixelSize, initialQuality: Double) throws in
                 try self.prepareTargetEncoding(
                     target: target,
                     sizing: sizing,
@@ -88,8 +161,9 @@ extension ImagePipeline {
             var search = PNGTargetSearch(
                 maxBytes: target.maxBytes,
                 basePixelSize: sizing.basePixelSize,
-                maxEncodeAttempts: maxEncodeAttempts
-            ) { (pixelSize: WIPixelSize) throws(WICompressError) in
+                maxEncodeAttempts: maxEncodeAttempts,
+                checkCancellation: checkCancellation
+            ) { (pixelSize: WIPixelSize) throws in
                 try self.prepareTargetEncoding(
                     target: target,
                     sizing: sizing,
@@ -108,7 +182,10 @@ extension ImagePipeline {
             pixelSize: sizing.basePixelSize,
             initialQuality: nil
         )
-        return try encoding.encode(nil)
+        try checkCancellation()
+        let data = try encoding.encode(nil)
+        try checkCancellation()
+        return data
     }
 
     private func prepareTargetEncoding(
@@ -117,7 +194,7 @@ extension ImagePipeline {
         output: ImageDestination,
         pixelSize: WIPixelSize,
         initialQuality: Double?
-    ) throws(WICompressError) -> PreparedTargetEncoding {
+    ) throws -> PreparedTargetEncoding {
         let renderedImage = try renderedImageIfNeeded(
             target: target,
             sizing: sizing,
@@ -131,7 +208,7 @@ extension ImagePipeline {
 
         return PreparedTargetEncoding(
             pixelSize: outputPixelSize
-        ) { (quality: Double?) throws(WICompressError) in
+        ) { (quality: Double?) throws in
             try self.encodeTargetCandidate(
                 renderedImage,
                 target: target,
@@ -168,7 +245,7 @@ extension ImagePipeline {
         output: ImageDestination,
         pixelSize: WIPixelSize,
         quality: Double?
-    ) throws(WICompressError) -> CGImage? {
+    ) throws -> CGImage? {
         if canTranscodeFromSource(
             target: target,
             sizing: sizing,

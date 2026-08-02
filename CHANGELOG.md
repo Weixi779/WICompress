@@ -14,6 +14,9 @@ domains: deterministic image processing and byte-target compression.
 
 - `WICompressor.process(_:using:)` and its file URL terminal with
   `WIImageProcess`.
+- Swift 6.2 `@concurrent` async overloads for every Data and file Process/Target
+  terminal, with cooperative cancellation between pipeline stages and Target
+  search attempts.
 - Extensible `WIImageResizing`, built-in `WIImageResize` algorithms, and
   aspect-ratio crop with normalized anchors.
 - `WIImageResize.lubanV2`, with mobile-oriented sizing for standard photos,
@@ -31,12 +34,16 @@ domains: deterministic image processing and byte-target compression.
 - The package and module remain `WICompress`; the public static terminal is now
   the uninhabited `WICompressor` namespace.
 - Target compression now uses `WICompressionSizing` plus the shared
-  `WIImageOutput` and execution-plan boundary.
+  `WIImageOutput`, with request-scoped execution owned directly by
+  `ImagePipeline`.
 - Process terminals now return `WIResult`; callers that only need encoded bytes
   read `result.data`.
 - The default Process sizing is now Luban 2. The corrected Luban 1 behavior
   remains available through explicit `WIImageResize.luban`.
 - The package requires Swift 6.2 and Xcode 26.
+- Async terminals preserve the standard `CancellationError`; synchronous
+  terminals retain their typed `throws(WICompressError)` signatures and do not
+  observe surrounding task cancellation.
 
 ### Removed
 

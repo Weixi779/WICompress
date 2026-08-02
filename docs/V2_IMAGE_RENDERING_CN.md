@@ -292,8 +292,9 @@ Rendering 的美感来自把有状态的 Core Graphics machinery 压缩成一次
 - Pipeline 在固定 geometry 的 quality search 中只 render 一次，并复用同一个
   `CGImage`。
 
-async terminal 尚未进入公共 API，因此 sync/async parity 留给 execution phase；实际
-row padding 的观测与固定内存预算留给后续 benchmark，不扩大当前 Rendering 返回值。
+async terminal 已复用同一个同步 Rendering primitive，取消只在调用前后观察，不进入
+`CGContext` 生命周期。实际 row padding 的观测与固定内存预算留给后续 benchmark，
+不扩大当前 Rendering 返回值。
 
 ## 已冻结与延后
 
@@ -311,5 +312,4 @@ row padding 的观测与固定内存预算留给后续 benchmark，不扩大当�
 
 - 未来是否发布独立 Rendering product 与 public request surface。
 - 内部 interpolation 的 benchmark 结果。
-- async terminal 建立后的 sync/async parity gate。
 - raw mutable bytes、materialized crop、wide-gamut/HDR backend。

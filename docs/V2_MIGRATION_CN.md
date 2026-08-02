@@ -49,8 +49,19 @@ deprecated wrapper 或 `.shared` 单例；这能避免 package/module 名和执�
 
 对于已经采用 2.0 Process/Target Domain 的代码，本次 facade 重命名不改变同步方法的
 参数标签、typed error 或执行语义。Process 与 Target 现在统一返回 `WIResult`；
-原先直接使用 Process `Data` 的位置改为读取 `result.data`。异步 terminal 属于后续
-独立阶段，不通过本次重命名提前加入。
+原先直接使用 Process `Data` 的位置改为读取 `result.data`。
+
+2.0 同时为四个 Data/file Process/Target terminal 提供同名 async overload：
+
+```swift
+let result = try await WICompressor.process(input, using: process)
+let thumbnail = try await WICompressor.compress(input, to: target)
+```
+
+同步 overload 继续使用 typed `throws(WICompressError)`，并在当前调用上下文完整执行。
+异步 overload 使用普通 `async throws`：图片处理失败仍是 `WICompressError`，Task 取消则
+原样抛出 `CancellationError`。取消只在 Pipeline 阶段边界与 Target 搜索尝试之间观察，
+不会强行中断已经进入 ImageIO 或 Core Graphics 的单次调用。
 
 ## Domain 迁移
 

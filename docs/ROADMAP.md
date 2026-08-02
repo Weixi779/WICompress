@@ -79,8 +79,12 @@ Implementation status:
 - Completed: the package and module remain `WICompress`, while the public
   uninhabited terminal namespace is now `WICompressor`; no compatibility alias
   keeps the 1.x facade alive.
-- Next: add the Swift 6.2 asynchronous terminals over the same synchronous
-  execution core.
+- Completed: Swift 6.2 `@concurrent` async overloads run the same synchronous
+  Pipeline without occupying the caller actor. They preserve structured-task
+  cancellation as `CancellationError` and check it between stages and Target
+  search attempts; synchronous typed-throws terminals remain unchanged.
+- Next: consolidate the final 2.0 architecture and release documentation, then
+  run the release gates.
 
 Implementation details must not reopen the frozen product domains without
 conflicting evidence.

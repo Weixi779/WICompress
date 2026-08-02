@@ -140,7 +140,9 @@ struct WICompressExampleView: View {
                     
                     // Compress Button
                     Button("Compress & Fix Orientation") {
-                        viewModel.compressImage()
+                        Task {
+                            await viewModel.compressImage()
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)

@@ -14,6 +14,18 @@ import WIImageDomain
 import WIImageIO
 import WIImageRendering
 
+enum PipelineCancellation {
+    case disabled
+    case task
+
+    func check() throws(CancellationError) {
+        guard self == .task, Task.isCancelled else {
+            return
+        }
+        throw CancellationError()
+    }
+}
+
 package final class ImagePipeline {
     enum Input {
         case data(Data)
@@ -22,6 +34,7 @@ package final class ImagePipeline {
 
     let input: Input
     let reader: ImageReader
+    let cancellation: PipelineCancellation
 
     var descriptor: ImageDescriptor {
         reader.descriptor
@@ -31,18 +44,26 @@ package final class ImagePipeline {
         descriptor.byteCount
     }
 
-    convenience init(data: Data) throws(WICompressError) {
+    convenience init(
+        data: Data,
+        cancellation: PipelineCancellation = .disabled
+    ) throws(WICompressError) {
         try self.init(
             input: .data(data),
+            cancellation: cancellation,
             reader: Self.imageIO { () throws(ImageIOError) in
                 try ImageReader(data)
             }
         )
     }
 
-    convenience init(contentsOf url: URL) throws(WICompressError) {
+    convenience init(
+        contentsOf url: URL,
+        cancellation: PipelineCancellation = .disabled
+    ) throws(WICompressError) {
         try self.init(
             input: .file(url),
+            cancellation: cancellation,
             reader: Self.imageIO { () throws(ImageIOError) in
                 try ImageReader(contentsOf: url)
             }
@@ -51,6 +72,7 @@ package final class ImagePipeline {
 
     private init(
         input: Input,
+        cancellation: PipelineCancellation,
         reader: ImageReader
     ) throws(WICompressError) {
         guard reader.descriptor.frameCount == 1 else {
@@ -60,7 +82,26 @@ package final class ImagePipeline {
         }
 
         self.input = input
+        self.cancellation = cancellation
         self.reader = reader
+    }
+
+    func checkCancellation() throws(CancellationError) {
+        try cancellation.check()
+    }
+
+    static func withoutTaskCancellation<Value>(
+        _ operation: () throws -> Value
+    ) throws(WICompressError) -> Value {
+        do {
+            return try operation()
+        } catch let error as WICompressError {
+            throw error
+        } catch is CancellationError {
+            preconditionFailure("Synchronous ImagePipeline unexpectedly observed task cancellation.")
+        } catch {
+            preconditionFailure("ImagePipeline produced an unexpected error: \(error)")
+        }
     }
 
     func originalData() throws(WICompressError) -> Data {
@@ -132,23 +173,26 @@ package final class ImagePipeline {
         output: ImageDestination,
         metadata: ImageMetadataOptions,
         quality: Double?
-    ) throws(WICompressError) -> Data {
+    ) throws -> Data {
         let image = try render(
             geometry: geometry,
             output: output
         )
-        return try encodeRendered(
+        try checkCancellation()
+        let data = try encodeRendered(
             image,
             output: output,
             metadata: metadata,
             quality: quality
         )
+        try checkCancellation()
+        return data
     }
 
     func render(
         geometry: RenderGeometry,
         output: ImageDestination
-    ) throws(WICompressError) -> CGImage {
+    ) throws -> CGImage {
         return try render(
             geometry: geometry,
             destinationFormat: output.destinationFormat,
@@ -213,7 +257,9 @@ package final class ImagePipeline {
         destinationFormat: ImageFormat,
         jpegBackground: WIJPEGBackground?,
         outputColorSpace: DestinationColorSpace
-    ) throws(WICompressError) -> CGImage {
+    ) throws -> CGImage {
+        try checkCancellation()
+
         let sourceImage: CGImage
         let sourceRect: Rect
         let orientation: WIImageOrientation
@@ -241,6 +287,7 @@ package final class ImagePipeline {
             sourceRect = geometry.sourceRect
             orientation = descriptor.orientation
         }
+        try checkCancellation()
 
         let request = ImageRenderRequest(
             canvasSize: geometry.canvasSize,
@@ -256,12 +303,14 @@ package final class ImagePipeline {
             ),
             colorSpace: renderColorSpace(from: outputColorSpace)
         )
-        return try Self.rendering { () throws(ImageRenderingError) -> CGImage in
+        let image = try Self.rendering { () throws(ImageRenderingError) -> CGImage in
             try ImageRenderer.render(
                 sourceImage,
                 request: request
             )
         }
+        try checkCancellation()
+        return image
     }
 
     private func decodedImage() throws(WICompressError) -> CGImage {

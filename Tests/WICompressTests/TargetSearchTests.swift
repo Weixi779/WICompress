@@ -74,6 +74,30 @@ struct TargetSearchTests {
         #expect(probe.encodedQualities.prefix(2) == [0.82, 0.45])
     }
 
+    @Test("Lossy search stops before another attempt after cancellation")
+    func lossySearchStopsAfterCancellation() {
+        let probe = SearchProbe()
+        var search = LossyTargetSearch(
+            maxBytes: 100,
+            format: .jpeg,
+            basePixelSize: Self.basePixelSize,
+            maxEncodeAttempts: 12,
+            checkCancellation: probe.cancelAfterFirstEncode
+        ) { pixelSize, initialQuality in
+            probe.recordPreparation(pixelSize, initialQuality: initialQuality)
+            return PreparedTargetEncoding(pixelSize: pixelSize) { quality in
+                probe.encodedQualities.append(quality)
+                return Data(count: 200)
+            }
+        }
+
+        #expect(throws: CancellationError.self) {
+            _ = try search.run()
+        }
+        #expect(probe.preparedPixelSizes == [Self.basePixelSize])
+        #expect(probe.encodedQualities == [0.82])
+    }
+
     @Test("PNG search with no attempt budget prepares but does not encode")
     func pngSearchStopsBeforeFirstEncode() {
         let probe = SearchProbe()
@@ -103,6 +127,29 @@ struct TargetSearchTests {
         #expect(probe.preparedPixelSizes.count == 2)
         #expect(probe.preparedPixelSizes.first == Self.basePixelSize)
         #expect(probe.preparedPixelSizes.last != Self.basePixelSize)
+        #expect(probe.encodedQualities == [nil])
+    }
+
+    @Test("PNG search stops before another attempt after cancellation")
+    func pngSearchStopsAfterCancellation() {
+        let probe = SearchProbe()
+        var search = PNGTargetSearch(
+            maxBytes: 100,
+            basePixelSize: Self.basePixelSize,
+            maxEncodeAttempts: 12,
+            checkCancellation: probe.cancelAfterFirstEncode
+        ) { pixelSize in
+            probe.preparedPixelSizes.append(pixelSize)
+            return PreparedTargetEncoding(pixelSize: pixelSize) { quality in
+                probe.encodedQualities.append(quality)
+                return Data(count: 200)
+            }
+        }
+
+        #expect(throws: CancellationError.self) {
+            _ = try search.run()
+        }
+        #expect(probe.preparedPixelSizes == [Self.basePixelSize])
         #expect(probe.encodedQualities == [nil])
     }
 
@@ -155,5 +202,12 @@ private final class SearchProbe {
     ) {
         preparedPixelSizes.append(pixelSize)
         initialQualities.append(initialQuality)
+    }
+
+    func cancelAfterFirstEncode() throws(CancellationError) {
+        guard encodedQualities.count == 1 else {
+            return
+        }
+        throw CancellationError()
     }
 }

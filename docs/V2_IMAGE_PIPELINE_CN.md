@@ -297,13 +297,27 @@ source PixelSize -> caller or built-in resizing -> concrete PixelSize
 ## 同步与异步
 
 ImagePipeline 的基础执行保持同步、有序。同步 terminal 在当前调用上下文运行；异步
-terminal 必须避免让耗时的同步 Pipeline 阻塞 caller actor，并与同步入口保持相同结果
-和错误语义。
+terminal 使用 Swift 6.2 `@concurrent`，让同一条同步 Pipeline 在 concurrent executor
+运行而不占用 caller actor。它仍属于调用方原有的 structured Task，不创建
+`Task.detached`，因此 Task priority、Task-local values 与 cancellation context 能自然继承。
 
 Pipeline 内部不把 inspect、decode、Rendering 或 encode 设计成多个 public suspension
 point，也不在 ImageIO/Rendering 中建立 queue、actor 或 Task。同步与异步入口必须共享
-完全相同的 Pipeline 语义。异步 terminal 最终使用何种 Task 和 executor、如何映射
-priority、以及在哪里检查和传播 cancellation，尚未冻结。
+完全相同的 Pipeline 语义；2.0 不提供 public executor、queue 或 cancellation token。
+
+取消采用 cooperative checkpoints：
+
+- 创建/检查输入前。
+- inspect 与 Process/Target 决策阶段之间。
+- decode、thumbnail、Rendering、transcode、encode 与最终结果检查前后。
+- Target 每次 prepare 与 encode attempt 前后。
+
+ImageIO 与 Core Graphics 没有可供当前架构转交的取消句柄，因此已经开始的单次同步调用
+可能先完成，Pipeline 会在返回后立即观察取消。异步 terminal 原样抛
+`CancellationError`，不把取消映射为 `WICompressError`；图片处理失败仍保持
+`WICompressError`。Swift 目前不能在签名上表达两种 typed error 的 union，因此 async
+overload 使用普通 `async throws`。同步 terminal 关闭 Task cancellation 检查，继续使用
+`throws(WICompressError)`，即使从已取消 Task 中同步调用也不改变原有语义。
 
 ## 决策记录
 
@@ -346,13 +360,12 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
   size estimation、quality profile 和 candidate ranking。
 - Target Search 只接收 byte budget、基础尺寸与固定尺寸编码闭包，不认识 Pipeline、ImageIO、
   Rendering、metadata 或 output，不能成为第二执行 owner。
-- 同步 Data 与 file URL terminal 已共享上述实现；异步 terminal 尚未实施。
+- 同步与异步 Data/file Process/Target terminal 已共享上述实现；async overload 使用
+  `@concurrent` 与 cooperative cancellation，sync overload 保持 typed throws 和原执行语义。
 
 ### Defer
 
 - working image 是否需要一个按 geometry 标识的私有缓存值。
-- 异步 terminal 的 Task 结构与 custom TaskExecutor 选择。
-- 异步 priority 映射、cancellation 检查点与传播方式。
 - crop 路径的解码采样优化：根据 crop rect 与最终 destination size 计算满足输出采样密度的
   最小整图 thumbnail，按实际 thumbnail 尺寸映射 source rect 后再交给 Rendering。当前仍完整
   解码 crop source；本轮 Rendering 重构不改变既有解码与画质语义。

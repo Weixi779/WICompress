@@ -1,7 +1,6 @@
 # WICompress 2.0 Image Process
 
-状态：Process Domain、同步 Swift API、执行边界与 1.x Process 删除已落地；异步
-terminal 尚未实施。
+状态：Process Domain、同步/异步 Swift API、执行边界与 1.x Process 删除已落地。
 
 本文记录 `WIImageProcess` 正向处理产品线已经接受的职责、尺寸插槽、裁切语义、
 输出组合与执行边界。1.x 事实和调研证据保留在
@@ -271,9 +270,15 @@ async terminal -> 在非 caller-actor 的执行上下文完成相同工作
 配置本身没有 async 版本。inspect、crop、resize 和 encode 也不分别成为 public
 suspension point。
 
-当前同步 base name 已确认为 `WICompressor.process(_:using:)` 与
-`WICompressor.process(contentsOf:using:)`。异步 overload 尚未加入；它必须消费同一个
-`ImagePipeline` 同步核心，不能建立第二套决策路径或改变执行语义。
+同步与异步使用相同 base name：`WICompressor.process(_:using:)` 与
+`WICompressor.process(contentsOf:using:)`。异步 overload 使用 Swift 6.2 `@concurrent`，
+在同一个 structured Task 中把完整同步 Pipeline 放到 concurrent executor；不创建
+`Task.detached`、第二套决策路径或公开的分阶段 suspension point。
+
+异步入口在阶段边界观察 cooperative cancellation。图片处理失败仍抛
+`WICompressError`，Task 取消原样抛 `CancellationError`；已经进入 ImageIO 或 Core
+Graphics 的单次同步调用可能先完成。同步入口关闭取消检查，继续保持
+`throws(WICompressError)` 与原有执行语义。
 
 ## 当前实施状态
 
@@ -282,7 +287,7 @@ suspension point。
   `WIImageProcess`。
 - 已实现纯 `crop -> resizing` geometry calculation；quality 在 Domain 中归一化，
   ratio 构造和 resizing 执行失败直接抛 Domain error。
-- 已实现同步 Data/file terminal；Process 的 output 解释、执行分支选择和结果生成由
+- 已实现同步与异步 Data/file terminal；Process 的 output 解释、执行分支选择和结果生成由
   请求级 `ImagePipeline` 直接持有，不经过 `WIExecutionPlan`、旧
   `WICompressOptions` 或 Resolver。
 - 无 crop 的缩小复用 ImageIO thumbnail；thumbnail max pixel 由目标宽、高两个轴
@@ -296,7 +301,8 @@ suspension point。
 - `WICompressionTarget` 已共享 `WIImageOutput`；两条产品线共用同一个
   `ImagePipeline` 和底层执行能力。Target 构造时建立 hard byte invariant；passthrough、
   反馈搜索和 hard byte check 位于 Pipeline；架构级 Plan/Resolver/Solver 已删除。
-- 尚未实现 async terminal。
+- async terminal 使用 `@concurrent`，复用同一个同步 Pipeline，并在阶段边界传播原生
+  `CancellationError`；同步 terminal 不观察 surrounding Task cancellation。
 
 ## 已接受
 

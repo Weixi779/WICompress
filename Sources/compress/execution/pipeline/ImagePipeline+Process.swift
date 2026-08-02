@@ -16,23 +16,85 @@ extension ImagePipeline {
         _ data: Data,
         using process: WIImageProcess
     ) throws(WICompressError) -> WIResult {
-        let pipeline = try ImagePipeline(data: data)
-        return try pipeline.process(process)
+        try withoutTaskCancellation {
+            try self.process(
+                data,
+                using: process,
+                cancellation: .disabled
+            )
+        }
     }
 
     package static func process(
         contentsOf url: URL,
         using process: WIImageProcess
     ) throws(WICompressError) -> WIResult {
-        let pipeline = try ImagePipeline(contentsOf: url)
+        try withoutTaskCancellation {
+            try self.process(
+                contentsOf: url,
+                using: process,
+                cancellation: .disabled
+            )
+        }
+    }
+
+    package static func processCancellable(
+        _ data: Data,
+        using process: WIImageProcess
+    ) throws -> WIResult {
+        try self.process(
+            data,
+            using: process,
+            cancellation: .task
+        )
+    }
+
+    package static func processCancellable(
+        contentsOf url: URL,
+        using process: WIImageProcess
+    ) throws -> WIResult {
+        try self.process(
+            contentsOf: url,
+            using: process,
+            cancellation: .task
+        )
+    }
+
+    private static func process(
+        _ data: Data,
+        using process: WIImageProcess,
+        cancellation: PipelineCancellation
+    ) throws -> WIResult {
+        try cancellation.check()
+        let pipeline = try ImagePipeline(
+            data: data,
+            cancellation: cancellation
+        )
+        return try pipeline.process(process)
+    }
+
+    private static func process(
+        contentsOf url: URL,
+        using process: WIImageProcess,
+        cancellation: PipelineCancellation
+    ) throws -> WIResult {
+        try cancellation.check()
+        let pipeline = try ImagePipeline(
+            contentsOf: url,
+            cancellation: cancellation
+        )
         return try pipeline.process(process)
     }
 
     private func process(
         _ process: WIImageProcess
-    ) throws(WICompressError) -> WIResult {
+    ) throws -> WIResult {
+        try checkCancellation()
+
         guard descriptor.format != .unknown else {
-            throw .unsupportedSourceFormat(descriptor.type?.identifier)
+            throw WICompressError.unsupportedSourceFormat(
+                descriptor.type?.identifier
+            )
         }
 
         let geometry = try process.geometry(
@@ -42,6 +104,7 @@ extension ImagePipeline {
         let quality = output.destinationFormat.supportsLossyQuality
             ? process.quality
             : nil
+        try checkCancellation()
 
         if canReturnOriginal(
             process: process,
@@ -49,13 +112,18 @@ extension ImagePipeline {
             quality: quality,
             output: output
         ) {
-            return try originalResult()
+            let result = try originalResult()
+            try checkCancellation()
+            return result
         }
 
         guard output.isWritable else {
-            throw .unsupportedDestinationFormat(output.destinationFormat)
+            throw WICompressError.unsupportedDestinationFormat(
+                output.destinationFormat
+            )
         }
 
+        try checkCancellation()
         let data: Data
         if canTranscodeFromSource(
             process: process,
@@ -76,8 +144,11 @@ extension ImagePipeline {
                 quality: quality
             )
         }
+        try checkCancellation()
 
-        return try result(for: data)
+        let result = try result(for: data)
+        try checkCancellation()
+        return result
     }
 
     private func canReturnOriginal(

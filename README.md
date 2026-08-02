@@ -59,8 +59,10 @@ let uploadData = try WICompressor.process(
   metadata, then redraw paths bake orientation into pixels.
 - **UIKit/AppKit-free core**: the compression pipeline works in iOS apps,
   macOS tools, and SwiftPM tests without UI image types.
-- **Typed failures**: errors are surfaced as `WICompressError`, not optional
-  `nil` results.
+- **Synchronous or asynchronous**: use the same terminal name from synchronous
+  code or `await` it without occupying the caller's actor.
+- **Typed failures**: image-processing failures use `WICompressError`; async
+  task cancellation remains the standard `CancellationError`.
 
 ## Requirements and Installation
 
@@ -127,6 +129,16 @@ Compress a file URL:
 ```swift
 let result = try WICompressor.process(contentsOf: imageURL)
 ```
+
+The same Process and Target terminals have asynchronous overloads:
+
+```swift
+let result = try await WICompressor.process(originalData)
+```
+
+Async cancellation is cooperative. It is observed between pipeline stages and
+Target search attempts; an ImageIO or Core Graphics call already in progress
+may finish first.
 
 Declare an explicit process:
 
@@ -226,7 +238,7 @@ guard let originalData = try await photosPickerItem.loadTransferable(type: Data.
     throw MyError.missingImageData
 }
 
-let result = try WICompressor.process(originalData)
+let result = try await WICompressor.process(originalData)
 let previewImage = UIImage(data: result.data)
 ```
 
@@ -319,11 +331,15 @@ targets from the current SDK documentation and product requirements.
 
 ## Error Handling
 
-All public APIs throw `WICompressError`.
+Synchronous compression terminals use typed `throws(WICompressError)`.
+Asynchronous overloads additionally preserve task cancellation as the standard
+`CancellationError` instead of converting it into a compression failure.
 
 ```swift
 do {
-    let result = try WICompressor.process(data)
+    let result = try await WICompressor.process(data)
+} catch is CancellationError {
+    // The surrounding task was cancelled.
 } catch let error as WICompressError {
     // Decide whether to show an error, retry, or keep the original data.
     print(error)
@@ -356,8 +372,6 @@ WICompress intentionally does not include:
 
 - `UIImage` / `NSImage` convenience adapters
 - Live Photo compression
-- async API
-- GPS-only metadata stripping
 - HDR gain map preservation
 - animated image output
 - WebP / JPEG XL writing
