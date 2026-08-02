@@ -5,7 +5,7 @@ All notable changes to WICompress will be documented in this file.
 The format is based on Keep a Changelog, and this project follows Semantic
 Versioning.
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-08-02
 
 WICompress 2.0 replaces the 1.x policy surface with two explicit product
 domains: deterministic image processing and byte-target compression.
@@ -37,11 +37,21 @@ domains: deterministic image processing and byte-target compression.
 
 - The package and module remain `WICompress`; the public static terminal is now
   the uninhabited `WICompressor` namespace.
-- Target compression now uses `WICompressionSizing` plus the shared
-  `WIImageOutput`, with request-scoped execution owned directly by
-  `ImagePipeline`.
-- Process terminals now return `WIResult`; callers that only need encoded bytes
-  read `result.data`.
+- `WICompressionTarget` is now a throwing, immutable `maxBytes` +
+  `WICompressionSizing` + `WIImageOutput` contract, with request-scoped
+  execution owned directly by `ImagePipeline`.
+- Target dimensions are now soft search inputs: an optional aspect-ratio crop
+  and longest-side cap establish the base candidate, which may be reduced to
+  satisfy `maxBytes`. The 1.x hard fill and exact-canvas contracts are not
+  carried forward.
+- The default Target output still selects PNG for alpha or JPEG otherwise and
+  strips metadata, but rendered output now converts to sRGB instead of
+  preserving the source color space.
+- Process and Target terminals now return the shared `WIResult`; callers that
+  only need encoded bytes read `result.data`, and byte count is derived from the
+  data.
+- `WICompressionOutput` is replaced by the shared `WIImageOutput`, and binary
+  metadata policy is replaced by category-selectable `ImageMetadataOptions`.
 - The default Process sizing is now Luban 2. The corrected Luban 1 behavior
   remains available through explicit `WIImageResize.luban`.
 - The package requires Swift 6.2 and Xcode 26.
@@ -59,6 +69,16 @@ domains: deterministic image processing and byte-target compression.
   singleton.
 - The 1.x `WICompressOptions` terminal and its resize, format, metadata,
   quality, and color-space policy types.
+- `WICompressionGeometry`, including `fitInside`, hard `fill`, and
+  `exactCanvas`; `WICropMode`; and `WIImagePlacement`. Normalized crop anchors
+  replace only the aspect-ratio crop subset, not canvas layout.
+- `WICompressionPreference` and its candidate-ranking modes. Target search now
+  has one deterministic ordering.
+- `WICompressionOutput` and its presets, `WICompressionResult`, `WIImageFormat`,
+  and `WISize`. Use `WIImageOutput`, `WIResult`, `ImageFormat`, and either
+  `WIPixelSize` or `WIAspectRatio`.
+- `WIOutputColorSpace.preserveIfSupported`; applications can inspect the source
+  color space and choose preserve or conversion explicitly.
 - The legacy write-plan resolver and encoder adapter.
 
 ## [1.4.0] - 2026-07-10
@@ -172,7 +192,7 @@ pixel cap while keeping the v1 data-first API intact.
 - Automatic format selection is not included.
 - HDR gain-map preservation is not guaranteed.
 
-## [1.0.0] - TBD
+## [1.0.0] - 2026-06-22
 
 Initial public release of the ImageIO-backed core.
 

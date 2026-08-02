@@ -46,4 +46,5 @@ Please include:
 - platform and OS version
 
 CI runs `swift build` and `swift test` on macOS, the test suite on an iOS
-Simulator, and build checks for tvOS/watchOS/visionOS on every pull request.
+Simulator, and build checks for Mac Catalyst, tvOS, watchOS, and visionOS on
+every pull request.

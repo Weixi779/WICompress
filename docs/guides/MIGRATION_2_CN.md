@@ -57,6 +57,65 @@ let constrained = try WICompressor.compress(
 Process 与 Target 都返回 `WIResult`。原先直接接收 `Data` 的位置改为读取
 `result.data`；格式、像素尺寸和字节数来自同一个结果。
 
+## 迁移 1.x Target 合同
+
+1.x 的 `WICompressionGeometry` 同时承载 soft sizing、hard crop/canvas geometry 与
+placement。2.0 的 `WICompressionSizing` 只描述 Target byte search 的起始 pixels；为了
+满足 `maxBytes`，搜索仍可继续缩小尺寸。Target 不再能同时要求 exact pixel canvas 与
+hard byte ceiling。
+
+| 1.x Target geometry | 2.0 迁移方式 | 语义差异 |
+| --- | --- | --- |
+| `.original` | `WICompressionSizing.original` | 都从 source size 开始，并可为满足 byte target 继续缩小。 |
+| `.fit(maxLongSide:)` | `WICompressionSizing(maximumPixelSize:)` | 都按比例限制最长边，搜索仍可继续缩小。1.x 的非正数会在执行时失败，2.0 则会归一化为 `1`。 |
+| `.fitInside(box:)` | 正方形 box 可直接映射为 `maximumPixelSize`；其他 box 需根据 inspection 得到的 source size 先计算等比尺寸，再传入其最长边。 | 没有通用的一对一 Target 映射。不需要 byte ceiling 时，Process 的 `WIImageResize.constrained(within:)` 可直接表达二维边界。 |
+| `.fill(size:crop:)` | Soft Target crop 使用 `aspectRatio`、`maximumPixelSize` 与 `anchor`；exact Process 使用 `WIImageCrop` 与 `WIImageResize.exact(_:)`。 | 1.x 要求 exact size 且允许放大；2.0 Target 不放大并可继续缩小。Process 保证 exact size，但不搜索 `maxBytes`。 |
+| `.exactCanvas(size:placement:background:)` | 没有一对一替代。Padding、placement 或 canvas 应在 WICompress 外部组装。 | 2.0 有意不在 Target 中建模 UI 风格的 canvas layout；仅 stretch 可改用 Process 的 `WIImageResize.exact(_:)`。`WIJPEGBackground` 只 flatten source transparency，不是 canvas background。 |
+
+在 aspect-ratio crop 中，`WICropMode` 改为 normalized、top-left-origin 的
+`WICropAnchor` 坐标：
+
+| 1.x crop | 2.0 anchor |
+| --- | --- |
+| `.center` | `.center`（`0.5, 0.5`） |
+| `.top` / `.bottom` | `WICropAnchor(x: 0.5, y: 0)` / `WICropAnchor(x: 0.5, y: 1)` |
+| `.left` / `.right` | `WICropAnchor(x: 0, y: 0.5)` / `WICropAnchor(x: 1, y: 0.5)` |
+| `.topLeft` / `.topRight` | `WICropAnchor(x: 0, y: 0)` / `WICropAnchor(x: 1, y: 0)` |
+| `.bottomLeft` / `.bottomRight` | `WICropAnchor(x: 0, y: 1)` / `WICropAnchor(x: 1, y: 1)` |
+
+其余 Target 类型按下表迁移：
+
+| 1.x | 2.0 |
+| --- | --- |
+| `WICompressionOutput` | `WIImageOutput`；`format`、`metadata` 与 `colorSpace` 分别改为 `representation`、`metadata` 与 `colorSpace`。 |
+| `WIFormatPolicy` | `WIImageRepresentation`；preserve、JPEG、alpha-aware、PNG 与 HEIC cases 可直接对应。 |
+| `WIMetadataPolicy` | `ImageMetadataOptions`；保留 `.strip` 与 `.preserve`，并增加 category-level selection。 |
+| `WIOutputColorSpace.preserve` / `.convert(to:)` | `WIImageColorSpace.preserve` / `.convert(to:)`。 |
+| `WICompressionOutput.upload` 或 `WICompressionOutput()` | 没有相同语义的 preset；应显式构造下方的 alpha-aware、strip、preserve-color output。2.0 Target 默认会把 rendered output 转换为 sRGB。 |
+| `WICompressionOutput.preserve` | 显式构造 `WIImageOutput(representation: .preserve, metadata: .preserve, colorSpace: .preserve)`。 |
+| `WIOutputColorSpace.preserveIfSupported` | 没有直接替代；先 inspection source color space，再由业务选择 `.preserve` 或 `.convert(to:)`。 |
+| `WICompressionPreference` | 删除且没有替代；Target search 只保留一种确定性的 candidate ordering。 |
+| `WISize` | Concrete integer pixels 使用 `WIPixelSize`，ratio 使用 `WIAspectRatio`；不提供单一 compatibility alias。 |
+| `WICompressionResult` | `WIResult`；Target 与 Process 共用结果，`format` 改用 `ImageFormat`，`pixelSize` 改用 `WIPixelSize`，`byteCount` 从 `data.count` 计算。 |
+
+需要保留 1.x 默认 Target output 语义时，应显式传入：
+
+```swift
+let target = try WICompressionTarget(
+    maxBytes: 500_000,
+    output: WIImageOutput(
+        representation: .pngIfAlphaOtherwiseJPEG,
+        metadata: .strip,
+        colorSpace: .preserve
+    )
+)
+```
+
+`WICompressionTarget` 初始化现在会验证 `maxBytes`，因此可能抛出
+`WICompressError`；2.0 的 public request properties 也改为 immutable。
+`WIImageOutput()` 是 Process-oriented default，并不是 `WICompressionTarget` 使用的
+default output。
+
 ## 默认 resizing
 
 默认 Process sizing 已升级为 `WIImageResize.lubanV2`。它会更完整地保留普通长截图，

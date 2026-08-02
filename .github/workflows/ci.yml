@@ -44,18 +44,26 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
   platform-builds:
-    name: Build (${{ matrix.platform }})
+    name: Build (${{ matrix.name }})
     runs-on: macos-15
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        platform: [tvOS, watchOS, visionOS]
+        include:
+          - name: Mac Catalyst
+            destination: generic/platform=macOS,variant=Mac Catalyst
+          - name: tvOS
+            destination: generic/platform=tvOS Simulator
+          - name: watchOS
+            destination: generic/platform=watchOS Simulator
+          - name: visionOS
+            destination: generic/platform=visionOS Simulator
     steps:
       - uses: actions/checkout@v5
-      - name: Build for ${{ matrix.platform }} Simulator
+      - name: Build for ${{ matrix.name }}
         run: |
           xcodebuild build \
             -scheme WICompress \
-            -destination "generic/platform=${{ matrix.platform }} Simulator" \
+            -destination "${{ matrix.destination }}" \
             CODE_SIGNING_ALLOWED=NO

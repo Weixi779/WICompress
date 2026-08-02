@@ -62,6 +62,66 @@ Process and Target both return `WIResult`. Code that previously expected `Data`
 should read `result.data`; format, pixel size, and byte count come from the same
 result.
 
+## Migrate 1.x Target contracts
+
+The 1.x `WICompressionGeometry` mixed soft sizing, hard crop/canvas geometry,
+and placement. In 2.0, `WICompressionSizing` describes only the base pixels from
+which byte-target search begins. The search may reduce those dimensions to
+satisfy `maxBytes`; a Target can no longer require both an exact pixel canvas
+and a hard byte ceiling.
+
+| 1.x Target geometry | 2.0 migration | Semantic difference |
+| --- | --- | --- |
+| `.original` | `WICompressionSizing.original` | Same source-sized starting point; both versions may reduce dimensions to meet the byte target. |
+| `.fit(maxLongSide:)` | `WICompressionSizing(maximumPixelSize:)` | Same proportional longest-side cap; search may reduce it further. A non-positive 1.x value failed during execution, while 2.0 normalizes it to `1`. |
+| `.fitInside(box:)` | A square box maps to `maximumPixelSize`. For any other box, resolve a proportional size from the inspected source, then pass its longest side. | There is no general one-to-one Target mapping. If a byte ceiling is not required, Process with `WIImageResize.constrained(within:)` directly expresses the two-dimensional bound. |
+| `.fill(size:crop:)` | Use `aspectRatio`, `maximumPixelSize`, and `anchor` for a soft Target crop, or `WIImageCrop` plus `WIImageResize.exact(_:)` in Process. | 1.x required the exact size and could upscale. A 2.0 Target does not upscale and may shrink further; Process preserves exact size but does not search for `maxBytes`. |
+| `.exactCanvas(size:placement:background:)` | No one-to-one replacement. Compose padding, placement, or a canvas outside WICompress. | 2.0 intentionally does not model UI-style canvas layout in Target. A stretch-only case can use Process with `WIImageResize.exact(_:)`; `WIJPEGBackground` flattens source transparency and is not a canvas background. |
+
+For aspect-ratio crop, `WICropMode` is replaced by normalized, top-left-origin
+`WICropAnchor` coordinates:
+
+| 1.x crop | 2.0 anchor |
+| --- | --- |
+| `.center` | `.center` (`0.5, 0.5`) |
+| `.top` / `.bottom` | `WICropAnchor(x: 0.5, y: 0)` / `WICropAnchor(x: 0.5, y: 1)` |
+| `.left` / `.right` | `WICropAnchor(x: 0, y: 0.5)` / `WICropAnchor(x: 1, y: 0.5)` |
+| `.topLeft` / `.topRight` | `WICropAnchor(x: 0, y: 0)` / `WICropAnchor(x: 1, y: 0)` |
+| `.bottomLeft` / `.bottomRight` | `WICropAnchor(x: 0, y: 1)` / `WICropAnchor(x: 1, y: 1)` |
+
+The remaining Target types migrate as follows:
+
+| 1.x | 2.0 |
+| --- | --- |
+| `WICompressionOutput` | `WIImageOutput`; `format`, `metadata`, and `colorSpace` become `representation`, `metadata`, and `colorSpace`. |
+| `WIFormatPolicy` | `WIImageRepresentation`; the preserve, JPEG, alpha-aware, PNG, and HEIC cases correspond directly. |
+| `WIMetadataPolicy` | `ImageMetadataOptions`; `.strip` and `.preserve` remain, with additional category-level selection. |
+| `WIOutputColorSpace.preserve` / `.convert(to:)` | `WIImageColorSpace.preserve` / `.convert(to:)`. |
+| `WICompressionOutput.upload` or `WICompressionOutput()` | No preset has identical semantics. Construct the alpha-aware, strip, preserve-color output shown below. The 2.0 Target default converts rendered output to sRGB. |
+| `WICompressionOutput.preserve` | Construct `WIImageOutput(representation: .preserve, metadata: .preserve, colorSpace: .preserve)`. |
+| `WIOutputColorSpace.preserveIfSupported` | No direct replacement. Inspect the source color space, then choose `.preserve` or `.convert(to:)` in application code. |
+| `WICompressionPreference` | Removed without replacement. Target search has one deterministic candidate ordering. |
+| `WISize` | Use `WIPixelSize` for concrete integer pixels and `WIAspectRatio` for a ratio; there is no single compatibility alias. |
+| `WICompressionResult` | `WIResult`; Target and Process now share one result, `format` uses `ImageFormat`, `pixelSize` uses `WIPixelSize`, and `byteCount` is derived from `data.count`. |
+
+To preserve the 1.x default Target output semantics, pass the output explicitly:
+
+```swift
+let target = try WICompressionTarget(
+    maxBytes: 500_000,
+    output: WIImageOutput(
+        representation: .pngIfAlphaOtherwiseJPEG,
+        metadata: .strip,
+        colorSpace: .preserve
+    )
+)
+```
+
+`WICompressionTarget` construction now validates `maxBytes` and therefore
+throws `WICompressError`; its public request properties are immutable in 2.0.
+`WIImageOutput()` is the Process-oriented default and is not the default output
+used by `WICompressionTarget`.
+
 ## Default resizing
 
 The default Process sizing algorithm is now `WIImageResize.lubanV2`. It keeps

@@ -87,10 +87,11 @@ flatten、orientation normalization 或 color conversion 都会排除这条路�
 
 ### Transcode
 
-当 encoded representation properties 必须变化，但 pixels 不需要变化时，使用 ImageIO
-transcode。它可以在保持 source display semantics 且不引入 Rendering 的情况下，重写受
-支持的 representation、quality 与 metadata properties。Pipeline 选择此路径前会验证
-完整 transcode options 是否受支持。
+只有 pixels 无需变化且 Output 明确保留 source representation 时，Pipeline 才使用
+ImageIO transcode。它可以在该 source container 内重写受支持的 quality 与 metadata
+properties，同时保持 source display semantics 且不引入 Rendering。显式 JPEG、PNG 或
+HEIC representation 即使最终与 source format 相同，也会进入 Render 路径。Pipeline
+选择此路径前会验证完整 transcode options 是否受支持。
 
 ### Render
 

@@ -93,10 +93,12 @@ normalization, or color conversion prevents this path.
 
 ### Transcode
 
-ImageIO transcode is used when encoded representation properties must change
-but pixels do not. It can rewrite supported representation, quality, and
-metadata properties while preserving source display semantics, without
-introducing a Rendering operation. The Pipeline verifies that the complete
+ImageIO transcode is used only when pixels do not need to change and the Output
+preserves the source representation. Within that preserved container, it may
+rewrite supported quality and metadata properties while preserving source
+display semantics, without introducing a Rendering operation. An explicit
+JPEG, PNG, or HEIC representation always takes the Render path, even when it
+resolves to the source format. The Pipeline verifies that the complete
 transcode options are supported before selecting this path.
 
 ### Render
