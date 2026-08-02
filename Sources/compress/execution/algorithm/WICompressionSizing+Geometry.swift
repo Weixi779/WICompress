@@ -44,7 +44,7 @@ extension WICompressionSizing {
 
         let basePixelSize: WIPixelSize
         if let maximumPixelSize {
-            basePixelSize = WICompressionSizeEstimation.scaledPixelSize(
+            basePixelSize = TargetSizeEstimation.scaledPixelSize(
                 source: cropGeometry.pixelSize,
                 maxLongSide: maximumPixelSize
             )

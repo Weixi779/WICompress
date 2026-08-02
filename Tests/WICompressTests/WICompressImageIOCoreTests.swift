@@ -939,13 +939,13 @@ struct WICompressImageIOCoreTests {
 
     @Test("Target candidate ranking uses one deterministic balance")
     func targetCandidateRankingIsDeterministic() {
-        let largeLowQuality = WISolvedCompressionCandidate(
+        let largeLowQuality = TargetCandidate(
             data: Data(count: 80),
             pixelSize: WIPixelSize(width: 1_000, height: 1_000),
             format: .jpeg,
             quality: 0.45
         )
-        let smallerHighQuality = WISolvedCompressionCandidate(
+        let smallerHighQuality = TargetCandidate(
             data: Data(count: 70),
             pixelSize: WIPixelSize(width: 800, height: 800),
             format: .jpeg,
@@ -954,8 +954,8 @@ struct WICompressImageIOCoreTests {
         let referencePixelSize = WIPixelSize(width: 1_000, height: 1_000)
         let candidates = [largeLowQuality, smallerHighQuality]
 
-        let candidate = WICompressionRanking.bestCandidate(
-            candidates,
+        let candidate = TargetCandidateRanking.best(
+            from: candidates,
             referencePixelSize: referencePixelSize
         )
 

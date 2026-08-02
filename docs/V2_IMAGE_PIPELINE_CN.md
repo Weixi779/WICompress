@@ -342,13 +342,14 @@ priority、以及在哪里检查和传播 cancellation，尚未冻结。
   working image 复用、候选选择与 hard byte check 已经迁入 Pipeline。
 - 架构级 Process/Target Resolver、`WIExecutionPlan`、`WIImageExecutor` 与
   `WICompressionSolver` 已删除。
-- `Algorithm/` 只保留 Process/Target geometry、size estimation、quality profile 和 ranking
-  等可独立验证的计算。
+- `Algorithm/` 保留 Process/Target geometry 等纯计算；Target 私有目录保存反馈搜索状态、
+  size estimation、quality profile 和 candidate ranking。
+- Target Search 只接收 byte budget、基础尺寸与固定尺寸编码闭包，不认识 Pipeline、ImageIO、
+  Rendering、metadata 或 output，不能成为第二执行 owner。
 - 同步 Data 与 file URL terminal 已共享上述实现；异步 terminal 尚未实施。
 
 ### Defer
 
-- Target 私有 search state 最终是否值得独立类型。
 - working image 是否需要一个按 geometry 标识的私有缓存值。
 - 异步 terminal 的 Task 结构与 custom TaskExecutor 选择。
 - 异步 priority 映射、cancellation 检查点与传播方式。

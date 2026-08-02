@@ -10,13 +10,13 @@ import Testing
 import WICompress
 @testable import WICompressExecution
 
-@Suite("Compression Size Estimation", .tags(.algorithm))
-struct WICompressionEstimationTests {
+@Suite("Target Size Estimation", .tags(.algorithm))
+struct TargetSizeEstimationTests {
 
     @Test("nextLongSide returns nil once the longest side reaches one pixel")
     func nextLongSideStopsAtOnePixel() {
         #expect(
-            WICompressionSizeEstimation.nextLongSide(
+            TargetSizeEstimation.nextLongSide(
                 current: 1,
                 encodedBytes: 100_000,
                 maxBytes: 1_000,
@@ -28,7 +28,7 @@ struct WICompressionEstimationTests {
     @Test("nextLongSide returns nil when the encoded size already fits")
     func nextLongSideStopsWhenWithinBudget() {
         #expect(
-            WICompressionSizeEstimation.nextLongSide(
+            TargetSizeEstimation.nextLongSide(
                 current: 1_000,
                 encodedBytes: 5_000,
                 maxBytes: 5_000,
@@ -40,7 +40,7 @@ struct WICompressionEstimationTests {
     @Test("nextLongSide shrinks aggressively when far over budget")
     func nextLongSideShrinksWhenFarOverBudget() {
         let next = try! #require(
-            WICompressionSizeEstimation.nextLongSide(
+            TargetSizeEstimation.nextLongSide(
                 current: 1_000,
                 encodedBytes: 100_000,
                 maxBytes: 10_000,
@@ -57,7 +57,7 @@ struct WICompressionEstimationTests {
     @Test("nextLongSide shrinks by at least one pixel when barely over budget")
     func nextLongSideShrinksByAtLeastOnePixel() {
         #expect(
-            WICompressionSizeEstimation.nextLongSide(
+            TargetSizeEstimation.nextLongSide(
                 current: 10,
                 encodedBytes: 10_001,
                 maxBytes: 10_000,
@@ -70,7 +70,7 @@ struct WICompressionEstimationTests {
     func nextLongSideAlignsHEIFToEvenSide() {
         // JPEG keeps the odd estimate; HEIF rounds the same estimate down to even.
         #expect(
-            WICompressionSizeEstimation.nextLongSide(
+            TargetSizeEstimation.nextLongSide(
                 current: 10,
                 encodedBytes: 10_001,
                 maxBytes: 10_000,
@@ -78,7 +78,7 @@ struct WICompressionEstimationTests {
             ) == 9
         )
         #expect(
-            WICompressionSizeEstimation.nextLongSide(
+            TargetSizeEstimation.nextLongSide(
                 current: 10,
                 encodedBytes: 10_001,
                 maxBytes: 10_000,
@@ -92,10 +92,10 @@ struct WICompressionEstimationTests {
         let source = WIPixelSize(width: 1_000, height: 500)
 
         #expect(
-            WICompressionSizeEstimation.scaledPixelSize(source: source, maxLongSide: 1_000) == source
+            TargetSizeEstimation.scaledPixelSize(source: source, maxLongSide: 1_000) == source
         )
         #expect(
-            WICompressionSizeEstimation.scaledPixelSize(source: source, maxLongSide: 2_000) == source
+            TargetSizeEstimation.scaledPixelSize(source: source, maxLongSide: 2_000) == source
         )
     }
 
@@ -104,7 +104,7 @@ struct WICompressionEstimationTests {
         let source = WIPixelSize(width: 1_000, height: 500)
 
         #expect(
-            WICompressionSizeEstimation.scaledPixelSize(source: source, maxLongSide: 500)
+            TargetSizeEstimation.scaledPixelSize(source: source, maxLongSide: 500)
                 == WIPixelSize(width: 500, height: 250)
         )
     }
@@ -114,7 +114,7 @@ struct WICompressionEstimationTests {
         let source = WIPixelSize(width: 1_000, height: 500)
 
         #expect(
-            WICompressionSizeEstimation.scaledPixelSize(source: source, maxLongSide: 1)
+            TargetSizeEstimation.scaledPixelSize(source: source, maxLongSide: 1)
                 == WIPixelSize(width: 1, height: 1)
         )
     }
