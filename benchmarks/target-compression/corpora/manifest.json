@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "lockFile": "manifest.lock.json",
+  "dataDirectory": "../data/corpora",
+  "corpora": [
+    {
+      "id": "clic-professional-valid",
+      "name": "CLIC 2020 Professional Validation",
+      "sourcePage": "https://archive.compression.cc/2019/challenge/",
+      "license": {
+        "status": "known",
+        "name": "Unsplash License",
+        "source": "https://data.vision.ee.ethz.ch/cvl/clic/LICENSE_professional_2020.txt",
+        "redistribution": "allowed-under-upstream-license",
+        "note": "The upstream license permits copying and distribution, subject to its terms. WICompress still keeps the corpus local and does not redistribute it."
+      }
+    },
+    {
+      "id": "clic-mobile-valid",
+      "name": "CLIC 2020 Mobile Validation",
+      "sourcePage": "https://archive.compression.cc/2019/challenge/",
+      "license": {
+        "status": "unknown",
+        "redistribution": "unknown",
+        "note": "The official download page does not identify a redistribution license for the Mobile corpus. Public download access is not treated as redistribution permission."
+      }
+    },
+    {
+      "id": "jpeg-ai-cfe",
+      "name": "JPEG AI Call for Evidence Test Images",
+      "sourcePage": "https://jpegai.github.io/test_images/",
+      "license": {
+        "status": "unknown",
+        "redistribution": "unknown",
+        "note": "The official test-image page publishes downloads and checksums but no redistribution grant. Public download access is not treated as redistribution permission."
+      }
+    }
+  ]
+}

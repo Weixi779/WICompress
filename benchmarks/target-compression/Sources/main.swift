@@ -11,12 +11,20 @@ import Foundation
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 do {
-    try runBenchmark(arguments: arguments)
+    try runCommand(arguments: arguments)
 } catch {
     fflush(nil)
     let message = "error: \(error.localizedDescription)\n"
     FileHandle.standardError.write(Data(message.utf8))
     exit(EXIT_FAILURE)
+}
+
+private func runCommand(arguments: [String]) throws {
+    if arguments.first == "compare" {
+        try compareReports(arguments: Array(arguments.dropFirst()))
+        return
+    }
+    try runBenchmark(arguments: arguments)
 }
 
 private func runBenchmark(arguments: [String]) throws {
@@ -37,6 +45,32 @@ private func runBenchmark(arguments: [String]) throws {
     if report.hasFailures {
         throw BenchmarkExecutionError.failedCases(
             report.cases.filter { $0.status != .passed }.count
+        )
+    }
+}
+
+private func compareReports(arguments: [String]) throws {
+    if arguments.contains("--help") || arguments.contains("-h") {
+        print(BenchmarkComparisonConfiguration.usage)
+        return
+    }
+
+    let configuration = try BenchmarkComparisonConfiguration.parse(arguments)
+    let report = try BenchmarkComparison.compare(
+        baselineAt: configuration.baselineURL,
+        candidateAt: configuration.candidateURL,
+        requireIdenticalOutput: configuration.requireIdenticalOutput
+    )
+    report.printSummary()
+
+    if let outputURL = configuration.jsonOutputURL {
+        try report.write(to: outputURL)
+        print("\nComparison JSON: \(outputURL.path)")
+    }
+
+    if configuration.requireIdenticalOutput, !report.identicalOutput.isSatisfied {
+        throw BenchmarkComparisonError.outputSignatureMismatch(
+            report.identicalOutput.mismatchKeys
         )
     }
 }

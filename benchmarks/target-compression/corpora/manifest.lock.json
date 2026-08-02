@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-02",
+  "corpora": [
+    {
+      "id": "clic-professional-valid",
+      "kind": "single-archive",
+      "archive": {
+        "url": "https://storage.googleapis.com/clic_datasets/clic2020_professional_valid.zip",
+        "fileName": "clic2020_professional_valid.zip",
+        "byteLength": 134862753,
+        "md5": "a1634c7d733d31033b29cb452bc06291",
+        "checksumSource": "https://storage.googleapis.com/storage/v1/b/clic_datasets/o/clic2020_professional_valid.zip"
+      },
+      "contents": {
+        "fileCount": 41,
+        "layout": "flat",
+        "fileExtension": "png",
+        "maximumExtractedByteLength": 1073741824
+      }
+    },
+    {
+      "id": "clic-mobile-valid",
+      "kind": "single-archive",
+      "archive": {
+        "url": "https://storage.googleapis.com/clic_datasets/clic2020_mobile_valid.zip",
+        "fileName": "clic2020_mobile_valid.zip",
+        "byteLength": 236640799,
+        "md5": "838ca96b3f1d7f4224c7e9e51c5c6e96",
+        "checksumSource": "https://storage.googleapis.com/storage/v1/b/clic_datasets/o/clic2020_mobile_valid.zip"
+      },
+      "contents": {
+        "fileCount": 61,
+        "layout": "flat",
+        "fileExtension": "png",
+        "maximumExtractedByteLength": 1073741824
+      }
+    },
+    {
+      "id": "jpeg-ai-cfe",
+      "kind": "one-archive-per-image",
+      "indexURL": "https://jpegai.github.io/test_images/",
+      "checksumURL": "https://jpegai.github.io/public/png.md5.txt",
+      "archiveChecksumStatus": "not-published-upstream",
+      "archiveByteLengthSource": "HTTP Content-Length observed and pinned on 2026-08-02",
+      "imageByteLengthSource": "locally observed after verification against the upstream image MD5 on 2026-08-02",
+      "archiveMemberPolicy": "image-with-optional-macos-metadata",
+      "contents": {
+        "fileCount": 16,
+        "layout": "flat",
+        "fileExtension": "png"
+      },
+      "files": [
+        {
+          "url": "https://jpegai.github.io/public/test_set/00001_TE_2096x1400.png.zip",
+          "archiveFileName": "00001_TE_2096x1400.png.zip",
+          "archiveByteLength": 4483684,
+          "imageFileName": "00001_TE_2096x1400.png",
+          "imageByteLength": 4481772,
+          "imageMD5": "0d89b343312dbb9ed05f3a94b40364a8"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00002_TE_2144x1424.png.zip",
+          "archiveFileName": "00002_TE_2144x1424.png.zip",
+          "archiveByteLength": 5475462,
+          "imageFileName": "00002_TE_2144x1424.png",
+          "imageByteLength": 5474970,
+          "imageMD5": "acc74bd138c122f74136cf795635f37c"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00003_TE_1944x1296.png.zip",
+          "archiveFileName": "00003_TE_1944x1296.png.zip",
+          "archiveByteLength": 3110533,
+          "imageFileName": "00003_TE_1944x1296.png",
+          "imageByteLength": 3108999,
+          "imageMD5": "48257df4164f878cda6aa04e728916e8"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00004_TE_1808x1352.png.zip",
+          "archiveFileName": "00004_TE_1808x1352.png.zip",
+          "archiveByteLength": 4806201,
+          "imageFileName": "00004_TE_1808x1352.png",
+          "imageByteLength": 4805109,
+          "imageMD5": "7b3109b6f7bb7a22477f9e5b327f3a59"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00005_TE_1336x872.png.zip",
+          "archiveFileName": "00005_TE_1336x872.png.zip",
+          "archiveByteLength": 1406419,
+          "imageFileName": "00005_TE_1336x872.png",
+          "imageByteLength": 1407943,
+          "imageMD5": "c4774fa32ca1dd77a28aa13c75b5a5d3"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00006_TE_1544x1120.png.zip",
+          "archiveFileName": "00006_TE_1544x1120.png.zip",
+          "archiveByteLength": 2454304,
+          "imageFileName": "00006_TE_1544x1120.png",
+          "imageByteLength": 2454272,
+          "imageMD5": "8934866c4b1c891c91a3ba96fac4a733"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00007_TE_1472x976.png.zip",
+          "archiveFileName": "00007_TE_1472x976.png.zip",
+          "archiveByteLength": 2186094,
+          "imageFileName": "00007_TE_1472x976.png",
+          "imageByteLength": 2189338,
+          "imageMD5": "cc103f0b5d7d92c608c159a5deaee439"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00008_TE_1912x1272.png.zip",
+          "archiveFileName": "00008_TE_1912x1272.png.zip",
+          "archiveByteLength": 3629342,
+          "imageFileName": "00008_TE_1912x1272.png",
+          "imageByteLength": 3641376,
+          "imageMD5": "8924c4659dc7393e096db8126f6642da"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00009_TE_1976x1312.png.zip",
+          "archiveFileName": "00009_TE_1976x1312.png.zip",
+          "archiveByteLength": 5790928,
+          "imageFileName": "00009_TE_1976x1312.png",
+          "imageByteLength": 5792442,
+          "imageMD5": "a49db044c5645b47fb4197f7adbecfa4"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00010_TE_2000x1128.png.zip",
+          "archiveFileName": "00010_TE_2000x1128.png.zip",
+          "archiveByteLength": 2836849,
+          "imageFileName": "00010_TE_2000x1128.png",
+          "imageByteLength": 2836414,
+          "imageMD5": "a4134df63a39e1dcfa1c608c5acd304f"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00011_TE_1744x1160.png.zip",
+          "archiveFileName": "00011_TE_1744x1160.png.zip",
+          "archiveByteLength": 4052343,
+          "imageFileName": "00011_TE_1744x1160.png",
+          "imageByteLength": 4053607,
+          "imageMD5": "08f51e6bcb2f92b4448549d669c9f7dc"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00012_TE_1512x2016.png.zip",
+          "archiveFileName": "00012_TE_1512x2016.png.zip",
+          "archiveByteLength": 5662091,
+          "imageFileName": "00012_TE_1512x2016.png",
+          "imageByteLength": 5683945,
+          "imageMD5": "e5dab1ce7fbb66eef876884f55de5d2f"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00013_TE_1920x1280.png.zip",
+          "archiveFileName": "00013_TE_1920x1280.png.zip",
+          "archiveByteLength": 3886705,
+          "imageFileName": "00013_TE_1920x1280.png",
+          "imageByteLength": 3885449,
+          "imageMD5": "5c51b7bd3b394001fd8ccb9d9cac1f57"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00014_TE_3680x2456.png.zip",
+          "archiveFileName": "00014_TE_3680x2456.png.zip",
+          "archiveByteLength": 12960040,
+          "imageFileName": "00014_TE_3680x2456.png",
+          "imageByteLength": 12966515,
+          "imageMD5": "5fa5db1a07e2cb19ef847f9d823b598f"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00015_TE_3680x2456.png.zip",
+          "archiveFileName": "00015_TE_3680x2456.png.zip",
+          "archiveByteLength": 12378141,
+          "imageFileName": "00015_TE_3680x2456.png",
+          "imageByteLength": 12377505,
+          "imageMD5": "1dda3e5d5ccdb40c5f4cf6eb02774e53"
+        },
+        {
+          "url": "https://jpegai.github.io/public/test_set/00016_TE_1744x2000.png.zip",
+          "archiveFileName": "00016_TE_1744x2000.png.zip",
+          "archiveByteLength": 6247963,
+          "imageFileName": "00016_TE_1744x2000.png",
+          "imageByteLength": 6247277,
+          "imageMD5": "140ca18a8576dfdf0c1583110becc0e9"
+        }
+      ]
+    }
+  ]
+}

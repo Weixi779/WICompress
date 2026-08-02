@@ -103,8 +103,7 @@ let package = Package(
         .executableTarget(
             name: "TargetCompressionBenchmark",
             dependencies: ["WICompress", "WIImageIO"],
-            path: "benchmarks/target-compression",
-            exclude: ["README.md"]
+            path: "benchmarks/target-compression/Sources"
         ),
         .executableTarget(
             name: "WICompressDocAssetGenerator",

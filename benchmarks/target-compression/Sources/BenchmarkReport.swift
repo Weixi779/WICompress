@@ -13,6 +13,7 @@ struct BenchmarkReport: Codable {
     let schemaVersion: Int
     let createdAt: String
     let strategyID: String
+    let qualityProtocolID: String
     let environment: BenchmarkEnvironment
     let runs: Int
     let warmupRuns: Int
@@ -23,7 +24,10 @@ struct BenchmarkReport: Codable {
     }
 
     func printSummary() {
-        print("\nfixture\tfamily\tbudget\tstatus\tbytes\tutilization\tpixels\tarea\tmedian ms")
+        print(
+            "\nfixture\trepresentation\tbudget\tstatus\tbytes\tbpp\tutilization"
+                + "\tpixels\tarea\tPSNR\tSSIM\tmedian ms"
+        )
         for item in cases {
             print(item.summaryLine)
             if let error = item.errorDescription {
@@ -54,6 +58,7 @@ struct BenchmarkEnvironment: Codable {
     let buildConfiguration: String
     let revision: String?
     let isDirty: Bool?
+    let sourceFingerprint: String?
 
     static var current: Self {
         let repository = BenchmarkCorpus.packageRootURL()
@@ -81,8 +86,69 @@ struct BenchmarkEnvironment: Codable {
                 arguments: ["rev-parse", "HEAD"],
                 currentDirectory: repository
             ),
-            isDirty: status.map { !$0.isEmpty }
+            isDirty: status.map { !$0.isEmpty },
+            sourceFingerprint: sourceFingerprint(in: repository)
         )
+    }
+
+    private static func sourceFingerprint(in repository: URL) -> String? {
+        let relativePaths = [
+            "Package.swift",
+            "Sources",
+            "benchmarks/target-compression/Sources",
+        ]
+        let fileManager = FileManager.default
+        var files: [URL] = []
+
+        for relativePath in relativePaths {
+            let url = repository.appendingPathComponent(relativePath)
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+                return nil
+            }
+            if !isDirectory.boolValue {
+                files.append(url)
+                continue
+            }
+            guard let enumerator = fileManager.enumerator(
+                at: url,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                return nil
+            }
+            for case let fileURL as URL in enumerator {
+                guard
+                    let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
+                    values.isRegularFile == true
+                else {
+                    continue
+                }
+                files.append(fileURL)
+            }
+        }
+
+        var source = Data()
+        for fileURL in files.sorted(by: { $0.path < $1.path }) {
+            guard let data = try? Data(contentsOf: fileURL) else {
+                return nil
+            }
+            let path = fileURL.path.replacingOccurrences(
+                of: repository.path + "/",
+                with: ""
+            )
+            append(path.data(using: .utf8) ?? Data(), to: &source)
+            append(data, to: &source)
+        }
+        return source.sha256
+    }
+
+    private static func append(_ value: Data, to data: inout Data) {
+        var count = UInt64(value.count).bigEndian
+        withUnsafeBytes(of: &count) { bytes in
+            data.append(contentsOf: bytes)
+        }
+        data.append(value)
     }
 }
 
@@ -93,26 +159,32 @@ struct BenchmarkCaseReport: Codable {
     let sourceByteCount: Int
     let sourceWidth: Int
     let sourceHeight: Int
-    let outputFamily: String
+    let requestedRepresentation: String
     let budget: BenchmarkBudgetReport
     let status: BenchmarkCaseStatus
     let output: BenchmarkOutputReport?
     let warmupFailure: BenchmarkWarmupFailure?
+    let qualityFailure: BenchmarkQualityFailure?
     let artifactFileName: String?
     let hardLimitSatisfied: Bool?
     let stableOutputSignature: Bool?
     let byteUtilization: Double?
+    let actualBitsPerPixel: Double?
     let pixelAreaRatio: Double?
+    let quality: BenchmarkQualityReport?
     let medianNanoseconds: UInt64?
     let runs: [BenchmarkRunReport]
 
     init(
         fixture: BenchmarkFixture,
+        representation: BenchmarkRepresentation,
         budget: BenchmarkBudget,
         targetByteCount: Int,
         status: BenchmarkCaseStatus,
         warmupFailure: BenchmarkWarmupFailure?,
+        qualityFailure: BenchmarkQualityFailure?,
         artifactFileName: String?,
+        quality: BenchmarkQualityReport?,
         runs: [BenchmarkRunReport]
     ) {
         let outputs = runs.compactMap(\.output)
@@ -136,29 +208,33 @@ struct BenchmarkCaseReport: Codable {
         self.sourceByteCount = fixture.descriptor.byteCount
         self.sourceWidth = fixture.descriptor.orientedPixelSize.width
         self.sourceHeight = fixture.descriptor.orientedPixelSize.height
-        self.outputFamily = fixture.outputFamily.rawValue
+        self.requestedRepresentation = representation.rawValue
         self.budget = BenchmarkBudgetReport(
             kind: budget.kind,
             ratio: budget.ratio,
             byteCount: budget.absoluteByteCount,
+            bitsPerPixel: budget.bitsPerPixel,
             targetByteCount: targetByteCount
         )
         self.status = status
         self.output = representativeOutput
         self.warmupFailure = warmupFailure
+        self.qualityFailure = qualityFailure
         self.artifactFileName = artifactFileName
         self.hardLimitSatisfied = hardLimitSatisfied
         self.stableOutputSignature = stableOutputSignature
         self.byteUtilization = representativeOutput.map {
             Double($0.byteCount) / Double(targetByteCount)
         }
+        self.actualBitsPerPixel = representativeOutput.map {
+            Double($0.byteCount) * 8 / fixture.sourcePixelArea
+        }
         self.pixelAreaRatio = representativeOutput.map {
             let outputArea = Double($0.width) * Double($0.height)
-            let sourceSize = fixture.descriptor.orientedPixelSize
-            let sourceArea = Double(sourceSize.width) * Double(sourceSize.height)
-            return outputArea / sourceArea
+            return outputArea / fixture.sourcePixelArea
         }
-        self.medianNanoseconds = status == .passed
+        self.quality = representativeOutput == nil ? nil : quality
+        self.medianNanoseconds = status == .passed || status == .qualityMeasurementFailed
             ? runs.map(\.durationNanoseconds).median
             : nil
         self.runs = runs
@@ -167,7 +243,10 @@ struct BenchmarkCaseReport: Codable {
     var errorDescription: String? {
         var errors = Set(
             runs.compactMap(\.errorDescription)
-                + [warmupFailure?.errorDescription].compactMap { $0 }
+                + [
+                    warmupFailure?.errorDescription,
+                    qualityFailure?.errorDescription
+                ].compactMap { $0 }
         )
         if status == .outputSignatureUnstable {
             errors.insert(outputSignatureSummary)
@@ -187,6 +266,9 @@ struct BenchmarkCaseReport: Codable {
 
     var summaryLine: String {
         let bytes = output.map { String($0.byteCount) } ?? "-"
+        let bitsPerPixel = actualBitsPerPixel.map {
+            String(format: "%.4f", $0)
+        } ?? "-"
         let utilization = byteUtilization.map {
             String(format: "%.3f", $0)
         } ?? "-"
@@ -194,13 +276,19 @@ struct BenchmarkCaseReport: Codable {
         let area = pixelAreaRatio.map {
             String(format: "%.3f", $0)
         } ?? "-"
+        let psnr = quality?.psnrRGBDB.map {
+            String(format: "%.3f", $0)
+        } ?? (quality?.exactMatch == true ? "exact" : "-")
+        let ssim = quality?.ssimLuma.map {
+            String(format: "%.5f", $0)
+        } ?? "-"
         let milliseconds = medianNanoseconds.map {
             String(format: "%.3f", Double($0) / 1_000_000)
         } ?? "-"
 
-        return "\(fixture)\t\(outputFamily)\t\(budget.displayLabel)\t"
-            + "\(status.rawValue)\t\(bytes)\t\(utilization)\t\(pixels)\t"
-            + "\(area)\t\(milliseconds)"
+        return "\(fixture)\t\(requestedRepresentation)\t\(budget.displayLabel)\t"
+            + "\(status.rawValue)\t\(bytes)\t\(bitsPerPixel)\t\(utilization)\t"
+            + "\(pixels)\t\(area)\t\(psnr)\t\(ssim)\t\(milliseconds)"
     }
 }
 
@@ -208,15 +296,19 @@ struct BenchmarkBudgetReport: Codable {
     let kind: String
     let ratio: Double?
     let byteCount: Int?
+    let bitsPerPixel: Double?
     let targetByteCount: Int
 
     var displayLabel: String {
         switch kind {
         case "ratio":
-            return ratio.map { "ratio-\(String(format: "%.17g", $0))" }
+            return ratio.map { "ratio-\(String(format: "%.6g", $0))" }
                 ?? "ratio-invalid"
         case "bytes":
             return byteCount.map { "bytes-\($0)" } ?? "bytes-invalid"
+        case "bpp":
+            return bitsPerPixel.map { "bpp-\(String(format: "%.6g", $0))" }
+                ?? "bpp-invalid"
         default:
             return "unknown"
         }
@@ -230,6 +322,7 @@ enum BenchmarkCaseStatus: String, Codable {
     case mixedOutcome
     case outputSignatureUnstable
     case limitViolation
+    case qualityMeasurementFailed
 
     static func resolve(
         runs: [BenchmarkRunReport],
@@ -272,6 +365,11 @@ enum BenchmarkRunStatus: String, Codable {
 
 struct BenchmarkWarmupFailure: Codable {
     let index: Int
+    let errorCode: String
+    let errorDescription: String
+}
+
+struct BenchmarkQualityFailure: Codable {
     let errorCode: String
     let errorDescription: String
 }

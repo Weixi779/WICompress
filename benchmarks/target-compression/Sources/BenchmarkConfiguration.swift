@@ -10,9 +10,11 @@ import Foundation
 
 struct BenchmarkConfiguration {
     let inputURL: URL?
+    let representations: [BenchmarkRepresentation]
     let budgets: [BenchmarkBudget]
     let runs: Int
     let warmupRuns: Int
+    let strategyID: String
     let jsonOutputURL: URL?
     let artifactDirectoryURL: URL?
 
@@ -24,16 +26,20 @@ struct BenchmarkConfiguration {
 
     Options:
       --input <file-or-directory>  Use one image or every supported image in a directory.
+      --representations <values>   Comma-separated outputs: jpeg,heic,png. Default: jpeg.
       --ratios <values>            Comma-separated source-byte ratios, for example 0.5,0.2.
       --bytes <values>             Comma-separated absolute byte budgets.
+      --bpp <values>               Comma-separated source bits-per-pixel budgets.
       --runs <count>               Timed runs per case. Default: 3.
       --warmup <count>             Untimed warmup runs per case. Default: 1.
+      --strategy-id <value>        Label this implementation in JSON. Default: current.
       --json <path>                Write the complete report as JSON.
-      --artifacts <directory>      Save the first validated output for each passed case.
+      --artifacts <directory>      Save validated compression outputs under a strategy subdirectory.
       --help                       Show this help.
 
     When --input is omitted, the benchmark uses the repository's four-image smoke corpus.
-    When neither --ratios nor --bytes is provided, ratios 0.5 and 0.2 are used.
+    When no budget option is provided, ratios 0.5 and 0.2 are used.
+    Run `TargetCompressionBenchmark compare --help` to compare schema-v2 JSON reports.
     """
 
     static func parse(_ arguments: [String]) throws -> Self {
@@ -42,10 +48,13 @@ struct BenchmarkConfiguration {
             isDirectory: true
         )
         var inputURL: URL?
+        var representations: [BenchmarkRepresentation] = [.jpeg]
         var ratios: [Double] = []
         var byteBudgets: [Int] = []
+        var bitsPerPixelBudgets: [Double] = []
         var runs = 3
         var warmupRuns = 1
+        var strategyID = "current"
         var jsonOutputURL: URL?
         var artifactDirectoryURL: URL?
         var index = 0
@@ -59,6 +68,12 @@ struct BenchmarkConfiguration {
                     arguments: arguments,
                     index: &index,
                     relativeTo: currentDirectory
+                )
+            case "--representations":
+                representations = try representationList(
+                    after: argument,
+                    arguments: arguments,
+                    index: &index
                 )
             case "--ratios":
                 ratios = try doubleList(
@@ -78,6 +93,15 @@ struct BenchmarkConfiguration {
                 guard byteBudgets.allSatisfy({ $0 > 0 }) else {
                     throw BenchmarkConfigurationError.invalidValue(argument)
                 }
+            case "--bpp":
+                bitsPerPixelBudgets = try doubleList(
+                    after: argument,
+                    arguments: arguments,
+                    index: &index
+                )
+                guard bitsPerPixelBudgets.allSatisfy({ $0.isFinite && $0 > 0 }) else {
+                    throw BenchmarkConfigurationError.invalidValue(argument)
+                }
             case "--runs":
                 runs = try integerValue(
                     after: argument,
@@ -94,6 +118,15 @@ struct BenchmarkConfiguration {
                     index: &index
                 )
                 guard warmupRuns >= 0 else {
+                    throw BenchmarkConfigurationError.invalidValue(argument)
+                }
+            case "--strategy-id":
+                strategyID = try stringValue(
+                    after: argument,
+                    arguments: arguments,
+                    index: &index
+                )
+                guard !strategyID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     throw BenchmarkConfigurationError.invalidValue(argument)
                 }
             case "--json":
@@ -117,22 +150,51 @@ struct BenchmarkConfiguration {
             index += 1
         }
 
-        let budgets: [BenchmarkBudget]
-        if ratios.isEmpty && byteBudgets.isEmpty {
-            budgets = [.ratio(0.5), .ratio(0.2)]
+        let requestedBudgets: [BenchmarkBudget]
+        if ratios.isEmpty && byteBudgets.isEmpty && bitsPerPixelBudgets.isEmpty {
+            requestedBudgets = [.ratio(0.5), .ratio(0.2)]
         } else {
-            budgets = ratios.map(BenchmarkBudget.ratio)
+            requestedBudgets = ratios.map(BenchmarkBudget.ratio)
                 + byteBudgets.map(BenchmarkBudget.bytes)
+                + bitsPerPixelBudgets.map(BenchmarkBudget.bitsPerPixel)
         }
+        let budgets = requestedBudgets.removingDuplicateBudgets()
 
         return Self(
             inputURL: inputURL,
+            representations: representations,
             budgets: budgets,
             runs: runs,
             warmupRuns: warmupRuns,
+            strategyID: strategyID,
             jsonOutputURL: jsonOutputURL,
             artifactDirectoryURL: artifactDirectoryURL
         )
+    }
+
+    private static func representationList(
+        after option: String,
+        arguments: [String],
+        index: inout Int
+    ) throws -> [BenchmarkRepresentation] {
+        let value = try stringValue(
+            after: option,
+            arguments: arguments,
+            index: &index
+        )
+        let components = value.split(
+            separator: ",",
+            omittingEmptySubsequences: false
+        )
+        let representations = components.compactMap {
+            BenchmarkRepresentation(
+                rawValue: $0.trimmingCharacters(in: .whitespaces).lowercased()
+            )
+        }
+        guard !representations.isEmpty, representations.count == components.count else {
+            throw BenchmarkConfigurationError.invalidValue(option)
+        }
+        return representations.removingDuplicates()
     }
 
     private static func pathValue(
@@ -230,13 +292,16 @@ struct BenchmarkConfiguration {
 enum BenchmarkBudget: Sendable {
     case ratio(Double)
     case bytes(Int)
+    case bitsPerPixel(Double)
 
     var label: String {
         switch self {
         case .ratio(let ratio):
-            return "ratio-\(String(format: "%.17g", ratio))"
+            return "ratio-\(String(format: "%.6g", ratio))"
         case .bytes(let bytes):
             return "bytes-\(bytes)"
+        case .bitsPerPixel(let bitsPerPixel):
+            return "bpp-\(String(format: "%.6g", bitsPerPixel))"
         }
     }
 
@@ -246,6 +311,8 @@ enum BenchmarkBudget: Sendable {
             return "ratio"
         case .bytes:
             return "bytes"
+        case .bitsPerPixel:
+            return "bpp"
         }
     }
 
@@ -263,7 +330,39 @@ enum BenchmarkBudget: Sendable {
         return bytes
     }
 
-    func byteCount(for sourceByteCount: Int) -> Int {
+    var bitsPerPixel: Double? {
+        guard case .bitsPerPixel(let bitsPerPixel) = self else {
+            return nil
+        }
+        return bitsPerPixel
+    }
+
+    var artifactIdentity: String {
+        switch self {
+        case .ratio(let ratio):
+            return "ratio-f64-\(String(ratio.bitPattern, radix: 16))"
+        case .bytes(let bytes):
+            return "bytes-int-\(bytes)"
+        case .bitsPerPixel(let bitsPerPixel):
+            return "bpp-f64-\(String(bitsPerPixel.bitPattern, radix: 16))"
+        }
+    }
+
+    fileprivate var identity: BenchmarkBudgetIdentity {
+        switch self {
+        case .ratio(let ratio):
+            return .ratio(ratio.bitPattern)
+        case .bytes(let bytes):
+            return .bytes(bytes)
+        case .bitsPerPixel(let bitsPerPixel):
+            return .bitsPerPixel(bitsPerPixel.bitPattern)
+        }
+    }
+
+    func byteCount(
+        for sourceByteCount: Int,
+        sourcePixelArea: Double
+    ) -> Int {
         switch self {
         case .ratio(let ratio):
             let value = Double(sourceByteCount) * ratio
@@ -273,7 +372,33 @@ enum BenchmarkBudget: Sendable {
             return max(1, Int(value.rounded(.down)))
         case .bytes(let bytes):
             return bytes
+        case .bitsPerPixel(let bitsPerPixel):
+            let value = sourcePixelArea * bitsPerPixel / 8
+            guard value < Double(Int.max) else {
+                return Int.max
+            }
+            return max(1, Int(value.rounded(.down)))
         }
+    }
+}
+
+private enum BenchmarkBudgetIdentity: Hashable {
+    case ratio(UInt64)
+    case bytes(Int)
+    case bitsPerPixel(UInt64)
+}
+
+private extension Array where Element == BenchmarkBudget {
+    func removingDuplicateBudgets() -> Self {
+        var seen = Set<BenchmarkBudgetIdentity>()
+        return filter { seen.insert($0.identity).inserted }
+    }
+}
+
+private extension Array where Element: Hashable {
+    func removingDuplicates() -> Self {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }
 

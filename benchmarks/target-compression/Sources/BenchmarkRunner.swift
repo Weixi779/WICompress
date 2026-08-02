@@ -22,32 +22,41 @@ struct BenchmarkRunner {
         print("runs: \(configuration.runs), warmup: \(configuration.warmupRuns)")
 
         var reports: [BenchmarkCaseReport] = []
-        reports.reserveCapacity(corpus.urls.count * configuration.budgets.count)
+        reports.reserveCapacity(
+            corpus.urls.count
+                * configuration.representations.count
+                * configuration.budgets.count
+        )
 
         for url in corpus.urls {
             let fixture = try corpus.loadFixture(url)
-            for budget in configuration.budgets {
-                let targetByteCount = budget.byteCount(
-                    for: fixture.descriptor.byteCount
-                )
-                print(
-                    "running: \(fixture.name), \(fixture.outputFamily.rawValue), "
-                        + "\(budget.label) -> \(targetByteCount) bytes"
-                )
-                reports.append(
-                    try run(
-                        fixture: fixture,
-                        budget: budget,
-                        targetByteCount: targetByteCount
+            for representation in configuration.representations {
+                for budget in configuration.budgets {
+                    let targetByteCount = budget.byteCount(
+                        for: fixture.descriptor.byteCount,
+                        sourcePixelArea: fixture.sourcePixelArea
                     )
-                )
+                    print(
+                        "running: \(fixture.name), \(representation.rawValue), "
+                            + "\(budget.label) -> \(targetByteCount) bytes"
+                    )
+                    reports.append(
+                        try run(
+                            fixture: fixture,
+                            representation: representation,
+                            budget: budget,
+                            targetByteCount: targetByteCount
+                        )
+                    )
+                }
             }
         }
 
         return BenchmarkReport(
-            schemaVersion: 1,
+            schemaVersion: 2,
             createdAt: ISO8601DateFormatter().string(from: Date()),
-            strategyID: "current",
+            strategyID: configuration.strategyID,
+            qualityProtocolID: BenchmarkQualityEvaluator.protocolID,
             environment: .current,
             runs: configuration.runs,
             warmupRuns: configuration.warmupRuns,
@@ -57,6 +66,7 @@ struct BenchmarkRunner {
 
     private func run(
         fixture: BenchmarkFixture,
+        representation: BenchmarkRepresentation,
         budget: BenchmarkBudget,
         targetByteCount: Int
     ) throws -> BenchmarkCaseReport {
@@ -64,7 +74,7 @@ struct BenchmarkRunner {
             maxBytes: targetByteCount,
             sizing: .original,
             output: WIImageOutput(
-                representation: fixture.outputFamily.representation,
+                representation: representation.representation,
                 metadata: .strip,
                 colorSpace: .convert(to: .sRGB)
             )
@@ -76,11 +86,14 @@ struct BenchmarkRunner {
         ) {
             return BenchmarkCaseReport(
                 fixture: fixture,
+                representation: representation,
                 budget: budget,
                 targetByteCount: targetByteCount,
                 status: .warmupFailed,
                 warmupFailure: warmupFailure,
+                qualityFailure: nil,
                 artifactFileName: nil,
+                quality: nil,
                 runs: []
             )
         }
@@ -101,6 +114,7 @@ struct BenchmarkRunner {
                     let output = try validate(
                         result,
                         fixture: fixture,
+                        representation: representation,
                         targetByteCount: targetByteCount
                     )
                     runs.append(
@@ -166,15 +180,28 @@ struct BenchmarkRunner {
             }
         }
 
-        let status = BenchmarkCaseStatus.resolve(
+        let compressionStatus = BenchmarkCaseStatus.resolve(
             runs: runs,
             targetByteCount: targetByteCount
         )
+        let qualityMeasurement: BenchmarkQualityMeasurement?
+        if compressionStatus == .passed, let representativeData {
+            qualityMeasurement = measureQuality(
+                sourceData: fixture.data,
+                outputData: representativeData
+            )
+        } else {
+            qualityMeasurement = nil
+        }
+        let status: BenchmarkCaseStatus = qualityMeasurement?.failure == nil
+            ? compressionStatus
+            : .qualityMeasurementFailed
         let artifactFileName: String?
-        if status == .passed, let representativeData {
+        if compressionStatus == .passed, let representativeData {
             artifactFileName = try writeArtifact(
                 representativeData,
                 fixture: fixture,
+                representation: representation,
                 budget: budget,
                 targetByteCount: targetByteCount
             )
@@ -184,13 +211,47 @@ struct BenchmarkRunner {
 
         return BenchmarkCaseReport(
             fixture: fixture,
+            representation: representation,
             budget: budget,
             targetByteCount: targetByteCount,
             status: status,
             warmupFailure: nil,
+            qualityFailure: qualityMeasurement?.failure,
             artifactFileName: artifactFileName,
+            quality: qualityMeasurement?.report,
             runs: runs
         )
+    }
+
+    private func measureQuality(
+        sourceData: Data,
+        outputData: Data
+    ) -> BenchmarkQualityMeasurement {
+        do {
+            return BenchmarkQualityMeasurement(
+                report: try BenchmarkQualityEvaluator.evaluate(
+                    sourceData: sourceData,
+                    outputData: outputData
+                ),
+                failure: nil
+            )
+        } catch let error as BenchmarkQualityError {
+            return BenchmarkQualityMeasurement(
+                report: nil,
+                failure: BenchmarkQualityFailure(
+                    errorCode: error.rawValue,
+                    errorDescription: error.localizedDescription
+                )
+            )
+        } catch {
+            return BenchmarkQualityMeasurement(
+                report: nil,
+                failure: BenchmarkQualityFailure(
+                    errorCode: "qualityMeasurementFailed",
+                    errorDescription: error.localizedDescription
+                )
+            )
+        }
     }
 
     private func warmUp(
@@ -222,6 +283,7 @@ struct BenchmarkRunner {
     private func validate(
         _ result: WIResult,
         fixture: BenchmarkFixture,
+        representation: BenchmarkRepresentation,
         targetByteCount: Int
     ) throws -> BenchmarkOutputReport {
         let reader = try ImageReader(result.data)
@@ -248,14 +310,10 @@ struct BenchmarkRunner {
         guard descriptor.frameCount == 1 else {
             throw BenchmarkValidationError.animatedOutput(descriptor.frameCount)
         }
-        // ImageIO may synthesize TIFF/Exif destination facts. Strip validation
-        // targets source-carried privacy metadata instead.
-        let forbiddenMetadata: ImageMetadataOptions = [
-            .gps,
-            .iptc,
-            .makerNotes
-        ]
-        guard descriptor.metadata.intersection(forbiddenMetadata).isEmpty else {
+        guard !BenchmarkMetadataValidation.sourceMetadataWasRetained(
+            in: result.data,
+            descriptor: descriptor
+        ) else {
             throw BenchmarkValidationError.sourceMetadataWasRetained
         }
         guard frame.image.colorSpace?.name == CGColorSpace.sRGB else {
@@ -267,8 +325,8 @@ struct BenchmarkRunner {
                 target: targetByteCount
             )
         }
-        guard descriptor.format == fixture.outputFamily.imageFormat else {
-            throw BenchmarkValidationError.unexpectedOutputFamily
+        guard descriptor.format == representation.imageFormat else {
+            throw BenchmarkValidationError.unexpectedOutputRepresentation
         }
 
         return BenchmarkOutputReport(
@@ -278,7 +336,7 @@ struct BenchmarkRunner {
     }
 
     private func prepareArtifactDirectory() throws {
-        guard let directory = configuration.artifactDirectoryURL else {
+        guard let directory = artifactOutputDirectoryURL else {
             return
         }
         try FileManager.default.createDirectory(
@@ -290,23 +348,69 @@ struct BenchmarkRunner {
     private func writeArtifact(
         _ data: Data,
         fixture: BenchmarkFixture,
+        representation: BenchmarkRepresentation,
         budget: BenchmarkBudget,
         targetByteCount: Int
     ) throws -> String? {
-        guard let directory = configuration.artifactDirectoryURL else {
+        guard let directory = artifactOutputDirectoryURL else {
             return nil
         }
 
         let sourceName = fixture.url.deletingPathExtension().lastPathComponent
         let sourceID = fixture.sha256.prefix(12)
         let budgetName = budget.label.replacingOccurrences(of: ".", with: "_")
-        let fileName = "\(sourceName)--\(sourceID)--\(budgetName)--\(targetByteCount)"
-            + ".\(fixture.outputFamily.fileExtension)"
+        let fileName = "\(sourceName)--\(sourceID)--\(representation.rawValue)"
+            + "--\(budgetName)--\(budget.artifactIdentity)--\(targetByteCount)"
+            + ".\(representation.fileExtension)"
         try data.write(
             to: directory.appendingPathComponent(fileName),
             options: .atomic
         )
-        return fileName
+        return "\(directory.lastPathComponent)/\(fileName)"
+    }
+
+    private var artifactOutputDirectoryURL: URL? {
+        configuration.artifactDirectoryURL?.appendingPathComponent(
+            configuration.strategyID.benchmarkPathComponent,
+            isDirectory: true
+        )
+    }
+}
+
+private struct BenchmarkQualityMeasurement {
+    let report: BenchmarkQualityReport?
+    let failure: BenchmarkQualityFailure?
+}
+
+private extension String {
+    var benchmarkPathComponent: String {
+        let allowed = CharacterSet.alphanumerics.union(
+            CharacterSet(charactersIn: "-_")
+        )
+        var sanitized = ""
+        var previousWasSeparator = false
+
+        for scalar in unicodeScalars {
+            if allowed.contains(scalar) {
+                sanitized.append(String(scalar))
+                previousWasSeparator = false
+            } else if !previousWasSeparator {
+                sanitized.append("-")
+                previousWasSeparator = true
+            }
+        }
+
+        sanitized = sanitized.trimmingCharacters(
+            in: CharacterSet(charactersIn: "-_")
+        )
+        let readablePrefix = String(sanitized.prefix(64))
+        guard !readablePrefix.isEmpty else {
+            return "strategy--\(Data(utf8).sha256.prefix(12))"
+        }
+        guard sanitized == self, sanitized.count <= 64 else {
+            return "\(readablePrefix)--\(Data(utf8).sha256.prefix(12))"
+        }
+        return readablePrefix
     }
 }
 
@@ -319,7 +423,7 @@ enum BenchmarkValidationError: Error, LocalizedError {
     case orientationWasNotNormalized
     case outputIsNotSRGB
     case sourceMetadataWasRetained
-    case unexpectedOutputFamily
+    case unexpectedOutputRepresentation
 
     var benchmarkCode: String {
         switch self {
@@ -347,22 +451,9 @@ enum BenchmarkValidationError: Error, LocalizedError {
         case .outputIsNotSRGB:
             return "Benchmark output is not sRGB."
         case .sourceMetadataWasRetained:
-            return "Benchmark output retained GPS, IPTC, or maker-note metadata."
-        case .unexpectedOutputFamily:
-            return "Benchmark output does not match the requested container family."
-        }
-    }
-}
-
-private extension BenchmarkOutputFamily {
-    var imageFormat: ImageFormat {
-        switch self {
-        case .jpeg:
-            return .jpeg
-        case .heif:
-            return .heif
-        case .png:
-            return .png
+            return "Benchmark output retained source-carried metadata."
+        case .unexpectedOutputRepresentation:
+            return "Benchmark output does not match the requested representation."
         }
     }
 }

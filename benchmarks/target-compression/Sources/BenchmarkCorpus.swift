@@ -16,23 +16,27 @@ struct BenchmarkFixture {
     let data: Data
     let sha256: String
     let descriptor: ImageDescriptor
-    let outputFamily: BenchmarkOutputFamily
 
     var name: String {
         relativePath
     }
+
+    var sourcePixelArea: Double {
+        let size = descriptor.orientedPixelSize
+        return Double(size.width) * Double(size.height)
+    }
 }
 
-enum BenchmarkOutputFamily: String, Codable {
+enum BenchmarkRepresentation: String, CaseIterable, Codable, Hashable, Sendable {
     case jpeg
-    case heif
+    case heic
     case png
 
     var representation: WIImageRepresentation {
         switch self {
         case .jpeg:
-            return .jpeg()
-        case .heif:
+            return .jpeg(background: .white)
+        case .heic:
             return .heic
         case .png:
             return .png
@@ -43,10 +47,21 @@ enum BenchmarkOutputFamily: String, Codable {
         switch self {
         case .jpeg:
             return "jpg"
-        case .heif:
+        case .heic:
             return "heic"
         case .png:
             return "png"
+        }
+    }
+
+    var imageFormat: ImageFormat {
+        switch self {
+        case .jpeg:
+            return .jpeg
+        case .heic:
+            return .heif
+        case .png:
+            return .png
         }
     }
 }
@@ -152,16 +167,7 @@ struct BenchmarkCorpus {
     ) throws -> BenchmarkFixture {
         let data = try Data(contentsOf: url)
         let descriptor = try ImageReader.inspect(data)
-        let outputFamily: BenchmarkOutputFamily
-
-        switch descriptor.format {
-        case .jpeg:
-            outputFamily = .jpeg
-        case .heif:
-            outputFamily = .heif
-        case .png:
-            outputFamily = .png
-        case .unknown:
+        guard descriptor.format != .unknown else {
             throw BenchmarkConfigurationError.noSupportedImages(url)
         }
 
@@ -170,13 +176,13 @@ struct BenchmarkCorpus {
             relativePath: relativePath(for: url, rootURL: rootURL),
             data: data,
             sha256: data.sha256,
-            descriptor: descriptor,
-            outputFamily: outputFamily
+            descriptor: descriptor
         )
     }
 
     static func packageRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
