@@ -22,10 +22,6 @@ let package = Package(
             name: "WIImageIO",
             targets: ["WIImageIO"]
         ),
-        .executable(
-            name: "TargetCompressionBenchmark",
-            targets: ["TargetCompressionBenchmark"]
-        ),
     ],
     dependencies: [],
     targets: [
