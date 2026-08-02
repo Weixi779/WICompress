@@ -42,7 +42,7 @@ extension ImageReader {
         )
     }
 
-    /// Opens an encoded image file without loading its complete bytes.
+    /// Opens an encoded image file by passing its URL directly to ImageIO.
     public convenience init(contentsOf url: URL) throws(ImageIOError) {
         let (source, byteCount) = try Self.imageSource(contentsOf: url)
         self.init(
@@ -56,7 +56,7 @@ extension ImageReader {
         try ImageReader(data).descriptor
     }
 
-    /// Inspects an encoded image file without loading its complete bytes.
+    /// Inspects an encoded image file by passing its URL directly to ImageIO.
     public static func inspect(contentsOf url: URL) throws(ImageIOError) -> ImageDescriptor {
         try ImageReader(contentsOf: url).descriptor
     }

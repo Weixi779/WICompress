@@ -1,21 +1,28 @@
-# Target compression benchmark
+# Target Compression Benchmark
 
-这个 macOS developer executable 为 `WICompressionTarget` 建立可重复的黑盒证据。
-它测量公开 `WICompressor.compress` 的真实结果，不向生产 API 暴露 strategy、搜索参数或
-内部候选轨迹。
+English | [简体中文](README_CN.md)
 
-Benchmark 与单元测试职责不同：测试固定正确性合同；benchmark 记录同一环境、同一输入下
-的输出形态、质量和执行成本，不在 CI 中设置易波动的性能阈值。
+This macOS developer executable builds reproducible black-box evidence for
+`WICompressionTarget`. It measures the real output of the public
+`WICompressor.compress` terminal without exposing strategies, search parameters,
+or internal candidate traces through the production API. It is repository
+developer tooling, not part of the supported public library surface.
+
+The benchmark and unit tests have different responsibilities. Tests freeze
+correctness contracts; the benchmark records output shape, quality, and
+execution cost for the same inputs in the same environment. It does not enforce
+volatile performance thresholds in CI.
 
 ## Run
 
-执行默认四图 smoke corpus。默认显式输出 JPEG，预算为源文件字节数的 `0.5` 和 `0.2`：
+Run the default four-image smoke corpus. It explicitly writes JPEG and uses
+budgets equal to `0.5` and `0.2` of each source's encoded byte count:
 
 ```sh
 swift run -c release TargetCompressionBenchmark
 ```
 
-快速验证全部编码分支与 bpp budget：
+Quickly exercise every encoding branch with a bpp budget:
 
 ```sh
 swift run -c release TargetCompressionBenchmark \
@@ -26,7 +33,7 @@ swift run -c release TargetCompressionBenchmark \
   --warmup 0
 ```
 
-正式测量 JPEG AI CfE：
+Run a formal JPEG AI CfE measurement:
 
 ```sh
 ./benchmarks/target-compression/fetch-corpora.sh jpeg-ai-cfe
@@ -42,16 +49,20 @@ swift run -c release TargetCompressionBenchmark \
   --artifacts benchmarks/target-compression/artifacts
 ```
 
-`data/`、`results/` 与 `artifacts/` 默认忽略，不会把本地语料、测量结果或编码产物提交到
-仓库。默认 fixture 从 Package checkout 定位；自定义 `--input` 相对路径相对于当前 working
-directory 解析。Artifact 会写入 `--artifacts` 下经过文件名安全处理的 strategy 子目录，避免
-baseline 与 candidate 复用根目录时互相覆盖；文件名同时携带可读 budget 和精确的整数或
-IEEE-754 bit-pattern identity，接近但不相同的 ratio/bpp case 也不会互相覆盖。
+`data/`, `results/`, and `artifacts/` are ignored by default, so local corpora,
+reports, and encoded outputs are not committed. Default fixtures are located
+relative to the Package checkout; a relative custom `--input` is resolved from
+the current working directory. Artifacts are written to a filename-safe
+strategy subdirectory under `--artifacts`, preventing baseline and candidate
+runs from overwriting one another when they share an artifact root. Filenames
+include both a readable budget and the exact integer or IEEE-754 bit-pattern
+identity, so similar but nonidentical ratio/bpp cases remain distinct.
 
 ## Compare
 
-生产代码不提供 benchmark strategy switch。应在 baseline 与 candidate revision 分别运行，
-再离线比较两份 schema-v2 JSON：
+Production code has no benchmark strategy switch. Run the baseline and
+candidate revisions separately, then compare their schema-v2 JSON reports
+offline:
 
 ```sh
 swift run -c release TargetCompressionBenchmark compare \
@@ -60,48 +71,60 @@ swift run -c release TargetCompressionBenchmark compare \
   --json benchmarks/target-compression/results/comparison.json
 ```
 
-仅做等价结构重构时增加：
+For a behavior-preserving structural refactor, add:
 
 ```sh
 --require-identical-output
 ```
 
-它要求每个配对 case 的状态以及稳定、非空 output signature 全部相同；signature 包含 format、
-pixel size、byte count 与 SHA-256。两侧都失败且都没有输出，不会被误判为严格等价。
-Comparator 还会拒绝不同 schema、case 集合、quality protocol、build configuration、OS 或
-architecture。CPU、Swift、run/warmup 数量不一致时仍可比较结果，但会禁用 timing delta。
-报告会记录 Package、生产 Sources 与 benchmark Sources 的有序内容 fingerprint。只要任一报告
-来自 dirty worktree，Comparator 也会禁用 timing；提交前后的 clean revision 才能形成可重建的
-正式性能对照。dirty 报告仍可比较 hard limit、输出、尺寸与质量。
-Strict comparison 会先打印并写出包含 mismatch keys 的 comparison report，再以非零状态结束。
-Comparison JSON 还会区分 measured、exact match、unavailable、measurement failure 与 missing
-quality；PSNR/SSIM 只报告绝对差，其他线性指标同时报告相对百分比。
+This requires every paired case to have the same status and the same stable,
+nonempty output signature. A signature includes format, pixel size, byte count,
+and SHA-256. Two failed cases with no output are not treated as strict
+equivalence. The comparator also rejects different schemas, case sets, quality
+protocols, build configurations, operating systems, or architectures. Results
+with different CPUs, Swift versions, run counts, or warmup counts can still be
+compared, but timing deltas are disabled.
+
+Reports record an ordered content fingerprint for the Package, production
+Sources, and benchmark Sources. If either report comes from a dirty worktree,
+the comparator also disables timing; clean revisions before and after a change
+are required for a reproducible performance comparison. Dirty reports can
+still compare hard limits, outputs, dimensions, and quality. A strict
+comparison writes and prints its report, including mismatch keys, before
+exiting with a nonzero status. Comparison JSON distinguishes measured values,
+exact matches, unavailable values, measurement failures, and missing quality.
+PSNR/SSIM report absolute differences only; other linear metrics also report
+relative percentages.
 
 ## Corpus
 
-未传 `--input` 时使用现有测试资源中的 JPEG、HEIC、透明 PNG 和不透明 PNG，负责平台和
-正确性 smoke，不承担算法质量结论。
+Without `--input`, the benchmark uses the existing JPEG, HEIC, transparent PNG,
+and opaque PNG test resources. They provide platform and correctness smoke
+coverage, not evidence for algorithm-quality conclusions.
 
-正式 corpus 由 [corpora manifest](corpora/README.md) 管理：
+Formal corpora are managed by the [corpora manifest](corpora/README.md):
 
-- JPEG AI CfE 16：快速评审集；
-- CLIC 2020 Professional validation：41 张；
-- CLIC 2020 Mobile validation：61 张。
+- JPEG AI CfE 16: a fast review set;
+- CLIC 2020 Professional validation: 41 images;
+- CLIC 2020 Mobile validation: 61 images.
 
-仓库只保存官方 URL、完整性锁和本地获取脚本，不保存图片或 ZIP。脚本校验 HTTP、archive
-或解压图片 checksum、ZIP 成员、文件数量与目录形态；不传 corpus 时不会自动下载。Mobile
-与 JPEG AI 没有明确的再分发授权，因此不得进入 Git、Git LFS、Release artifact 或镜像。
+The repository stores only official URLs, integrity locks, and the local fetch
+script—not images or ZIP archives. The script validates HTTP responses, archive
+or extracted-image checksums, ZIP members, file counts, and directory shape.
+Nothing is downloaded unless a corpus is requested. Mobile and JPEG AI have no
+clear redistribution grant, so they must not be added to Git, Git LFS, release
+artifacts, or mirrors.
 
 ## Scenarios
 
-一个 case 是：
+A case is:
 
 ```text
 fixture × requested representation × budget
 ```
 
-`--representations` 接受 `jpeg`、`heic`、`png`，与源容器完全独立。JPEG 固定使用白色背景，
-所有场景使用：
+`--representations` accepts `jpeg`, `heic`, and `png`, independently of the
+source container. JPEG always uses a white background. Every scenario uses:
 
 ```text
 sizing: original
@@ -110,68 +133,86 @@ color space: sRGB
 representation: explicit
 ```
 
-预算可以组合使用：
+Budget sources can be combined:
 
-- `--ratios`：源 encoded bytes 的比例，用于历史产品回归；
-- `--bytes`：绝对字节限制，用于分享 SDK 等硬性合同；
-- `--bpp`：基于 display-oriented source pixel area 的 bits per pixel。
+- `--ratios`: a fraction of source encoded bytes for historical product
+  regressions;
+- `--bytes`: an absolute byte ceiling for contracts such as sharing SDKs;
+- `--bpp`: bits per pixel based on display-oriented source pixel area.
 
-bpp 始终使用源图面积，而不是输出面积：
+bpp always uses source area rather than output area:
 
 ```text
 targetBytes = floor(sourceWidth × sourceHeight × requestedBPP / 8)
 actualBPP = outputBytes × 8 / (sourceWidth × sourceHeight)
 ```
 
-因此算法通过缩图节省字节时，码率数字不会被输出面积反向“美化”；空间分辨率损失由
-`pixelAreaRatio` 单独表达。
+When an algorithm saves bytes by reducing dimensions, the smaller output area
+therefore cannot make its bitrate appear artificially better. Spatial
+resolution loss is reported separately as `pixelAreaRatio`.
 
 ## Metrics
 
-终端表格和 JSON 报告记录：
+The terminal table and JSON reports record:
 
-- hard byte limit 与预算利用率；
-- output format、pixel size、actual bpp 与 pixel-area ratio；
-- 多次运行的原始耗时、中位耗时和稳定输出签名；
-- RGB MSE / PSNR 与 luma SSIM；
-- 输入、输出 SHA-256；
-- schema、strategy、OS、CPU、Swift、Git revision 与 dirty 状态。
+- hard byte-limit correctness and budget utilization;
+- output format, pixel size, actual bpp, and pixel-area ratio;
+- raw timings from repeated runs, median timing, and stable output signatures;
+- RGB MSE / PSNR and luma SSIM;
+- input and output SHA-256;
+- schema, strategy, OS, CPU, Swift, Git revision, and dirty state.
 
-质量计算完全位于计时区外。协议固定为：
+Quality measurement is entirely outside the timed region. The protocol is
+fixed:
 
-1. ImageIO 解码 source/output，并显式应用 EXIF orientation；
-2. 转换为 8-bit sRGB；
-3. 用 benchmark 自己的 vImage high-quality scaler 将 pristine source 缩到实际输出尺寸；
-4. 计算 RGB MSE/PSNR；
-5. 使用 BT.709 luma、11×11 Gaussian、σ=1.5 的 valid-window SSIM。
+1. Decode source and output with ImageIO and explicitly apply EXIF orientation.
+2. Convert to 8-bit sRGB.
+3. Scale the pristine source to the actual output dimensions with the
+   benchmark's own high-quality vImage scaler.
+4. Compute RGB MSE/PSNR.
+5. Compute valid-window SSIM using BT.709 luma and an 11×11 Gaussian with
+   σ=1.5.
 
-它不复用 production `ImageRenderer`，避免候选算法与参考图同时变化而掩盖回归。若 source
-或 output 存在非不透明像素，当前协议不计算感知指标并记录原因；仅仅携带一个全不透明 Alpha
-channel 不会被误判。小于 11×11 时仍计算 PSNR，SSIM 为 unavailable。精确像素匹配使用
-`exactMatch = true`，PSNR 保持 `null`，避免把 infinity 写进 JSON。
+The quality path does not reuse the production `ImageRenderer`; otherwise a
+candidate algorithm and its reference image could change together and conceal
+a regression. When source or output contains nonopaque pixels, the current
+protocol records why perceptual metrics are unavailable. Merely carrying a
+fully opaque alpha channel does not trigger this exclusion. Images smaller than
+11×11 still receive PSNR, while SSIM is unavailable. Exact pixel matches use
+`exactMatch = true` and keep PSNR `null` instead of encoding infinity in JSON.
 
-单个标准化 RGBA 像素面上限为 256 MiB，并在真正 decode 前按 inspection dimensions
-检查。SSIM 的 signals、horizontal ring 与 statistics 另有合计 256 MiB 的 workspace 上限，
-所有乘法和加法先检查溢出；任一上限超出都会成为 `qualityMeasurementFailed`，避免极端输入
-让 benchmark 自身失去可执行性。
+A normalized RGBA surface is limited to 256 MiB and is checked against
+inspection dimensions before decode. SSIM signals, the horizontal ring, and
+statistics have a separate combined 256 MiB workspace limit. Every addition
+and multiplication is checked for overflow. Exceeding any limit produces
+`qualityMeasurementFailed`, preventing extreme inputs from exhausting the
+benchmark process.
 
-PSNR/SSIM 只评价最终分辨率下的编码与渲染误差，不惩罚缩图，因此必须和
-`pixelAreaRatio` 一起阅读。本工具不生成单一综合分数。
+PSNR/SSIM evaluate encoding and rendering error at the final output resolution;
+they do not penalize downscaling. Read them together with `pixelAreaRatio`. The
+tool does not produce a single composite score.
 
-## Validation and status
+## Validation and Status
 
-计时包含一次完整公开压缩调用。输入读取、warmup、独立输出验证、质量计算、artifact 写入
-与 JSON 编码不在计时范围内。成功结果会在计时后通过 `WIImageIO` 完整 decode，并校验容器、
-尺寸、orientation、sRGB、隐私 metadata 与 hard byte limit。
+Timing covers one complete public compression call. Input reading, warmup,
+independent output validation, quality measurement, artifact writing, and JSON
+encoding are outside the timed region. After timing, every successful result is
+fully decoded through `WIImageIO` and checked for container, dimensions,
+orientation, sRGB, privacy-sensitive metadata, and the hard byte limit.
 
-同一 case 的输出签名包含 format、pixel size、byte count 与 SHA-256。任何 encoded-byte 差异
-都会成为 `outputSignatureUnstable`；这是 benchmark 的回归约束，不是公开 API 的字节确定性
-承诺。质量协议自身失败会成为 `qualityMeasurementFailed`，保留已验证输出与计时，但让命令
-以非零状态结束。启用 `--artifacts` 时，这类 case 仍会保存 validated compression output，
-用于诊断质量测量失败。
+Each case's output signature contains format, pixel size, byte count, and
+SHA-256. Any encoded-byte difference becomes `outputSignatureUnstable`. This is
+a benchmark regression constraint, not a public promise of encoded-byte
+determinism. A quality-protocol failure becomes `qualityMeasurementFailed`; the
+validated output and timings remain in the report, but the command exits with a
+nonzero status. With `--artifacts`, these cases still save their validated
+compression output for diagnosing quality-measurement failures.
 
-JSON schema 当前为 `2`。fixture 由 corpus-relative path 与完整内容 hash 共同识别；配对 key 还包含
-requested representation、原始 budget 值与 resolved target bytes。
+The current JSON schema is `2`. A fixture is identified by both its
+corpus-relative path and full-content hash. Its pairing key also includes the
+requested representation, original budget value, and resolved target bytes.
 
-当前工具只能观察完整 terminal 耗时，不能读取 encode attempt、render 次数或候选轨迹。
-生产算法是否更换，必须由同一 corpus、同一协议、同一环境下的配对报告决定。
+The tool currently observes complete terminal duration only. It cannot read
+encode attempts, render counts, or internal candidate traces. A production
+algorithm change must be decided from paired reports using the same corpus,
+protocol, and environment.

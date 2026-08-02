@@ -93,7 +93,7 @@ enum GenerateDocAssets {
             Sample(
                 title: "Target API - share thumbnail",
                 filename: "real_jpeg_2098x1350_landscape.jpg",
-                note: "A WICompressionTarget solves bytes and geometry together for a 32 KB square thumbnail",
+                note: "A WICompressionTarget solves bytes and geometry together for a 32 KiB square thumbnail",
                 compression: .target(
                     try WICompressionTarget(
                         maxBytes: 32 * 1024,
@@ -165,7 +165,7 @@ enum GenerateDocAssets {
         context.fill(CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight))
 
         drawText(
-            "WICompress - Data and target API compression comparison",
+            "WICompress 2.0 - Process and Target compression",
             in: topRect(x: 60, y: 38, width: 1480, height: 44, canvasHeight: canvasHeight),
             fontName: "HelveticaNeue-Bold",
             size: 30,
@@ -173,7 +173,7 @@ enum GenerateDocAssets {
             context: context
         )
         drawText(
-            "Generated from repository fixtures with options-based compression and target-based compression.",
+            "Generated from real fixtures through WICompressor. Ratio = original bytes ÷ result bytes.",
             in: topRect(x: 60, y: 82, width: 1480, height: 24, canvasHeight: canvasHeight),
             fontName: "HelveticaNeue",
             size: 16,

@@ -28,6 +28,10 @@ domains: deterministic image processing and byte-target compression.
   inspection, thumbnail, source transcode, runtime capability, and `ImageIOError`.
 - Package-only `WIImageDomain`, `WIImageRendering`, `WICompressDomain`, and
   `WICompressExecution` modules behind the public umbrella and ImageIO product.
+- Bilingual architecture and DocC guides for the Domain, ImageIO, Rendering,
+  Pipeline, concurrency, and 1.x migration boundaries.
+- A reproducible Target compression benchmark with fixed corpora, hard-limit
+  validation, quality metrics, environment fingerprints, and offline comparison.
 
 ### Changed
 
@@ -46,6 +50,8 @@ domains: deterministic image processing and byte-target compression.
   observe surrounding task cancellation.
 - The SwiftUI example is now a Swift 6 single-screen Process/Target demo with
   request-owned loading, cancellation, and typed ImageIO inspection.
+- README is now a focused quick start for the two products, backed by a
+  fixture-generated Process/Target comparison image.
 
 ### Removed
 

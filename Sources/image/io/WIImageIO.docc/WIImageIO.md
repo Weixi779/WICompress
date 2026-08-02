@@ -1,24 +1,21 @@
 # ``WIImageIO``
 
-Inspect, decode, transcode, and encode image data without exposing ImageIO's
-Core Foundation interfaces.
+Inspect, decode, transcode, and encode static images without exposing Core Foundation interfaces.
 
 ## Overview
 
-Start with an ``ImageReader`` created from encoded `Data` or a file URL. The
-reader inspects its input once and exposes the resulting facts through
-``ImageReader/descriptor``.
+Create an ``ImageReader`` from encoded `Data` or a file URL. The reader inspects its
+input once and exposes stable source facts through ``ImageReader/descriptor``.
 
 ```swift
+import UniformTypeIdentifiers
 import WIImageIO
 
 let reader = try ImageReader(imageData)
 let descriptor = reader.descriptor
 ```
 
-Decode pixels when the image needs to be transformed. An ``ImageFrame`` keeps
-the decoded pixels, display orientation, and available metadata provenance
-together through encoding.
+Decode a thumbnail when pixels need to be transformed, then encode its ``ImageFrame``:
 
 ```swift
 let data = try reader
@@ -29,37 +26,65 @@ let data = try reader
     )
 ```
 
-Use ``ImageReader/transcode(as:options:)`` when ImageIO can write directly from
-the encoded source without exposing decoded pixels.
+Use ``ImageReader/transcode(as:options:)`` when ImageIO can write from the encoded
+source without exposing decoded pixels.
 
-```swift
-let data = try reader.transcode(
-    as: .jpeg,
-    options: .init(metadata: .preserve)
-)
-```
+All WIImageIO operations are synchronous. The caller owns scheduling, actor isolation,
+priority, and cancellation around these request-scoped primitives.
 
-All operations are synchronous. The caller owns scheduling, actor isolation,
-and cancellation around these primitives.
-
-For the Chinese guide, see <doc:Getting-Started-CN>.
+For module ownership and WICompress pipeline integration, see the
+[architecture documentation](https://github.com/Weixi779/WICompress/blob/main/docs/architecture/README.md).
 
 ## Topics
 
 ### Start Here
 
-- <doc:Getting-Started-CN>
+- <doc:ImageIO-Getting-Started>
+- <doc:ImageIO-Operations>
+
+### 中文指南
+
+- <doc:ImageIO-Getting-Started-CN>
+- <doc:ImageIO-Operations-CN>
+
+### Inspection
+
 - ``ImageReader``
+- ``ImageReader/init(_:)``
+- ``ImageReader/init(contentsOf:)``
+- ``ImageReader/inspect(_:)``
+- ``ImageReader/inspect(contentsOf:)``
+- ``ImageReader/descriptor``
 - ``ImageDescriptor``
-- ``ImageFrame``
+- ``ImageReader/colorSpace()``
 
 ### Decoding
 
+- ``ImageReader/image(options:)``
+- ``ImageReader/thumbnail(options:)``
 - ``ImageDecodeOptions``
 - ``ImageThumbnailOptions``
+- ``ImageFrame``
 
 ### Transcoding and Encoding
 
+- ``ImageReader/transcode(as:options:)``
 - ``ImageTranscodeOptions``
+- ``ImageFrame/init(image:orientation:)``
+- ``ImageFrame/encode(as:options:)``
 - ``ImageEncodeOptions``
+
+### Runtime Capabilities
+
+- ``ImageReader/canDecode(_:)``
+- ``ImageReader/canEncode(_:)``
 - ``ImageIOError``
+
+### Shared Image Values
+
+- ``ImageFormat``
+- ``WIPixelSize``
+- ``WIImageOrientation``
+- ``ImageMetadataOptions``
+- ``WIColorSpace``
+- ``WIColor``

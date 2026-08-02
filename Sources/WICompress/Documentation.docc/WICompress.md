@@ -1,20 +1,20 @@
-# WICompress
+# ``WICompress``
 
-Compress JPEG, PNG, and HEIC image data with a small, predictable ImageIO-backed API.
+Process JPEG, PNG, and HEIC images with explicit pixel operations or a hard byte target.
 
 ## Overview
 
-``WICompressor`` operates directly on original image `Data` or file `URL` input.
-ImageIO handles format inspection, orientation, alpha, metadata, color profiles,
-resizing, and encoding; every terminal returns one ``WIResult``.
+WICompress operates on encoded `Data` or file URLs and always returns a ``WIResult``.
+It coordinates ImageIO and Core Graphics while keeping UIKit and AppKit out of the
+compression core.
 
-The Process entry point declares one deterministic operation:
+Use Process when you already know the pixel operation and output requirements:
 
 ```swift
-let result = try WICompressor.process(
+let result = try await WICompressor.process(
     originalData,
     using: WIImageProcess(
-        sizing: .resize(using: WIImageResize.maximumPixelSize(1600)),
+        sizing: .resize(using: WIImageResize.maximumPixelSize(1_600)),
         quality: 0.7,
         output: WIImageOutput(
             representation: .jpeg(background: .white),
@@ -25,52 +25,57 @@ let result = try WICompressor.process(
 )
 ```
 
-The target-based entry point declares an output contract — a hard byte ceiling
-plus optional base sizing — and searches quality and dimensions to satisfy it:
+Use Target when the encoded result must not exceed a concrete byte count:
 
 ```swift
-let thumbnail = try WICompressor.compress(
+let result = try await WICompressor.compress(
     originalData,
-    to: WICompressionTarget(
-        maxBytes: 32 * 1024,
-        sizing: WICompressionSizing(
-            maximumPixelSize: 200,
-            aspectRatio: .square
-        )
-    )
+    to: WICompressionTarget(maxBytes: 500_000)
 )
 ```
 
-Every Process and Target terminal also has an async overload:
+Every Data and file terminal has synchronous and asynchronous forms. Async work does
+not occupy the caller's actor and preserves the standard `CancellationError`.
 
-```swift
-let result = try await WICompressor.process(originalData)
-```
-
-Async work runs without occupying the caller's actor. Cancellation is observed
-between pipeline stages and Target search attempts; an ImageIO or Core Graphics
-operation already in progress may finish first. Async overloads preserve the
-standard `CancellationError`, while image-processing failures remain
-``WICompressError``. Synchronous overloads keep typed
-`throws(WICompressError)` and do not observe surrounding task cancellation.
-
-The core never imports UIKit or AppKit.
+For implementation ownership, module dependencies, and pipeline internals, see the
+[architecture documentation](https://github.com/Weixi779/WICompress/blob/main/docs/architecture/README.md).
 
 ## Topics
 
-### Essentials
+### Start Here
+
+- <doc:Getting-Started>
+- <doc:Process-and-Target>
+- <doc:Concurrency-and-Cancellation>
+- <doc:Migrating-to-2.0>
+
+### 中文指南
+
+- <doc:Getting-Started-CN>
+- <doc:Process-and-Target-CN>
+- <doc:Concurrency-and-Cancellation-CN>
+- <doc:Migrating-to-2.0-CN>
+
+### Terminals and Results
 
 - ``WICompressor``
-- ``WIImageProcess``
+- ``WIResult``
 - ``WICompressError``
 
 ### Process
 
+- ``WIImageProcess``
 - ``WIImageSizing``
 - ``WIImageResizing``
 - ``WIImageResize``
 - ``WIImageCrop``
-- ``WIPixelSize``
+- ``WIAspectRatio``
+- ``WICropAnchor``
+
+### Target-Based Compression
+
+- ``WICompressionTarget``
+- ``WICompressionSizing``
 
 ### Output
 
@@ -79,20 +84,11 @@ The core never imports UIKit or AppKit.
 - ``WIJPEGBackground``
 - ``ImageMetadataOptions``
 - ``WIImageColorSpace``
-
-### Color Handling
-
 - ``WIColorSpace``
 - ``WIColor``
 
-### Target-Based Compression
-
-- ``WICompressionTarget``
-- ``WICompressionSizing``
-- ``WIAspectRatio``
-- ``WICropAnchor``
-- ``WIResult``
-
-### Values
+### Image Values
 
 - ``ImageFormat``
+- ``WIPixelSize``
+- ``WIImageOrientation``

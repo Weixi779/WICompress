@@ -43,15 +43,23 @@ identity; physical paths do not repeat the `WI` brand.
 
 ## Architecture Boundaries
 
-```text
-                    WIImageDomain
-                  ↑       ↑       ↑
-       WIImageIO  WIImageRendering  WICompressDomain
-                  ↖      ↑      ↗
-                WICompressExecution
-                         ↑
-                     WICompress
+```mermaid
+flowchart TD
+    Compress["WICompress"] --> ImageDomain["WIImageDomain"]
+    Compress --> CompressDomain["WICompressDomain"]
+    Compress --> Execution["WICompressExecution"]
+
+    Execution --> ImageDomain
+    Execution --> CompressDomain
+    Execution --> ImageIO["WIImageIO"]
+    Execution --> Rendering["WIImageRendering"]
+
+    CompressDomain --> ImageDomain
+    ImageIO --> ImageDomain
+    Rendering --> ImageDomain
 ```
+
+Arrows mean imports.
 
 - `WIImageDomain` owns shared image vocabulary and no execution lifecycle.
 - `WIImageIO` owns synchronous inspection, decode, transcode, and encode. It
@@ -68,10 +76,12 @@ Keep dependencies one-way. Do not introduce mirrored Core models, global
 registries, public Pipeline stages, or a second execution owner. `ImagePipeline`
 is internal orchestration; pure helpers receive only the values they need.
 
-Current V2 decisions live in `docs/V2_*`. Update the relevant decision document
-when a frozen contract changes. Do not duplicate complete Process/Target flows
-or algorithm details in this file; a consolidated architecture document will
-replace the evolving design set after the refactor is complete.
+Current architecture lives in `docs/architecture/`. Update the document owned by
+the affected module or execution boundary when a contract changes. Keep usage in
+README/DocC, migration in `docs/guides/`, and confirmed future work in
+`docs/ROADMAP.md`. Refactoring retrospectives belong in a separate article
+rather than product documentation. Do not duplicate complete Process/Target
+flows or algorithm details in this file.
 
 ## Code Style
 

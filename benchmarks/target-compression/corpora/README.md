@@ -1,7 +1,10 @@
 # Benchmark corpora
 
-本目录只保存 corpus 来源、许可边界与完整性锁，不保存任何图片或 ZIP。实际内容由
-`fetch-corpora.sh` 下载到已被 Git 忽略的 `../data/corpora/`。
+[简体中文](README_CN.md)
+
+This directory stores only corpus provenance, license boundaries, and
+integrity locks. It contains no images or ZIP archives. `fetch-corpora.sh`
+downloads requested data into the Git-ignored `../data/corpora/` directory.
 
 ```sh
 ./benchmarks/target-compression/fetch-corpora.sh --list
@@ -10,32 +13,46 @@
 ./benchmarks/target-compression/fetch-corpora.sh clic-mobile-valid
 ```
 
-不传 corpus 时脚本只显示用法并退出，不会默认下载约 355 MB 的两份 CLIC archive。
-必须显式传入 `all` 才会获取全部语料。每个 corpus 先在同一 data volume 的临时目录完成
-HTTP、archive 或图片 checksum、ZIP 成员名称、文件数量与扁平目录验证，然后才原子移动到
-最终目录。下载与解压都有 lock 中的字节上限；全局排他锁阻止并发安装。完成目录带有隐藏的
-完整性收据，绑定当前 corpus lock 指纹；再次执行会重新计算内容摘要并幂等复用，绝不会覆盖
-已有目标。网络传输没有不合理的固定总时长，只会在持续 60 秒低于 1 KiB/s 时判定为停滞。
+With no corpus argument, the script prints usage and exits; it does not
+silently download the two CLIC archives (about 355 MB). Pass `all` explicitly
+to fetch every corpus. Each corpus is validated in a temporary directory on
+the destination volume before an atomic move. Validation covers HTTP response,
+archive or image checksums, ZIP member names, file count, and flat directory
+shape. Download and extraction obey byte limits from the lock. A global lock
+prevents concurrent installation.
+
+Completed directories contain a hidden integrity receipt bound to the current
+corpus-lock fingerprint. A later run recomputes the content digest and reuses a
+matching installation without overwriting it. Network transfer has no arbitrary
+total timeout; it fails only after staying below 1 KiB/s for 60 seconds.
 
 ## Integrity provenance
 
-- CLIC archive 的 byte length 与 MD5 来自对应 Google Cloud Storage object metadata。
-- JPEG AI 官方只发布了解压后 16 张 PNG 的 MD5。ZIP 没有 upstream checksum，因此 lock
-  不为 ZIP 声称自制 checksum；部分 archive 还包含可选的 `__MACOSX/` 与对应 `._PNG`
-  AppleDouble 项。脚本逐成员只允许目标 PNG 和这些精确的 macOS metadata，并以官方 PNG
-  MD5 验证真正的图片内容。ZIP 的 HTTP `Content-Length` 以及通过官方 MD5 后的 PNG 长度是
-  2026-08-02 的本地观测锁，只用于在 checksum 之前限制资源消耗，不冒充上游 checksum。
-- CLIC archive checksum 已经固定全部内容；脚本另外要求其中恰好为 41/61 个名称唯一的
-  flat PNG，并在解压前执行 1 GiB 安全上限。JPEG AI 则锁定每一张 PNG 的精确名称、长度与
-  MD5。
+- CLIC archive byte lengths and MD5 values come from the corresponding Google
+  Cloud Storage object metadata.
+- JPEG AI publishes MD5 values for the 16 extracted PNGs, but no upstream ZIP
+  checksum. The lock therefore does not present a locally computed ZIP digest
+  as upstream provenance. Some archives contain optional `__MACOSX/` and matching
+  `._PNG` AppleDouble entries; the script allows only the target PNGs and those
+  exact macOS metadata members, then validates image content with the official
+  PNG MD5 values. ZIP HTTP `Content-Length` and post-MD5 PNG lengths are local
+  observation locks dated 2026-08-02. They constrain resources before checksum
+  validation and are not represented as upstream checksums.
+- A CLIC archive checksum covers its complete contents. The script additionally
+  requires exactly 41 or 61 uniquely named flat PNGs and enforces a 1 GiB
+  pre-extraction limit. JPEG AI locks each PNG's exact name, length, and MD5.
 
 ## License and redistribution boundary
 
-- CLIC Professional 官方附带
-  [Unsplash License](https://data.vision.ee.ethz.ch/cvl/clic/LICENSE_professional_2020.txt)，
-  允许在其条款下复制与分发。本项目仍只提供本地获取脚本，不再分发图片。
-- CLIC Mobile 的官方页面没有给出明确的再分发许可，状态记为 `unknown`。
-- JPEG AI CfE 页面提供公开下载与 checksum，但没有给出明确的再分发授权，状态记为
-  `unknown`。公开可下载不等于获得再分发许可。
+- CLIC Professional includes the
+  [Unsplash License](https://data.vision.ee.ethz.ch/cvl/clic/LICENSE_professional_2020.txt),
+  which permits copying and distribution under its terms. This repository
+  still provides only a local fetch script and does not redistribute images.
+- The official CLIC Mobile page does not state a clear redistribution grant;
+  its status is `unknown`.
+- JPEG AI CfE provides public downloads and checksums but no clear redistribution
+  grant; its status is `unknown`. Public availability is not redistribution
+  permission.
 
-下载与使用者仍需自行确认上游当时有效的条款；WICompress 的 Apache-2.0 不覆盖这些图片。
+Downloaders remain responsible for confirming the upstream terms in effect at
+the time of use. WICompress's Apache-2.0 license does not cover these images.
