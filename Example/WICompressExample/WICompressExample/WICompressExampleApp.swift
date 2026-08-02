@@ -12,17 +12,7 @@ import SwiftUI
 struct WICompressExampleApp: App {
     var body: some Scene {
         WindowGroup {
-            TabView {
-                WICompressExampleView()
-                    .tabItem {
-                        Label("PhotosPicker", systemImage: "photo.on.rectangle")
-                    }
-                
-                UIKitPickerView()
-                    .tabItem {
-                        Label("PHPicker", systemImage: "photo.stack")
-                    }
-            }
+            CompressionDemoView()
         }
     }
 }

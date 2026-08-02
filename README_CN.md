@@ -98,11 +98,10 @@ target API 分享缩略图示例。前三行优先展示 HEIC，因为这是最�
 
 示例覆盖：
 
-- `PhotosPicker` 和 `PHPickerViewController` 获取原始图片 `Data`
-- `WICompressor.process(_:)` 处理
-- 格式检测
-- 原图 / 压缩图预览
-- 文件大小和压缩比展示
+- `PhotosPicker` 获取图片，以及请求级任务取消
+- 异步默认 Process 与 500 KB Target 压缩
+- 通过 `WIImageIO` 读取强类型源图信息
+- 原图 / 结果图预览，以及格式、像素尺寸和字节数对比
 
 ## API 示例
 

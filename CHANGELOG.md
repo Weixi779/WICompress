@@ -44,6 +44,8 @@ domains: deterministic image processing and byte-target compression.
 - Async terminals preserve the standard `CancellationError`; synchronous
   terminals retain their typed `throws(WICompressError)` signatures and do not
   observe surrounding task cancellation.
+- The SwiftUI example is now a Swift 6 single-screen Process/Target demo with
+  request-owned loading, cancellation, and typed ImageIO inspection.
 
 ### Removed
 

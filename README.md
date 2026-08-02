@@ -110,11 +110,10 @@ The repository includes a SwiftUI example app:
 
 The example demonstrates:
 
-- `PhotosPicker` and `PHPickerViewController` data loading
-- raw `Data` compression
-- format detection
-- original/compressed preview
-- file-size and compression-ratio display
+- `PhotosPicker` loading with request-owned task cancellation
+- asynchronous default Process and 500 KB Target compression
+- typed source inspection through `WIImageIO`
+- original/result previews with format, pixel-size, and byte-count comparison
 
 ## API Examples
 
