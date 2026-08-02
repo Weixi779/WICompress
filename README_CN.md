@@ -341,6 +341,12 @@ policy API。Package import 仍为 `WICompress`，静态执行入口改为
 `WICompressor`。详情见 [2.0 迁移指南](docs/V2_MIGRATION_CN.md) 和
 [CHANGELOG.md](CHANGELOG.md)。
 
+## Benchmark
+
+仓库提供 Target 压缩的 Release 黑盒 benchmark。它使用固定 corpus 测量当前公开 terminal，
+记录 hard byte limit、输出形态、原始耗时样本、执行环境和可复现信息。使用方式见
+[Target compression benchmark](benchmarks/target-compression/README.md)。
+
 ## 许可证
 
 WICompress 基于 Apache-2.0 许可证开源。详情见 `LICENSE.txt`。

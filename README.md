@@ -371,6 +371,14 @@ static terminal is now `WICompressor`. See
 [the 2.0 migration guide](docs/V2_MIGRATION_CN.md) and
 [CHANGELOG.md](CHANGELOG.md) for details.
 
+## Benchmarks
+
+The repository includes a Release-mode black-box benchmark for Target
+compression. It measures the current public terminal against a fixed corpus and
+records hard-limit correctness, output shape, timing samples, environment, and
+reproducibility facts. See the
+[Target compression benchmark](benchmarks/target-compression/README.md).
+
 ## License
 
 WICompress is available under the Apache-2.0 license. See `LICENSE.txt` for details.

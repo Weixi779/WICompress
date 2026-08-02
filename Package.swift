@@ -22,6 +22,10 @@ let package = Package(
             name: "WIImageIO",
             targets: ["WIImageIO"]
         ),
+        .executable(
+            name: "TargetCompressionBenchmark",
+            targets: ["TargetCompressionBenchmark"]
+        ),
     ],
     dependencies: [],
     targets: [
@@ -95,6 +99,12 @@ let package = Package(
             ],
             path: "Tests/WICompressTests",
             resources: [.copy("Resources")]
+        ),
+        .executableTarget(
+            name: "TargetCompressionBenchmark",
+            dependencies: ["WICompress", "WIImageIO"],
+            path: "benchmarks/target-compression",
+            exclude: ["README.md"]
         ),
         .executableTarget(
             name: "WICompressDocAssetGenerator",
