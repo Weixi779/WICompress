@@ -47,8 +47,9 @@
 - `WICompressionTarget` / `WICompressionSizing`
 - `WICompressError`
 
-Luban 纯尺寸算法与数值规范化留在 `WICompressDomain`，作为请求构造和
-`WIImageResize.luban` 的实现细节。
+Luban 1/2 纯尺寸算法与数值规范化留在 `WICompressDomain`，作为请求构造和
+`WIImageResize.luban` / `.lubanV2` 的实现细节。两个版本都不拥有 quality、
+目标字节或编码格式。
 
 ## 不属于 Domain 的事实
 

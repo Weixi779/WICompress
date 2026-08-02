@@ -394,16 +394,18 @@ struct WICompressImageIOCoreTests {
         let outputData = try WICompressor.process(inputData).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        let ratio = WILuban.ratio(
-            width: inputInfo.displayWidth,
-            height: inputInfo.displayHeight
+        let expectedSize = try WIImageResize.lubanV2.targetSize(
+            for: WIPixelSize(
+                width: inputInfo.displayWidth,
+                height: inputInfo.displayHeight
+            )
         )
 
         #expect(try imageFormat(of: outputData) == imageFormat(of: inputData))
         #expect(outputInfo.hasGPS == false)
         #expect(outputInfo.orientation == 1)
-        #expect(outputInfo.displayWidth == max(inputInfo.displayWidth / ratio, 1))
-        #expect(outputInfo.displayHeight == max(inputInfo.displayHeight / ratio, 1))
+        #expect(outputInfo.displayWidth == expectedSize.width)
+        #expect(outputInfo.displayHeight == expectedSize.height)
         #expect(outputData.count < inputData.count)
     }
 

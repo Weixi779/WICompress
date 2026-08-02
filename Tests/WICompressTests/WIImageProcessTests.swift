@@ -90,7 +90,7 @@ struct WIImageProcessTests {
     }
 
     @Test(
-        "Public Luban resizing returns frozen target sizes",
+        "Public Luban 1 resizing returns frozen target sizes",
         arguments: [
             (
                 WIPixelSize(width: 3_000, height: 2_000),
@@ -100,6 +100,10 @@ struct WIImageProcessTests {
                 WIPixelSize(width: 1_440, height: 3_200),
                 WIPixelSize(width: 720, height: 1_600)
             ),
+            (
+                WIPixelSize(width: .max, height: 1),
+                WIPixelSize(width: .max, height: 1)
+            ),
         ]
     )
     func lubanTargetSize(
@@ -108,6 +112,109 @@ struct WIImageProcessTests {
     ) throws {
         #expect(
             try WIImageResize.luban.targetSize(for: source) == expected
+        )
+    }
+
+    @Test(
+        "Luban 2 resizing returns mobile-oriented target sizes",
+        arguments: [
+            (
+                WIPixelSize(width: 100, height: 100),
+                WIPixelSize(width: 100, height: 100)
+            ),
+            (
+                WIPixelSize(width: 1, height: 1),
+                WIPixelSize(width: 1, height: 1)
+            ),
+            (
+                WIPixelSize(width: 1, height: 3),
+                WIPixelSize(width: 1, height: 2)
+            ),
+            (
+                WIPixelSize(width: 3_024, height: 4_032),
+                WIPixelSize(width: 1_440, height: 1_920)
+            ),
+            (
+                WIPixelSize(width: 4_000, height: 6_000),
+                WIPixelSize(width: 1_440, height: 2_160)
+            ),
+            (
+                WIPixelSize(width: 1_440, height: 3_200),
+                WIPixelSize(width: 1_440, height: 3_200)
+            ),
+            (
+                WIPixelSize(width: 12_000, height: 5_000),
+                WIPixelSize(width: 1_440, height: 600)
+            ),
+            (
+                WIPixelSize(width: 10_800, height: 4_320),
+                WIPixelSize(width: 2_700, height: 1_080)
+            ),
+            (
+                WIPixelSize(width: 10_800, height: 4_321),
+                WIPixelSize(width: 1_440, height: 576)
+            ),
+            (
+                WIPixelSize(width: 10_000, height: 4_096),
+                WIPixelSize(width: 3_514, height: 1_440)
+            ),
+            (
+                WIPixelSize(width: 10_001, height: 4_096),
+                WIPixelSize(width: 2_500, height: 1_024)
+            ),
+            (
+                WIPixelSize(width: 4_000, height: 12_000),
+                WIPixelSize(width: 1_000, height: 3_000)
+            ),
+            (
+                WIPixelSize(width: 32_000, height: 5_120),
+                WIPixelSize(width: 8_000, height: 1_280)
+            ),
+            (
+                WIPixelSize(width: 32_008, height: 5_120),
+                WIPixelSize(width: 7_992, height: 1_278)
+            ),
+            (
+                WIPixelSize(width: 1_242, height: 22_080),
+                WIPixelSize(width: 758, height: 13_490)
+            ),
+            (
+                WIPixelSize(width: 196_928, height: 208),
+                WIPixelSize(width: 49_232, height: 52)
+            ),
+            (
+                WIPixelSize(
+                    width: 45_036_894_121_365_315,
+                    height: 18_014_757_648_546_126
+                ),
+                WIPixelSize(width: 3_600, height: 1_440)
+            ),
+            (
+                WIPixelSize(width: 1, height: .max),
+                WIPixelSize(width: 1, height: 10_240_000)
+            ),
+        ]
+    )
+    func lubanV2TargetSize(
+        source: WIPixelSize,
+        expected: WIPixelSize
+    ) throws {
+        #expect(
+            try WIImageResize.lubanV2.targetSize(for: source) == expected
+        )
+    }
+
+    @Test("Default Process uses Luban 2 while Luban 1 remains explicit")
+    func defaultProcessUsesLubanV2() throws {
+        let source = WIPixelSize(width: 1_440, height: 3_200)
+
+        #expect(
+            try WIImageProcess.default.geometry(for: source).targetPixelSize
+                == WIPixelSize(width: 1_440, height: 3_200)
+        )
+        #expect(
+            try WIImageResize.luban.targetSize(for: source)
+                == WIPixelSize(width: 720, height: 1_600)
         )
     }
 

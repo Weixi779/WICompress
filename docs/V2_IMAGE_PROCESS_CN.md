@@ -87,10 +87,15 @@ let result = try WICompressor.process(contentsOf: url, using: process)
 只有 passthrough 需要返回原始 bytes 时，才按需读取文件；decode、thumbnail、transcode 和
 encode 路径继续由 URL source 驱动。
 
-`WIImageResize` 提供 `.luban`、`.maximumPixelSize(_:)`、
+`WIImageResize` 提供 `.lubanV2`、`.luban`、`.maximumPixelSize(_:)`、
 `.constrained(within:allowingUpscaling:)`、`.scaled(by:)` 和 `.exact(_:)`。
 调用方也可以直接实现 `WIImageResizing`。这些便利实现不会扩展
 `WIImageSizing` 的核心 case。
+
+Process 默认使用 `.lubanV2`。它只移植 Luban 2 的移动端尺寸决策，包括 1440
+短边基线、`wall` 大图分支、超大源图降采样、10.24MP 目标上限、不放大和偶数尺寸规范化；
+不会接管 quality、目标字节或输出格式。`.luban` 保留 WICompress 已修正部分上游问题的
+Luban 1 行为，供需要旧尺寸结果的调用方显式选择。
 
 anchor 与 quality 是可安全规范化的偏好：anchor clamp 到 `0...1`，quality clamp 到
 `0...1`；NaN 分别回退到中心和默认 `0.6`。ratio 与 scale 没有可信的自动修复语义，
@@ -126,7 +131,7 @@ point 或 Target solver context。
 调用方因此可以：
 
 - 直接返回业务已经计算好的像素尺寸。
-- 使用 WICompress 提供的等比缩小、明确允许放大的等比缩放、exact size 或 Luban 实现。
+- 使用 WICompress 提供的等比缩小、明确允许放大的等比缩放、exact size 或 Luban 1/2 实现。
 - 实现自己的 source-size-to-target-size 算法，而不扩展 WICompress 的公共 case。
 
 内置实现是协议的便利值或静态工厂，不升级为 `fit`、`fill`、`fitInside` 等新的核心

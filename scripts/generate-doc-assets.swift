@@ -112,7 +112,7 @@ enum GenerateDocAssets {
             Sample(
                 title: "PNG - panoramic screenshot",
                 filename: "real_png_1928x464_pano.png",
-                note: "Long PNG keeps full resolution - Luban sizes by the short side, so long images are not over-shrunk",
+                note: "Luban 2 keeps this ordinary panoramic screenshot at full resolution instead of over-shrinking it",
                 compression: .process(.default)
             ),
             Sample(

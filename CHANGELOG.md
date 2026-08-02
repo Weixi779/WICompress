@@ -16,6 +16,8 @@ domains: deterministic image processing and byte-target compression.
   `WIImageProcess`.
 - Extensible `WIImageResizing`, built-in `WIImageResize` algorithms, and
   aspect-ratio crop with normalized anchors.
+- `WIImageResize.lubanV2`, with mobile-oriented sizing for standard photos,
+  panoramas, large-pixel sources, and long images.
 - Shared `WIImageOutput` requirements for representation, metadata, and color
   space.
 - One `WIResult` from every Process and Target terminal.
@@ -32,6 +34,8 @@ domains: deterministic image processing and byte-target compression.
   `WIImageOutput` and execution-plan boundary.
 - Process terminals now return `WIResult`; callers that only need encoded bytes
   read `result.data`.
+- The default Process sizing is now Luban 2. The corrected Luban 1 behavior
+  remains available through explicit `WIImageResize.luban`.
 - The package requires Swift 6.2 and Xcode 26.
 
 ### Removed

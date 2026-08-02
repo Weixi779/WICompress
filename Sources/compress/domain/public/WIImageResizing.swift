@@ -20,6 +20,7 @@ public protocol WIImageResizing: Sendable {
 public struct WIImageResize: WIImageResizing, Sendable, Equatable {
     private enum Operation: Sendable, Equatable {
         case luban
+        case lubanV2
         case maximumPixelSize(Int)
         case constrained(WIPixelSize, allowsUpscaling: Bool)
         case scaled(Double)
@@ -32,8 +33,11 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
         self.operation = operation
     }
 
-    /// Applies WICompress's Luban-derived proportional reduction.
+    /// Applies WICompress's corrected Luban 1 proportional reduction.
     public static let luban = WIImageResize(operation: .luban)
+
+    /// Applies Luban 2's mobile-oriented sizing without changing quality or format.
+    public static let lubanV2 = WIImageResize(operation: .lubanV2)
 
     /// Caps the longest side without upscaling.
     public static func maximumPixelSize(_ value: Int) -> WIImageResize {
@@ -74,7 +78,7 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
     ) throws(WICompressError) -> WIPixelSize {
         switch operation {
         case .luban:
-            let ratio = WILuban.ratio(
+            let ratio = WILuban.legacyScaleFactor(
                 width: sourceSize.width,
                 height: sourceSize.height
             )
@@ -92,6 +96,8 @@ public struct WIImageResize: WIImageResizing, Sendable, Equatable {
                 ),
                 allowsUpscaling: false
             )
+        case .lubanV2:
+            return try WILuban.v2TargetSize(for: sourceSize)
         case .maximumPixelSize(let value):
             return try constrainedSize(
                 sourceSize,

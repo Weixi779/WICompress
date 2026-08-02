@@ -25,7 +25,7 @@ public struct WIImageProcess: Sendable {
     public let output: WIImageOutput
 
     public init(
-        sizing: WIImageSizing = .resize(using: WIImageResize.luban),
+        sizing: WIImageSizing = .resize(using: WIImageResize.lubanV2),
         crop: WIImageCrop? = nil,
         quality: Double? = 0.6,
         output: WIImageOutput = WIImageOutput()

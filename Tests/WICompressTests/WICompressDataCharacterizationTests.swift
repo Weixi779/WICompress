@@ -61,16 +61,16 @@ struct WICompressDataCharacterizationTests {
         let outputData = try WICompressor.process(inputData).data
         let outputInfo = try Self.imageInfo(outputData)
 
-        let ratio = WILuban.ratio(
-            width: inputInfo.displayWidth,
-            height: inputInfo.displayHeight
+        let expectedSize = try WIImageResize.lubanV2.targetSize(
+            for: WIPixelSize(
+                width: inputInfo.displayWidth,
+                height: inputInfo.displayHeight
+            )
         )
-        let expectedWidth = max(inputInfo.displayWidth / ratio, 1)
-        let expectedHeight = max(inputInfo.displayHeight / ratio, 1)
 
         #expect(try imageFormat(of: outputData) == imageFormat(of: inputData))
-        #expect(abs(outputInfo.displayWidth - expectedWidth) <= 1)
-        #expect(abs(outputInfo.displayHeight - expectedHeight) <= 1)
+        #expect(abs(outputInfo.displayWidth - expectedSize.width) <= 1)
+        #expect(abs(outputInfo.displayHeight - expectedSize.height) <= 1)
     }
 
     private static func imageInfo(_ data: Data) throws -> ImageInfo {

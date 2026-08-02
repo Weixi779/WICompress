@@ -41,7 +41,7 @@ let uploadData = try WICompressor.process(
 
 - **Data in, structured result out**：保留相册、文件或网络拿到的原始字节，
   从 `WIResult` 获取编码数据、格式、像素尺寸和字节数。
-- **适合上传的默认值**：Luban resize、metadata strip、JPEG/HEIC 有损质量。
+- **适合上传的默认值**：Luban 2 resize、metadata strip、JPEG/HEIC 有损质量。
 - **目标约束压缩**：当 SDK 或后端要求明确字节上限时，可以用 `maxBytes`
   搭配 geometry 表达目标。
 - **处理过程可组合**：crop、resizing、quality 和 output 是
@@ -82,8 +82,8 @@ swift run WICompressDocAssetGenerator
 
 图里大多数行使用默认 API，同时包含一行用显式 `WICompressionTarget` 生成的
 target API 分享缩略图示例。前三行优先展示 HEIC，因为这是最值得被用户看到的
-真实场景；后面再展示 JPEG 和 PNG。PNG 不是被跳过：长截图触发 Luban resize
-后会变小，而 alpha PNG 这一行只是 no-op case，原图本身已经是更好的结果。
+真实场景；后面再展示 JPEG 和 PNG。普通宽幅截图不会被 Luban 2 过度缩小，
+而 alpha PNG 这一行也是 no-op case，原图本身已经是更好的结果。
 
 ## 示例项目
 
@@ -121,7 +121,7 @@ let result = try WICompressor.process(contentsOf: imageURL)
 let result = try WICompressor.process(
     originalData,
     using: WIImageProcess(
-        sizing: .resize(using: WIImageResize.luban),
+        sizing: .resize(using: WIImageResize.lubanV2),
         quality: 0.7,
         output: WIImageOutput(
             representation: .preserve,
@@ -219,7 +219,7 @@ let previewImage = UIImage(data: result.data)
 
 ## Image Process
 
-`WIImageProcess` 描述一次确定性的图片处理。默认使用 Luban resize、`0.6`
+`WIImageProcess` 描述一次确定性的图片处理。默认使用 Luban 2 resize、`0.6`
 quality、保持源容器、移除 metadata，并保留源图色彩语义。
 
 ```swift
@@ -232,9 +232,11 @@ public struct WIImageProcess {
 ```
 
 Sizing 刻意只保留两条分支：保留当前像素尺寸，或者交给一个
-`WIImageResizing` 实现返回完整目标尺寸。内置算法包括 `luban`、
-`maximumPixelSize`、`constrained`、`scaled` 和 `exact`。尺寸受业务规则
-控制时，应用可以自行实现 `WIImageResizing`。
+`WIImageResizing` 实现返回完整目标尺寸。内置算法包括 `lubanV2`、`luban`、
+`maximumPixelSize`、`constrained`、`scaled` 和 `exact`。`lubanV2` 是默认的
+移动端尺寸算法；`luban` 保留 WICompress 修正过部分上游问题的 Luban 1 行为。
+两者都只决定像素尺寸，不改变 quality 或输出格式。尺寸受业务规则控制时，应用可以
+自行实现 `WIImageResizing`。
 
 Crop 是可选的宽高比与归一化 `WICropAnchor`，先于 resizing 解析。Output
 独立声明 representation（保持源容器、JPEG、PNG、HEIC、按 Alpha 选择

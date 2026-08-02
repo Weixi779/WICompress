@@ -9,7 +9,7 @@
 import Testing
 @testable import WICompressDomain
 
-@Suite("Luban Ratio Policy", .tags(.luban))
+@Suite("Luban 1 Ratio", .tags(.luban))
 struct LubanRatioTests {
 
     struct RatioCase: CustomTestStringConvertible, Sendable {
@@ -40,7 +40,7 @@ struct LubanRatioTests {
         RatioCase(width: 1280, height: 640, expected: 1, testDescription: "wide image at longSide boundary 1280"),
         // Branch 7: default (aspectRatio < 0.5) → ceil(shortSide / 1280)
         // (original Luban constrains the SHORT side here; dividing the long side
-        // over-shrinks long images. See WILuban default branch.)
+        // over-shrinks long images. See WILuban.legacyScaleFactor.)
         RatioCase(width: 2000, height: 500, expected: 1, testDescription: "very wide image, short side 500"),
         RatioCase(width: 2560, height: 256, expected: 1, testDescription: "panoramic image, short side 256"),
         RatioCase(width: 1440, height: 3200, expected: 2, testDescription: "long screenshot, short side 1440"),
@@ -51,7 +51,10 @@ struct LubanRatioTests {
 
     @Test("Ratio calculation covers all branches", arguments: ratioCases)
     func ratioForBranch(_ ratioCase: RatioCase) {
-        let ratio = WILuban.ratio(width: ratioCase.width, height: ratioCase.height)
+        let ratio = WILuban.legacyScaleFactor(
+            width: ratioCase.width,
+            height: ratioCase.height
+        )
         #expect(ratio == ratioCase.expected)
     }
 
@@ -71,6 +74,7 @@ struct LubanRatioTests {
             EnsureEvenCase(value: 1, expected: 2, testDescription: "odd number 1 increments to 2"),
             EnsureEvenCase(value: 99, expected: 100, testDescription: "odd number 99 increments to 100"),
             EnsureEvenCase(value: 1279, expected: 1280, testDescription: "odd boundary 1279 increments to 1280"),
+            EnsureEvenCase(value: .max, expected: .max - 1, testDescription: "maximum integer decrements safely"),
             EnsureEvenCase(value: 0, expected: 0, testDescription: "zero remains zero"),
             EnsureEvenCase(value: -3, expected: -2, testDescription: "negative odd increments toward even"),
         ]

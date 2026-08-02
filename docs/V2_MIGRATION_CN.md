@@ -27,6 +27,11 @@ import WICompress
 若代码曾跟随未发布的 2.0 草案使用 `WICompress.process`，只需把 facade 改为
 `WICompressor.process`。
 
+2.0 的默认 Process 尺寸算法升级为 `WIImageResize.lubanV2`。它会比 Luban 1
+更完整地保留普通长截图，并限制超长图和超大像素输入。需要延续 WICompress 修正版
+Luban 1 尺寸结果时，应显式传入 `.resize(using: WIImageResize.luban)`；两个版本都不会
+隐式改变 Process 的 quality 或输出格式。
+
 例如：
 
 ```swift

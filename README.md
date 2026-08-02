@@ -42,7 +42,7 @@ let uploadData = try WICompressor.process(
 
 - **Data in, structured result out**: keep picker/file/network bytes, then use
   the encoded data, format, pixel size, and byte count from one `WIResult`.
-- **Upload-ready defaults**: Luban resize, metadata stripping, and JPEG/HEIC
+- **Upload-ready defaults**: Luban 2 resize, metadata stripping, and JPEG/HEIC
   lossy quality are configured for common app uploads.
 - **Selective metadata**: preserve Exif, IPTC, TIFF, maker notes, or standard
   GPS independently; `.preserve.subtracting(.gps)` keeps the remaining
@@ -94,9 +94,9 @@ swift run WICompressDocAssetGenerator
 The preview uses the default API for most rows and includes one target-based
 sharing thumbnail row built from an explicit `WICompressionTarget`. It shows
 three HEIC photos first because HEIC is the most important real-world case, then
-JPEG and PNG examples. PNG is not skipped: the panoramic screenshot shrinks when
-Luban resize is triggered, while the alpha PNG is a no-op case where the
-original data is already the better result.
+JPEG and PNG examples. PNG is not skipped: Luban 2 avoids over-shrinking the
+ordinary panoramic screenshot, while the alpha PNG is also a no-op case where
+the original data is already the better result.
 
 ## Example Project
 
@@ -134,7 +134,7 @@ Declare an explicit process:
 let result = try WICompressor.process(
     originalData,
     using: WIImageProcess(
-        sizing: .resize(using: WIImageResize.luban),
+        sizing: .resize(using: WIImageResize.lubanV2),
         quality: 0.7,
         output: WIImageOutput(
             representation: .preserve,
@@ -237,7 +237,7 @@ directly from the original bytes.
 ## Image Process
 
 `WIImageProcess` describes one deterministic operation. Its default uses the
-Luban-derived resizing algorithm, quality `0.6`, source representation,
+Luban 2 resizing algorithm, quality `0.6`, source representation,
 stripped metadata, and preserved color-space semantics.
 
 ```swift
@@ -251,8 +251,11 @@ public struct WIImageProcess {
 
 Sizing deliberately has only two branches: keep the current pixels or ask a
 `WIImageResizing` implementation for a complete target size. Built-ins include
-`luban`, `maximumPixelSize`, `constrained`, `scaled`, and `exact`. Applications
-can implement `WIImageResizing` when sizing follows product-specific rules.
+`lubanV2`, `luban`, `maximumPixelSize`, `constrained`, `scaled`, and `exact`.
+`lubanV2` is the default mobile-oriented algorithm. `luban` preserves
+WICompress's corrected Luban 1 behavior. Both decide pixel size only; neither
+changes quality or output format. Applications can implement `WIImageResizing`
+when sizing follows product-specific rules.
 
 Crop is an optional aspect ratio plus a normalized `WICropAnchor`; it is
 resolved before resizing. Output independently declares representation

@@ -61,6 +61,10 @@ Implementation status:
 - Completed: synchronous `WIImageProcess` vertical slice with public
   `WIPixelSize`, resizing slot and built-ins, aspect-ratio crop, shared Output
   values, pure geometry calculation, and direct pipeline execution.
+- Completed: Luban 2's portable pixel-sizing rules are available as
+  `WIImageResize.lubanV2` and are the Process default. The corrected Luban 1
+  behavior remains available as explicit `.luban`; neither sizing algorithm
+  owns quality, target bytes, or representation.
 - Completed: file-backed Process URL execution, on-demand original-byte reads,
   two-axis-safe thumbnail sampling, and overflow validation before Rendering.
 - Completed: Target now uses the shared `WIImageOutput`; its frozen default is
