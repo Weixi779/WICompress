@@ -20,12 +20,16 @@ Package 发布两个可以独立使用的 library：
 
 ## 压缩效果
 
-下图通过 public API 和仓库真实 fixtures 生成，覆盖默认 Process、格式转换、Target
-压缩、HEIC、JPEG、PNG、透明度与 passthrough 场景。
+下列明暗主题图通过 public API 和仓库真实 fixtures 生成，显式使用 Luban 2，并覆盖
+格式转换、Target 压缩、HEIC、JPEG、PNG、透明度与 passthrough 场景。
 
-![WICompress 压缩效果对比](docs/assets/compression-comparison.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/compression-comparison-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/compression-comparison-light.svg">
+  <img alt="WICompress 压缩效果对比" src="docs/assets/compression-comparison-light.svg">
+</picture>
 
-使用 `swift run WICompressDocAssetGenerator` 可以重新生成。
+使用 `swift run WICompressDocAssetGenerator` 可以重新生成两个版本。
 
 ## 快速开始
 
@@ -34,7 +38,7 @@ Mac Catalyst 14、tvOS 14、watchOS 7 与 visionOS 1 以上。
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Weixi779/WICompress.git", from: "2.0.0")
+    .package(url: "https://github.com/Weixi779/WICompress.git", from: "2.0.1")
 ]
 ```
 

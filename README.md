@@ -21,13 +21,17 @@ The package publishes two independent libraries:
 
 ## Compression Preview
 
-This image is generated from real repository fixtures through the public API.
-It includes default Process, format conversion, Target compression, HEIC, JPEG,
-PNG, transparency, and passthrough cases.
+These theme-aware diagrams are generated from real repository fixtures through
+the public API. They explicitly use Luban 2 and include format conversion,
+Target compression, HEIC, JPEG, PNG, transparency, and passthrough cases.
 
-![WICompress compression comparison](docs/assets/compression-comparison.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/compression-comparison-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/compression-comparison-light.svg">
+  <img alt="WICompress compression comparison" src="docs/assets/compression-comparison-light.svg">
+</picture>
 
-Regenerate it with `swift run WICompressDocAssetGenerator`.
+Regenerate both variants with `swift run WICompressDocAssetGenerator`.
 
 ## Quick Start
 
@@ -36,7 +40,7 @@ macOS 11, Mac Catalyst 14, tvOS 14, watchOS 7, and visionOS 1 or later.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Weixi779/WICompress.git", from: "2.0.0")
+    .package(url: "https://github.com/Weixi779/WICompress.git", from: "2.0.1")
 ]
 ```
 

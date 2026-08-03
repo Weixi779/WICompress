@@ -7,38 +7,38 @@
 //
 
 import CoreGraphics
-import CoreText
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 import WICompress
 
-private let canvasWidth = 1600
+private let canvasWidth = 1_600
 private let headerHeight = 176
 private let rowHeight = 310
 private let cardHeight = 268
-private let bottomPadding = 116
+private let bottomPadding = 72
 
-struct Sample {
+private struct Sample {
     let title: String
     let filename: String
     let note: String
     let compression: SampleCompression
 }
 
-enum SampleCompression {
+private enum SampleCompression {
     case process(WIImageProcess)
     case target(WICompressionTarget)
 }
 
-struct ImageSummary {
-    let data: Data
+private struct ImageSummary {
     let thumbnail: CGImage
+    let thumbnailData: Data
+    let thumbnailMediaType: String
     let format: String
     let displaySize: CGSize
 }
 
-struct RenderedSample {
+private struct RenderedSample {
     let sample: Sample
     let inputData: Data
     let outputData: Data
@@ -46,223 +46,311 @@ struct RenderedSample {
     let compressed: ImageSummary
 }
 
+private enum AssetTheme: CaseIterable {
+    case light
+    case dark
+
+    var filename: String {
+        switch self {
+        case .light:
+            return "compression-comparison-light.svg"
+        case .dark:
+            return "compression-comparison-dark.svg"
+        }
+    }
+
+    var palette: Palette {
+        switch self {
+        case .light:
+            return Palette(
+                background: "#F6F8FA",
+                card: "#FFFFFF",
+                border: "#D0D7DE",
+                primaryText: "#1F2328",
+                secondaryText: "#59636E",
+                accent: "#1A7F37",
+                checkerLight: "#EAEEF2",
+                checkerDark: "#D8DEE4",
+                checkerBorder: "#AFB8C1"
+            )
+        case .dark:
+            return Palette(
+                background: "#0D1117",
+                card: "#161B22",
+                border: "#30363D",
+                primaryText: "#F0F6FC",
+                secondaryText: "#8B949E",
+                accent: "#3FB950",
+                checkerLight: "#21262D",
+                checkerDark: "#30363D",
+                checkerBorder: "#484F58"
+            )
+        }
+    }
+}
+
+private struct Palette {
+    let background: String
+    let card: String
+    let border: String
+    let primaryText: String
+    let secondaryText: String
+    let accent: String
+    let checkerLight: String
+    let checkerDark: String
+    let checkerBorder: String
+}
+
 @main
-enum GenerateDocAssets {
+private enum GenerateDocAssets {
     static func main() throws {
         let rootURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let fixtureURL = rootURL.appendingPathComponent("Tests/WICompressTests/Resources")
-        let outputURL = rootURL.appendingPathComponent("docs/assets/compression-comparison.png")
-
-        let samples = [
-            Sample(
-                title: "HEIC photo - flowers",
-                filename: "real_heic_4032x3024_o6_gps_hdr.heic",
-                note: "Default compression keeps HEIC and preserves the display result",
-                compression: .process(.default)
-            ),
-            Sample(
-                title: "HEIC -> JPEG (forced format)",
-                filename: "real_heic_4032x3024_o6_gps_hdr.heic",
-                note: "Explicit JPEG representation transcodes and resizes the HEIC source for upload endpoints that only accept JPEG",
-                compression: .process(
-                    WIImageProcess(
-                        output: WIImageOutput(
-                            representation: .jpeg()
-                        )
-                    )
-                )
-            ),
-            Sample(
-                title: "HEIC photo - large landscape",
-                filename: "real_heic_5712x4284_o6_gps_hdr.heic",
-                note: "Large HEIC photos get resized and re-encoded for upload",
-                compression: .process(.default)
-            ),
-            Sample(
-                title: "HEIC photo - circle cutout",
-                filename: "real_heic_3001x2458_alpha_circle.heic",
-                note: "Transparent HEIC artwork stays clean while file size drops",
-                compression: .process(.default)
-            ),
-            Sample(
-                title: "JPEG - landscape photo",
-                filename: "real_jpeg_2098x1350_landscape.jpg",
-                note: "JPEG gets the expected upload-style size reduction",
-                compression: .process(.default)
-            ),
-            Sample(
-                title: "Target API - share thumbnail",
-                filename: "real_jpeg_2098x1350_landscape.jpg",
-                note: "A WICompressionTarget solves bytes and geometry together for a 32 KiB square thumbnail",
-                compression: .target(
-                    try WICompressionTarget(
-                        maxBytes: 32 * 1024,
-                        sizing: WICompressionSizing(
-                            maximumPixelSize: 200,
-                            aspectRatio: .square
-                        ),
-                        output: WIImageOutput(
-                            representation: .jpeg(background: .white),
-                            metadata: .strip,
-                            colorSpace: .convert(to: .sRGB)
-                        )
-                    )
-                )
-            ),
-            Sample(
-                title: "PNG - panoramic screenshot",
-                filename: "real_png_1928x464_pano.png",
-                note: "Luban 2 keeps this ordinary panoramic screenshot at full resolution instead of over-shrinking it",
-                compression: .process(.default)
-            ),
-            Sample(
-                title: "PNG - alpha no-op case",
-                filename: "real_png_1086x1630_alpha.png",
-                note: "This PNG does not need resize; Process returns the original and alpha remains",
-                compression: .process(.default)
-            ),
-        ]
-        let canvasHeight = headerHeight + samples.count * rowHeight + bottomPadding
+        let outputDirectory = rootURL.appendingPathComponent("docs/assets")
 
         try FileManager.default.createDirectory(
-            at: outputURL.deletingLastPathComponent(),
+            at: outputDirectory,
             withIntermediateDirectories: true
         )
 
         let renderedSamples = try samples.map { sample in
-            let inputURL = fixtureURL.appendingPathComponent(sample.filename)
-            let inputData = try Data(contentsOf: inputURL)
-            let outputData: Data
-            switch sample.compression {
-            case .process(let process):
-                outputData = try WICompressor.process(inputData, using: process).data
-            case .target(let target):
-                outputData = try WICompressor.compress(inputData, to: target).data
-            }
-            return RenderedSample(
-                sample: sample,
-                inputData: inputData,
-                outputData: outputData,
-                original: try summarize(data: inputData, maxPixel: 360),
-                compressed: try summarize(data: outputData, maxPixel: 360)
-            )
+            try render(sample, fixtureURL: fixtureURL)
         }
 
-        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-        guard let context = CGContext(
-            data: nil,
-            width: canvasWidth,
-            height: canvasHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            fatalError("Failed to create bitmap context")
+        for theme in AssetTheme.allCases {
+            let outputURL = outputDirectory.appendingPathComponent(theme.filename)
+            let document = svgDocument(for: renderedSamples, theme: theme)
+            try document.write(to: outputURL, atomically: true, encoding: .utf8)
+            print("Generated \(outputURL.path)")
         }
+    }
 
-        context.setFillColor(CGColor(gray: 0.97, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight))
+    private static var samples: [Sample] {
+        get throws {
+            [
+                Sample(
+                    title: "HEIC photo - flowers",
+                    filename: "real_heic_4032x3024_o6_gps_hdr.heic",
+                    note: "Luban 2 keeps HEIC and preserves the display result",
+                    compression: .process(lubanV2Process())
+                ),
+                Sample(
+                    title: "HEIC -> JPEG (forced format)",
+                    filename: "real_heic_4032x3024_o6_gps_hdr.heic",
+                    note: "Explicit JPEG output resizes HEIC for endpoints that only accept JPEG",
+                    compression: .process(
+                        lubanV2Process(
+                            output: WIImageOutput(representation: .jpeg())
+                        )
+                    )
+                ),
+                Sample(
+                    title: "HEIC photo - large landscape",
+                    filename: "real_heic_5712x4284_o6_gps_hdr.heic",
+                    note: "Luban 2 resizes and re-encodes a large HEIC photo for upload",
+                    compression: .process(lubanV2Process())
+                ),
+                Sample(
+                    title: "HEIC photo - circle cutout",
+                    filename: "real_heic_3001x2458_alpha_circle.heic",
+                    note: "Transparent HEIC artwork keeps its alpha channel while file size drops",
+                    compression: .process(lubanV2Process())
+                ),
+                Sample(
+                    title: "JPEG - landscape photo",
+                    filename: "real_jpeg_2098x1350_landscape.jpg",
+                    note: "Luban 2 produces the expected upload-size reduction for JPEG",
+                    compression: .process(lubanV2Process())
+                ),
+                Sample(
+                    title: "Target API - share thumbnail",
+                    filename: "real_jpeg_2098x1350_landscape.jpg",
+                    note: "A hard 32 KiB Target solves bytes and square geometry together",
+                    compression: .target(
+                        try WICompressionTarget(
+                            maxBytes: 32 * 1_024,
+                            sizing: WICompressionSizing(
+                                maximumPixelSize: 200,
+                                aspectRatio: .square
+                            ),
+                            output: WIImageOutput(
+                                representation: .jpeg(background: .white),
+                                metadata: .strip,
+                                colorSpace: .convert(to: .sRGB)
+                            )
+                        )
+                    )
+                ),
+                Sample(
+                    title: "PNG - panoramic screenshot",
+                    filename: "real_png_1928x464_pano.png",
+                    note: "Luban 2 keeps this ordinary panorama at full resolution",
+                    compression: .process(lubanV2Process())
+                ),
+                Sample(
+                    title: "PNG - alpha no-op case",
+                    filename: "real_png_1086x1630_alpha.png",
+                    note: "Luban 2 keeps the original pixels and the alpha channel remains intact",
+                    compression: .process(lubanV2Process())
+                ),
+            ]
+        }
+    }
 
-        drawText(
-            "WICompress 2.0 - Process and Target compression",
-            in: topRect(x: 60, y: 38, width: 1480, height: 44, canvasHeight: canvasHeight),
-            fontName: "HelveticaNeue-Bold",
-            size: 30,
-            color: CGColor(gray: 0.08, alpha: 1),
-            context: context
+    private static func lubanV2Process(
+        output: WIImageOutput = WIImageOutput()
+    ) -> WIImageProcess {
+        WIImageProcess(
+            sizing: .resize(using: WIImageResize.lubanV2),
+            output: output
         )
-        drawText(
-            "Generated from real fixtures through WICompressor. Ratio = original bytes ÷ result bytes.",
-            in: topRect(x: 60, y: 82, width: 1480, height: 24, canvasHeight: canvasHeight),
-            fontName: "HelveticaNeue",
-            size: 16,
-            color: CGColor(gray: 0.34, alpha: 1),
-            context: context
-        )
-        drawText(
-            "Original",
-            in: topRect(x: 610, y: 132, width: 340, height: 26, canvasHeight: canvasHeight),
-            fontName: "HelveticaNeue-Bold",
-            size: 18,
-            color: CGColor(gray: 0.18, alpha: 1),
-            context: context
-        )
-        drawText(
-            "Compressed",
-            in: topRect(x: 1060, y: 132, width: 360, height: 26, canvasHeight: canvasHeight),
-            fontName: "HelveticaNeue-Bold",
-            size: 18,
-            color: CGColor(gray: 0.18, alpha: 1),
-            context: context
-        )
+    }
 
-        for (index, renderedSample) in renderedSamples.enumerated() {
-            let sample = renderedSample.sample
-            let y = CGFloat(headerHeight + index * rowHeight)
-            drawCardBackground(
-                in: topRect(x: 40, y: y, width: 1520, height: CGFloat(cardHeight), canvasHeight: canvasHeight),
-                context: context
-            )
-
-            drawText(
-                sample.title,
-                in: topRect(x: 70, y: y + 30, width: 450, height: 28, canvasHeight: canvasHeight),
-                fontName: "HelveticaNeue-Bold",
-                size: 20,
-                color: CGColor(gray: 0.08, alpha: 1),
-                context: context
-            )
-            drawText(
-                sample.note,
-                in: topRect(x: 70, y: y + 66, width: 420, height: 48, canvasHeight: canvasHeight),
-                fontName: "HelveticaNeue",
-                size: 14,
-                color: CGColor(gray: 0.34, alpha: 1),
-                context: context
-            )
-
-            let ratio = Double(renderedSample.inputData.count) / max(Double(renderedSample.outputData.count), 1)
-            drawText(
-                "Ratio \(String(format: "%.2f", ratio))x",
-                in: topRect(x: 70, y: y + 126, width: 200, height: 24, canvasHeight: canvasHeight),
-                fontName: "Menlo-Bold",
-                size: 17,
-                color: CGColor(red: 0.10, green: 0.35, blue: 0.22, alpha: 1),
-                context: context
-            )
-
-            drawSummary(
-                renderedSample.original,
-                data: renderedSample.inputData,
-                in: topRect(x: 545, y: y + 34, width: 390, height: 200, canvasHeight: canvasHeight),
-                context: context
-            )
-            drawSummary(
-                renderedSample.compressed,
-                data: renderedSample.outputData,
-                in: topRect(x: 1000, y: y + 34, width: 390, height: 200, canvasHeight: canvasHeight),
-                context: context
-            )
+    private static func render(
+        _ sample: Sample,
+        fixtureURL: URL
+    ) throws -> RenderedSample {
+        let inputURL = fixtureURL.appendingPathComponent(sample.filename)
+        let inputData = try Data(contentsOf: inputURL)
+        let outputData: Data
+        switch sample.compression {
+        case .process(let process):
+            outputData = try WICompressor.process(inputData, using: process).data
+        case .target(let target):
+            outputData = try WICompressor.compress(inputData, to: target).data
         }
 
-        guard
-            let image = context.makeImage(),
-            let destination = CGImageDestinationCreateWithURL(outputURL as CFURL, "public.png" as CFString, 1, nil)
-        else {
-            fatalError("Failed to create output image")
-        }
-
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else {
-            fatalError("Failed to write output image")
-        }
-
-        print("Generated \(outputURL.path)")
+        return RenderedSample(
+            sample: sample,
+            inputData: inputData,
+            outputData: outputData,
+            original: try summarize(data: inputData, maxPixel: 300),
+            compressed: try summarize(data: outputData, maxPixel: 300)
+        )
     }
 }
 
-func summarize(data: Data, maxPixel: Int) throws -> ImageSummary {
+private func svgDocument(
+    for samples: [RenderedSample],
+    theme: AssetTheme
+) -> String {
+    let palette = theme.palette
+    let canvasHeight = headerHeight + samples.count * rowHeight + bottomPadding
+    var body: [String] = []
+
+    body.append(text("WICompress 2.0 - Luban 2 Process and Target compression", x: 60, y: 68, style: "headline"))
+    body.append(
+        text(
+            "Generated from real fixtures through WICompressor. Ratio = original bytes ÷ result bytes.",
+            x: 60,
+            y: 102,
+            style: "subtitle"
+        )
+    )
+    body.append(text("Original", x: 740, y: 151, style: "column", anchor: "middle"))
+    body.append(text("Compressed", x: 1_195, y: 151, style: "column", anchor: "middle"))
+
+    for (index, renderedSample) in samples.enumerated() {
+        let y = headerHeight + index * rowHeight
+        body.append(
+            "<rect class=\"card\" x=\"40\" y=\"\(y)\" width=\"1520\" height=\"\(cardHeight)\" rx=\"14\"/>"
+        )
+        body.append(text(renderedSample.sample.title, x: 70, y: y + 54, style: "card-title"))
+
+        for (lineIndex, line) in wrappedLines(renderedSample.sample.note, maximumCharacters: 58).enumerated() {
+            body.append(
+                text(
+                    line,
+                    x: 70,
+                    y: y + 88 + lineIndex * 20,
+                    style: "note"
+                )
+            )
+        }
+
+        let ratio = Double(renderedSample.inputData.count) / max(Double(renderedSample.outputData.count), 1)
+        body.append(
+            text(
+                "Ratio \(String(format: "%.2f", ratio))×",
+                x: 70,
+                y: y + 154,
+                style: "ratio"
+            )
+        )
+        body.append(
+            summary(
+                renderedSample.original,
+                byteCount: renderedSample.inputData.count,
+                x: 545,
+                y: y + 34,
+                identifier: "\(index)-original"
+            )
+        )
+        body.append(
+            summary(
+                renderedSample.compressed,
+                byteCount: renderedSample.outputData.count,
+                x: 1_000,
+                y: y + 34,
+                identifier: "\(index)-compressed"
+            )
+        )
+    }
+
+    return """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns="http://www.w3.org/2000/svg" width="\(canvasWidth)" height="\(canvasHeight)" viewBox="0 0 \(canvasWidth) \(canvasHeight)" role="img" aria-labelledby="title description">
+      <title id="title">WICompress 2.0 compression comparison using Luban 2</title>
+      <desc id="description">Real HEIC, JPEG, and PNG fixtures before and after Process or Target compression.</desc>
+      <defs>
+        <pattern id="checker" width="28" height="28" patternUnits="userSpaceOnUse">
+          <rect width="28" height="28" fill="\(palette.checkerLight)"/>
+          <path d="M0 0h14v14H0zM14 14h14v14H14z" fill="\(palette.checkerDark)"/>
+        </pattern>
+      </defs>
+      <style>
+        .headline { font: 700 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: \(palette.primaryText); }
+        .subtitle { font: 400 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: \(palette.secondaryText); }
+        .column { font: 700 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: \(palette.primaryText); }
+        .card-title { font: 700 20px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: \(palette.primaryText); }
+        .note { font: 400 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: \(palette.secondaryText); }
+        .ratio { font: 700 17px ui-monospace, SFMono-Regular, Menlo, monospace; fill: \(palette.accent); }
+        .facts { font: 400 14px ui-monospace, SFMono-Regular, Menlo, monospace; fill: \(palette.secondaryText); }
+        .card { fill: \(palette.card); stroke: \(palette.border); stroke-width: 1.5; }
+        .preview { fill: url(#checker); stroke: \(palette.checkerBorder); stroke-width: 1; }
+      </style>
+      <rect width="100%" height="100%" fill="\(palette.background)"/>
+      \(body.joined(separator: "\n  "))
+    </svg>
+    """
+}
+
+private func summary(
+    _ summary: ImageSummary,
+    byteCount: Int,
+    x: Int,
+    y: Int,
+    identifier: String
+) -> String {
+    let previewWidth = 390
+    let previewHeight = 190
+    let imageRect = aspectFitRect(
+        imageSize: CGSize(width: summary.thumbnail.width, height: summary.thumbnail.height),
+        boundingRect: CGRect(x: x, y: y, width: previewWidth, height: previewHeight)
+    )
+    let dataURI = "data:\(summary.thumbnailMediaType);base64,\(summary.thumbnailData.base64EncodedString())"
+    let label = "\(summary.format) · \(formatBytes(byteCount)) · \(Int(summary.displaySize.width))×\(Int(summary.displaySize.height))"
+
+    return """
+    <g id="preview-\(identifier)">
+      <rect class="preview" x="\(x)" y="\(y)" width="\(previewWidth)" height="\(previewHeight)"/>
+      <image href="\(dataURI)" x="\(number(imageRect.minX))" y="\(number(imageRect.minY))" width="\(number(imageRect.width))" height="\(number(imageRect.height))" preserveAspectRatio="xMidYMid meet"/>
+      \(text(label, x: x, y: y + 220, style: "facts"))
+    </g>
+    """
+}
+
+private func summarize(data: Data, maxPixel: Int) throws -> ImageSummary {
     guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
         throw NSError(domain: "GenerateDocAssets", code: 1)
     }
@@ -280,107 +368,101 @@ func summarize(data: Data, maxPixel: Int) throws -> ImageSummary {
     let width = intValue(properties[kCGImagePropertyPixelWidth]) ?? thumbnail.width
     let height = intValue(properties[kCGImagePropertyPixelHeight]) ?? thumbnail.height
     let orientation = intValue(properties[kCGImagePropertyOrientation]) ?? 1
-    let displaySize: CGSize
-    if [5, 6, 7, 8].contains(orientation) {
-        displaySize = CGSize(width: height, height: width)
-    } else {
-        displaySize = CGSize(width: width, height: height)
-    }
+    let hasAlpha = boolValue(properties[kCGImagePropertyHasAlpha]) ?? false
+    let displaySize = [5, 6, 7, 8].contains(orientation)
+        ? CGSize(width: height, height: width)
+        : CGSize(width: width, height: height)
+
+    let thumbnailEncoding = try encodedThumbnail(
+        thumbnail,
+        preservingAlpha: hasAlpha
+    )
 
     return ImageSummary(
-        data: data,
         thumbnail: thumbnail,
-        format: formatName(
-            forTypeIdentifier: CGImageSourceGetType(source) as String?
-        ),
+        thumbnailData: thumbnailEncoding.data,
+        thumbnailMediaType: thumbnailEncoding.mediaType,
+        format: formatName(forTypeIdentifier: CGImageSourceGetType(source) as String?),
         displaySize: displaySize
     )
 }
 
-func topRect(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat, canvasHeight: Int) -> CGRect {
-    CGRect(x: x, y: CGFloat(canvasHeight) - y - height, width: width, height: height)
-}
-
-func drawCardBackground(in rect: CGRect, context: CGContext) {
-    let path = CGPath(roundedRect: rect, cornerWidth: 10, cornerHeight: 10, transform: nil)
-    context.setFillColor(CGColor(gray: 1, alpha: 1))
-    context.addPath(path)
-    context.fillPath()
-    context.setStrokeColor(CGColor(gray: 0.87, alpha: 1))
-    context.setLineWidth(1)
-    context.addPath(path)
-    context.strokePath()
-}
-
-func drawSummary(_ summary: ImageSummary, data: Data, in rect: CGRect, context: CGContext) {
-    drawCheckerboard(in: rect, context: context)
-    let imageRect = aspectFitRect(
-        imageSize: CGSize(width: summary.thumbnail.width, height: summary.thumbnail.height),
-        boundingRect: rect
-    )
-    context.interpolationQuality = .high
-    context.draw(summary.thumbnail, in: imageRect)
-
-    let label = "\(summary.format) - \(formatBytes(data.count)) - \(Int(summary.displaySize.width))x\(Int(summary.displaySize.height))"
-    drawText(
-        label,
-        in: CGRect(x: rect.minX, y: rect.minY - 36, width: rect.width, height: 24),
-        fontName: "Menlo",
-        size: 14,
-        color: CGColor(gray: 0.24, alpha: 1),
-        context: context
-    )
-}
-
-func drawCheckerboard(in rect: CGRect, context: CGContext) {
-    context.setFillColor(CGColor(gray: 0.92, alpha: 1))
-    context.fill(rect)
-
-    let tile: CGFloat = 14
-    context.setFillColor(CGColor(gray: 0.82, alpha: 1))
-    var row = 0
-    var y = rect.minY
-    while y < rect.maxY {
-        var column = 0
-        var x = rect.minX
-        while x < rect.maxX {
-            if (row + column).isMultiple(of: 2) {
-                context.fill(CGRect(x: x, y: y, width: tile, height: tile))
-            }
-            x += tile
-            column += 1
-        }
-        y += tile
-        row += 1
+private func encodedThumbnail(
+    _ image: CGImage,
+    preservingAlpha: Bool
+) throws -> (data: Data, mediaType: String) {
+    let type: UTType = preservingAlpha ? .png : .jpeg
+    let data = NSMutableData()
+    guard
+        let destination = CGImageDestinationCreateWithData(
+            data,
+            type.identifier as CFString,
+            1,
+            nil
+        )
+    else {
+        throw NSError(domain: "GenerateDocAssets", code: 3)
     }
 
-    context.setStrokeColor(CGColor(gray: 0.78, alpha: 1))
-    context.setLineWidth(1)
-    context.stroke(rect)
+    let properties: [CFString: Any]? = preservingAlpha
+        ? nil
+        : [kCGImageDestinationLossyCompressionQuality: 0.86]
+    CGImageDestinationAddImage(
+        destination,
+        image,
+        properties.map { $0 as CFDictionary }
+    )
+    guard CGImageDestinationFinalize(destination) else {
+        throw NSError(domain: "GenerateDocAssets", code: 4)
+    }
+    return (
+        data: data as Data,
+        mediaType: preservingAlpha ? "image/png" : "image/jpeg"
+    )
 }
 
-func drawText(
-    _ text: String,
-    in rect: CGRect,
-    fontName: String,
-    size: CGFloat,
-    color: CGColor,
-    context: CGContext
-) {
-    let font = CTFontCreateWithName(fontName as CFString, size, nil)
-    let attributes: [CFString: Any] = [
-        kCTFontAttributeName: font,
-        kCTForegroundColorAttributeName: color,
-    ]
-    let attributedString = CFAttributedStringCreate(nil, text as CFString, attributes as CFDictionary)!
-    let framesetter = CTFramesetterCreateWithAttributedString(attributedString)
-    let path = CGPath(rect: rect, transform: nil)
-    let frame = CTFramesetterCreateFrame(framesetter, CFRangeMake(0, text.count), path, nil)
-    CTFrameDraw(frame, context)
+private func text(
+    _ value: String,
+    x: Int,
+    y: Int,
+    style: String,
+    anchor: String = "start"
+) -> String {
+    "<text class=\"\(style)\" x=\"\(x)\" y=\"\(y)\" text-anchor=\"\(anchor)\">\(xmlEscaped(value))</text>"
 }
 
-func aspectFitRect(imageSize: CGSize, boundingRect: CGRect) -> CGRect {
-    let scale = min(boundingRect.width / imageSize.width, boundingRect.height / imageSize.height)
+private func wrappedLines(
+    _ value: String,
+    maximumCharacters: Int
+) -> [String] {
+    var lines: [String] = []
+    var line = ""
+
+    for word in value.split(separator: " ").map(String.init) {
+        let candidate = line.isEmpty ? word : "\(line) \(word)"
+        if candidate.count <= maximumCharacters {
+            line = candidate
+        } else {
+            if !line.isEmpty {
+                lines.append(line)
+            }
+            line = word
+        }
+    }
+    if !line.isEmpty {
+        lines.append(line)
+    }
+    return Array(lines.prefix(3))
+}
+
+private func aspectFitRect(
+    imageSize: CGSize,
+    boundingRect: CGRect
+) -> CGRect {
+    let scale = min(
+        boundingRect.width / imageSize.width,
+        boundingRect.height / imageSize.height
+    )
     let width = imageSize.width * scale
     let height = imageSize.height * scale
     return CGRect(
@@ -391,14 +473,27 @@ func aspectFitRect(imageSize: CGSize, boundingRect: CGRect) -> CGRect {
     )
 }
 
-func formatBytes(_ byteCount: Int) -> String {
+private func number(_ value: CGFloat) -> String {
+    String(format: "%.2f", Double(value))
+}
+
+private func xmlEscaped(_ value: String) -> String {
+    value
+        .replacingOccurrences(of: "&", with: "&amp;")
+        .replacingOccurrences(of: "<", with: "&lt;")
+        .replacingOccurrences(of: ">", with: "&gt;")
+        .replacingOccurrences(of: "\"", with: "&quot;")
+        .replacingOccurrences(of: "'", with: "&apos;")
+}
+
+private func formatBytes(_ byteCount: Int) -> String {
     let formatter = ByteCountFormatter()
     formatter.allowedUnits = [.useKB, .useMB]
     formatter.countStyle = .file
     return formatter.string(fromByteCount: Int64(byteCount))
 }
 
-func formatName(forTypeIdentifier typeIdentifier: String?) -> String {
+private func formatName(forTypeIdentifier typeIdentifier: String?) -> String {
     guard let typeIdentifier, let type = UTType(typeIdentifier) else {
         return "Unknown"
     }
@@ -414,12 +509,24 @@ func formatName(forTypeIdentifier typeIdentifier: String?) -> String {
     return "Unknown"
 }
 
-func intValue(_ value: Any?) -> Int? {
-    if let value = value as? Int {
+private func intValue(_ value: Any?) -> Int? {
+    switch value {
+    case let value as Int:
         return value
-    }
-    if let value = value as? NSNumber {
+    case let value as NSNumber:
         return value.intValue
+    default:
+        return nil
     }
-    return nil
+}
+
+private func boolValue(_ value: Any?) -> Bool? {
+    switch value {
+    case let value as Bool:
+        return value
+    case let value as NSNumber:
+        return value.boolValue
+    default:
+        return nil
+    }
 }
